@@ -85,6 +85,6 @@ celerybeat-schedule-wal
 
 
 .no
-
+.ruff_cache
 
 

@@ -1,11 +1,9 @@
 # backend/app/config.py
 from functools import lru_cache
-from typing import List
-import os
 from pathlib import Path
+from typing import List
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
 
 # Абсолютный путь до backend/.env
 BASE_DIR = Path(__file__).resolve().parent.parent  # backend/
@@ -35,6 +33,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # ========== DATABASE ==========
+
     DB_HOST: str
     DB_PORT: str
     DB_USER: str
@@ -73,7 +72,7 @@ def get_settings() -> Settings:
     return Settings()
 
 
-# if __name__ == "__main__":
-#     settings = get_settings()
-#     print("ENV_FILE:", ENV_FILE)
-#     print("DATABASE_URL:", settings.DATABASE_URL)
+if __name__ == "__main__":
+    settings = get_settings()
+    print("ENV_FILE:", ENV_FILE)
+    print("DATABASE_URL:", settings.DATABASE_URL)
