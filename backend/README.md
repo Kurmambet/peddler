@@ -37,3 +37,15 @@ curl <http://127.0.0.1:8000/api/v1/messages/3> ^
 -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiaWF0IjoxNzY0NTE3ODQ0LCJleHAiOjE3NjUxMjI2NDR9.eMGWxI4wKat_rD8ist774O2iMWN-lfB4o0OnzdrnUXs"
 
 [{"content":"Привет, как дела?","id":1,"sender_id":2,"receiver_id":3,"is_read":false,"created_at":"2025-11-30T15:52:08.679220Z"}]
+
+пометить как прочитанное:
+curl -X POST <http://127.0.0.1:8000/api/v1/auth/login> ^
+-H "Content-Type: application/json" ^
+-d "{\"username\": \"userB\", \"password\": \"passB12345\"}"
+
+{"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwiaWF0IjoxNzY0NTI0MjA3LCJleHAiOjE3NjUxMjkwMDd9.oomH3J1GY5Umaw5GJrBPx_6DJ4zr53Iray30dTrJMw4","token_type":"bearer"}
+
+curl -X POST <http://127.0.0.1:8000/api/v1/messages/1/read> ^
+-H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzIiwiaWF0IjoxNzY0NTI0MjA3LCJleHAiOjE3NjUxMjkwMDd9.oomH3J1GY5Umaw5GJrBPx_6DJ4zr53Iray30dTrJMw4"
+
+{"content":"Привет, как дела?","id":1,"sender_id":2,"receiver_id":3,"is_read":true,"created_at":"2025-11-30T15:52:08.679220Z"}

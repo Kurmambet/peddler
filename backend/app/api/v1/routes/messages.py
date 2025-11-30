@@ -67,3 +67,39 @@ async def get_dialog(
     )
     messages = result.scalars().all()  # списки типа list[Message]
     return messages  # -> list[MessageRead]
+
+
+@router.post("/messages/{message_id}/read", response_model=MessageRead)
+async def mark_message_read(
+    message_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> MessageRead:
+    # 1. найти сообщение, которое адресовано текущему пользователю
+    result = await db.execute(
+        select(Message).where(
+            and_(
+                Message.id == message_id,
+                Message.receiver_id == current_user.id,
+            )
+        )
+    )
+    msg = result.scalars().first()
+
+    if msg is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # 2. пометить как прочитанное
+    msg.is_read = True
+
+    # await db.execute(
+    #     update(Message)
+    #     .where(Message.id == message_id)
+    #     .values(is_read=True)
+    # )
+
+    # 3. сохранить изменения
+    await db.commit()  # UPDATE в БД
+    await db.refresh(msg)
+
+    return msg
