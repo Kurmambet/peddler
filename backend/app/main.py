@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import get_settings
 from app.database import close_db, init_db
 
+from .api.v1 import api_router
+
 settings = get_settings()
 
 
@@ -37,3 +39,6 @@ app.add_middleware(
 @app.get("/health")
 async def health():
     return {"status": "ok", "app": settings.APP_NAME}
+
+
+app.include_router(api_router, prefix="/api/v1")
