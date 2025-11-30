@@ -1,13 +1,14 @@
 # app/api/v1/routes/auth.py
+from app.api.dependencies import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import UserCreate, UserRead
-from app.utils.security import hash_password, verify_password
+from app.schemas.user import Token, UserCreate, UserRead
+from app.utils.security import create_access_token, decode_token, hash_password, verify_password
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(tags=["auth"])
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -36,7 +37,8 @@ async def register_user(
     return db_user  # Pydantic сам превратит в UserRead через from_attributes
 
 
-@router.post("/login")
+# oauth2_scheme
+@router.post("/login", response_model=Token)
 async def login_user(
     user_in: UserCreate,  # username + password
     db: AsyncSession = Depends(get_db),
@@ -57,5 +59,17 @@ async def login_user(
             detail="Incorrect username or password",
         )
 
-    # 3. пока просто вернём что логин ок (потом сюда прикрутим JWT)
-    return {"message": "Login successful", "user_id": db_user.id, "username": db_user.username}
+    # создаём токен, в subject кладём user_id (можно username)
+    access_token = create_access_token(subject=str(db_user.id))
+
+    return Token(access_token=access_token)
+
+
+@router.post("/debug-token")
+async def debug_token(token: str):
+    return decode_token(token)
+
+
+@router.get("/me", response_model=UserRead)
+async def read_me(current_user: User = Depends(get_current_user)):
+    return current_user

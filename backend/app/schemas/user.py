@@ -19,3 +19,8 @@ class UserRead(UserBase):
 
     class Config:
         from_attributes = True  # Pydantic v2: позволяет создавать из ORM-объектов
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
