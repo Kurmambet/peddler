@@ -1,6 +1,14 @@
 import os
 
-EXCLUDE_DIRS = {".git", ".venv", "__pycache__", "node_modules", ".idea", ".vscode"}
+EXCLUDE_DIRS = {
+    ".ruff_cache",
+    ".git",
+    ".venv",
+    "__pycache__",
+    "node_modules",
+    ".idea",
+    ".vscode",
+}
 
 for root, dirs, files in os.walk("."):
     # фильтруем директории

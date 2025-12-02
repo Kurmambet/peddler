@@ -1,5 +1,6 @@
 # app/schemas/message.py
 from datetime import datetime
+from typing import List
 
 from pydantic import BaseModel, Field
 
@@ -9,15 +10,21 @@ class MessageBase(BaseModel):
 
 
 class MessageCreate(MessageBase):
-    receiver_id: int
+    chat_id: int = Field(..., ge=1)
 
 
 class MessageRead(MessageBase):
     id: int
+    chat_id: int
     sender_id: int
-    receiver_id: int
     is_read: bool
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class MessageListResponse(BaseModel):
+    messages: List[MessageRead]
+    has_more: bool = False
+    next_offset: int | None = None

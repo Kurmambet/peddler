@@ -1,32 +1,54 @@
-from typing import List
+# app/api/v1/routes/messages.py
 
 from app.api.dependencies import get_current_user
 from app.database import get_db
+from app.models.chat import Chat, ChatParticipant
 from app.models.message import Message
 from app.models.user import User
-from app.schemas.message import MessageCreate, MessageRead
+from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["messages"])
 
 
-@router.post("/messages", response_model=MessageRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/chats/{chat_id}/messages", response_model=MessageRead, status_code=status.HTTP_201_CREATED
+)
 async def send_message(
+    chat_id: int,
     msg_in: MessageCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> MessageRead:
-    # можно проверить, что получатель существует (по желанию)
-    result = await db.execute(select(User).where(User.id == msg_in.receiver_id))
-    receiver = result.scalars().first()
-    if receiver is None:
-        raise HTTPException(status_code=404, detail="Receiver not found")
+) -> Message:
+    """
+    Отправляет сообщение в чат. Проверяет, что пользователь является участником чата.
+    """
+    # Проверяем, что chat_id существует и пользователь в нём участник
+    chat_result = await db.execute(
+        select(Chat)
+        .join(ChatParticipant)
+        .where(
+            and_(
+                Chat.id == chat_id,
+                ChatParticipant.user_id == current_user.id,
+            )
+        )
+    )
+    chat = chat_result.scalar_one_or_none()
 
+    if not chat:
+        raise HTTPException(status_code=403, detail="You are not a participant of this chat")
+
+    # Проверяем, что chat_id в запросе совпадает
+    if msg_in.chat_id != chat_id:
+        raise HTTPException(status_code=400, detail="chat_id mismatch")
+
+    # Создаём сообщение
     db_msg = Message(
+        chat_id=chat_id,
         sender_id=current_user.id,
-        receiver_id=msg_in.receiver_id,
         content=msg_in.content,
     )
     db.add(db_msg)
@@ -35,71 +57,54 @@ async def send_message(
     return db_msg
 
 
-@router.get("/messages/{other_user_id}", response_model=List[MessageRead])
-async def get_dialog(
-    other_user_id: int,
+@router.get("/chats/{chat_id}/messages", response_model=MessageListResponse)
+async def get_chat_messages(
+    chat_id: int,
+    limit: int = 50,
+    offset: int = 0,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-) -> list[MessageRead]:
+) -> MessageListResponse:
     """
-    SELECT * FROM messages
-    WHERE
-        (sender_id = :current_user_id AND receiver_id = :other_id)
-        OR
-        (sender_id = :other_id AND receiver_id = :current_user_id)
-    ORDER BY created_at ASC;
+    Возвращает сообщения из чата. Проверяет права доступа.
     """
-    result = await db.execute(
-        select(Message)
+    # Проверяем доступ к чату
+    chat_result = await db.execute(
+        select(Chat)
+        .join(ChatParticipant)
         .where(
-            or_(
-                and_(
-                    Message.sender_id == current_user.id,
-                    Message.receiver_id == other_user_id,
-                ),
-                and_(
-                    Message.sender_id == other_user_id,
-                    Message.receiver_id == current_user.id,
-                ),
-            )
-        )
-        .order_by(Message.created_at.asc())
-    )
-    messages = result.scalars().all()  # списки типа list[Message]
-    return messages  # -> list[MessageRead]
-
-
-@router.post("/messages/{message_id}/read", response_model=MessageRead)
-async def mark_message_read(
-    message_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> MessageRead:
-    # 1. найти сообщение, которое адресовано текущему пользователю
-    result = await db.execute(
-        select(Message).where(
             and_(
-                Message.id == message_id,
-                Message.receiver_id == current_user.id,
+                Chat.id == chat_id,
+                ChatParticipant.user_id == current_user.id,
             )
         )
     )
-    msg = result.scalars().first()
+    chat = chat_result.scalar_one_or_none()
 
-    if msg is None:
-        raise HTTPException(status_code=404, detail="Message not found")
+    if not chat:
+        raise HTTPException(status_code=403, detail="You are not a participant of this chat")
 
-    # 2. пометить как прочитанное
-    msg.is_read = True
+    # Получаем сообщения
+    stmt = (
+        select(Message)
+        .where(Message.chat_id == chat_id)
+        .where(Message.is_deleted == False)
+        .order_by(Message.created_at.desc())
+        .limit(limit + 1)  # +1 для определения has_more
+        .offset(offset)
+    )
 
-    # await db.execute(
-    #     update(Message)
-    #     .where(Message.id == message_id)
-    #     .values(is_read=True)
-    # )
+    result = await db.execute(stmt)
+    messages = result.scalars().all()
 
-    # 3. сохранить изменения
-    await db.commit()  # UPDATE в БД
-    await db.refresh(msg)
+    # Проверяем, есть ли ещё сообщения
+    has_more = len(messages) > limit
+    if has_more:
+        messages = messages[:-1]  # Убираем лишнее
 
-    return msg
+    # Переворачиваем для хронологического порядка (старые сначала)
+    messages = messages[::-1]
+
+    return MessageListResponse(
+        messages=messages, has_more=has_more, next_offset=offset + len(messages)
+    )

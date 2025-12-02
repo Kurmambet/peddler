@@ -1,4 +1,14 @@
-from app.schemas.message import MessageBase, MessageCreate, MessageRead
+# app/schemas/__init__.py
+from app.schemas.chat import (
+    ChatCreate,
+    ChatParticipantBase,
+    ChatParticipantRead,
+    ChatRead,
+    DirectChatCreate,
+    DirectChatRead,
+    GroupChatCreate,
+)
+from app.schemas.message import MessageBase, MessageCreate, MessageListResponse, MessageRead
 from app.schemas.user import UserBase, UserCreate, UserRead
 
 __all__ = [
@@ -8,4 +18,12 @@ __all__ = [
     "MessageBase",
     "MessageCreate",
     "MessageRead",
+    "MessageListResponse",
+    "ChatRead",
+    "ChatCreate",
+    "DirectChatCreate",
+    "DirectChatRead",
+    "GroupChatCreate",
+    "ChatParticipantBase",
+    "ChatParticipantRead",
 ]

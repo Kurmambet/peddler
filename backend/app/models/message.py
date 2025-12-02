@@ -1,22 +1,23 @@
 # app/models/message.py
-# from typing import Optional
-
 from sqlalchemy import Boolean, ForeignKey, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
 
+# from app.models.chat import Chat
+# from app.models.user import User
+
 
 class Message(BaseModel):
     __tablename__ = "messages"
 
-    sender_id: Mapped[int] = mapped_column(
+    chat_id: Mapped[int] = mapped_column(
         Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
+        ForeignKey("chats.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
-    receiver_id: Mapped[int] = mapped_column(
+    sender_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
@@ -26,14 +27,16 @@ class Message(BaseModel):
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
 
+    chat: Mapped["Chat"] = relationship(
+        "Chat",
+        back_populates="messages",
+        foreign_keys=[chat_id],
+    )
     sender: Mapped["User"] = relationship(
+        "User",
         back_populates="sent_messages",
         foreign_keys=[sender_id],
     )
-    receiver: Mapped["User"] = relationship(
-        back_populates="received_messages",
-        foreign_keys=[receiver_id],
-    )
 
     def __repr__(self) -> str:
-        return f"<Message id={self.id} sender_id={self.sender_id} receiver_id={self.receiver_id}>"
+        return f"<Message id={self.id} chat_id={self.chat_id} sender_id={self.sender_id}>"
