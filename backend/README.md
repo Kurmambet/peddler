@@ -23,6 +23,19 @@ taskkill /PID 8200 /F
 Успешно: Процесс, с идентификатором 8200, успешно завершен.
 ```
 
+создание миграций alembic
+
+```bash
+# Автогенерация миграции на основе моделей
+alembic revision --autogenerate -m "Initial migration"
+
+# Проверьте созданный файл в alembic/versions/
+
+# Применить миграцию
+alembic upgrade head
+
+```
+
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/auth/register ^
 -H "Content-Type: application/json" ^
