@@ -1,7 +1,18 @@
-(backend) C:\projects\peddler\peddler\backend>uv add fastapi sqlalchemy uvicorn[standard] daphne asyncpg alembic python-jose[cryptography] passlib python-dotenv redis aioredis pydantic pydantic-settings python-dateutil pytest pytest-asyncio httpx black flake8 mypy
+(backend) C:\projects\peddler\peddler\backend>uv add fastapi sqlalchemy uvicorn[standard] daphne asyncpg alembic python-jose[cryptography] passlib python-dotenv redis aioredis pydantic pydantic-settings python-dateutil pytest pytest-asyncio httpx black
 
 ```bash
 uv run uvicorn app.main:app --reload
+
+python app/ws/test_websocket.py
+```
+
+```bash
+docker-compose -f docker-compose.dev.yml up -d
+docker ps
+docker exec -it peddler-redis-dev redis-cli ping
+docker-compose -f docker-compose.dev.yml down
+
+docker exec -it peddler-redis-dev redis-cli MONITOR
 ```
 
 ```bash
@@ -10,6 +21,19 @@ uvicorn.exe 8200 Console 5 4 548 КБ
 
 taskkill /PID 8200 /F
 Успешно: Процесс, с идентификатором 8200, успешно завершен.
+```
+
+создание миграций alembic
+
+```bash
+# Автогенерация миграции на основе моделей
+alembic revision --autogenerate -m "Initial migration"
+
+# Проверьте созданный файл в alembic/versions/
+
+# Применить миграцию
+alembic upgrade head
+
 ```
 
 ```bash

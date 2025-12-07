@@ -1,3 +1,4 @@
+# backend\app\core\exceptions.py
 from fastapi import HTTPException, status
 
 
