@@ -24,12 +24,14 @@ from app.ws.events import (
     TypingIndicatorEvent,
 )
 from app.ws.manager import ConnectionManager
+from app.ws.pubsub import RedisPubSubManager
 
 logger = logging.getLogger(__name__)
 
 # Создаем единственный экземпляр ConnectionManager
 # Он будет жить все время работы приложения
 manager = ConnectionManager()  #  глобальный singleton
+pubsub_manager = RedisPubSubManager(manager)
 
 router = APIRouter()
 
@@ -77,6 +79,10 @@ async def websocket_endpoint(
     # Шаг 3: Регистрация соединения
     # ========================================================================
     await manager.connect(websocket, chat_id, user.id)
+
+    # Подписываемся на Redis канал этого чата
+    await pubsub_manager.subscribe_to_chat(chat_id)
+
     logger.info(f"User {user.id} ({user.username}) connected to chat {chat_id}")
 
     # ========================================================================
@@ -119,6 +125,11 @@ async def websocket_endpoint(
         # Шаг 6: Очистка при любом выходе из цикла
         # ====================================================================
         await manager.disconnect(websocket, chat_id, user.id)
+
+        # Отписываемся, если это был последний клиент в этом чате на воркере
+        if manager.get_chat_participant_count(chat_id) == 0:
+            await pubsub_manager.unsubscribe_from_chat(chat_id)
+
         logger.info(f"Cleaned up connection for user {user.id} in chat {chat_id}")
 
 
@@ -207,7 +218,10 @@ async def handle_send_message(
     )
 
     # Отправляем всем участникам чата (включая отправителя)
-    await manager.broadcast_to_chat(chat_id, message_event.model_dump_json())
+    # await manager.broadcast_to_chat(chat_id, message_event.model_dump_json())
+
+    # публикуем в Redis вместо прямого broadcast
+    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
 
     logger.info(f"Message {message.id} sent by user {user.id} to chat {chat_id}")
 
@@ -225,8 +239,8 @@ async def handle_typing_start(user: User, chat_id: int, websocket: WebSocket):
     # Формируем событие для других участников
     typing_event = TypingIndicatorEvent(user_id=user.id, username=user.username, is_typing=True)
 
-    # Broadcast всем В чате
-    await manager.broadcast_to_chat(chat_id, typing_event.model_dump_json())
+    # публикуем в Redis вместо manager.broadcast_to_chat
+    await pubsub_manager.publish_to_chat(chat_id, typing_event.model_dump_json())
 
     # Можно также отправить отправителю подтверждение (опционально)
     # await manager.send_personal_message(..., websocket)
@@ -240,7 +254,7 @@ async def handle_typing_stop(user: User, chat_id: int, websocket: WebSocket):
     """
     typing_event = TypingIndicatorEvent(user_id=user.id, username=user.username, is_typing=False)
 
-    await manager.broadcast_to_chat(chat_id, typing_event.model_dump_json())
+    await pubsub_manager.publish_to_chat(chat_id, typing_event.model_dump_json())
 
     logger.debug(f"User {user.id} stopped typing in chat {chat_id}")
 
@@ -278,6 +292,6 @@ async def handle_mark_read(
     )
 
     # Отправляем всем участникам (чтобы отправитель увидел, что прочитано)
-    await manager.broadcast_to_chat(chat_id, read_event.model_dump_json())
+    await pubsub_manager.publish_to_chat(chat_id, read_event.model_dump_json())
 
     logger.info(f"Message {message.id} marked as read by user {user.id}")

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import close_db, init_db
+from app.ws import pubsub_manager
 from app.ws import router as ws_router
 
 from .api.v1 import api_router
@@ -15,10 +16,14 @@ settings = get_settings()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Startup and shutdown events."""
     # startup
     await init_db()
+    await pubsub_manager.connect()
     yield
+
     # shutdown
+    await pubsub_manager.disconnect()
     await close_db()
 
 

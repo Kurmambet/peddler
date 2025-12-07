@@ -6,11 +6,12 @@ from app.ws.events import (
     MessageCreatedEvent,
     SendMessageEvent,
 )
-from app.ws.router import manager, router
+from app.ws.router import manager, pubsub_manager, router
 
 __all__ = [
     "router",
     "manager",
+    "pubsub_manager",
     "EventType",
     "SendMessageEvent",
     "MessageCreatedEvent",
