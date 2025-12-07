@@ -25,6 +25,7 @@ from app.ws.events import (
 )
 from app.ws.manager import ConnectionManager
 from app.ws.pubsub import RedisPubSubManager
+from app.ws.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,8 @@ manager = ConnectionManager()  #  глобальный singleton
 pubsub_manager = RedisPubSubManager(manager)
 
 router = APIRouter()
+
+rate_limiter = RateLimiter(max_requests=5, window_seconds=1)
 
 
 @router.websocket("/chats/{chat_id}")
@@ -75,10 +78,13 @@ async def websocket_endpoint(
         )
         return
 
+    connected = False
+
     # ========================================================================
     # Шаг 3: Регистрация соединения
     # ========================================================================
     await manager.connect(websocket, chat_id, user.id)
+    connected = True
 
     # Подписываемся на Redis канал этого чата
     await pubsub_manager.subscribe_to_chat(chat_id)
@@ -114,23 +120,29 @@ async def websocket_endpoint(
         # Неожиданная ошибка в цикле обработки
         logger.error(f"WebSocket error for user {user.id} in chat {chat_id}: {e}")
         # Отправляем ошибку клиенту, если соединение еще живо
-        try:
-            error_event = ErrorEvent(code="INTERNAL_ERROR", message="An unexpected error occurred")
-            await manager.send_personal_message(error_event.model_dump_json(), websocket)
-        except:
-            pass
+        if connected:
+            try:
+                error_event = ErrorEvent(
+                    code="INTERNAL_ERROR", message="An unexpected error occurred"
+                )
+                await manager.send_personal_message(error_event.model_dump_json(), websocket)
+            except Exception as send_error:
+                logger.debug(
+                    f"Failed to send error event (connection already closed): {send_error}"
+                )
 
     finally:
         # ====================================================================
         # Шаг 6: Очистка при любом выходе из цикла
         # ====================================================================
-        await manager.disconnect(websocket, chat_id, user.id)
+        if connected:
+            await manager.disconnect(websocket, chat_id, user.id)
 
-        # Отписываемся, если это был последний клиент в этом чате на воркере
-        if manager.get_chat_participant_count(chat_id) == 0:
-            await pubsub_manager.unsubscribe_from_chat(chat_id)
+            # Отписываемся, если это был последний клиент в этом чате на воркере
+            if manager.get_chat_participant_count(chat_id) == 0:
+                await pubsub_manager.unsubscribe_from_chat(chat_id)
 
-        logger.info(f"Cleaned up connection for user {user.id} in chat {chat_id}")
+            logger.info(f"Cleaned up connection for user {user.id} in chat {chat_id}")
 
 
 async def handle_client_event(
@@ -197,6 +209,12 @@ async def handle_send_message(
     2. Создает сообщение через MessageService
     3. Broadcast MessageCreatedEvent всем участникам чата
     """
+
+    if not await rate_limiter.is_allowed(user.id):
+        error_event = ErrorEvent(code="RATE_LIMIT_EXCEEDED", message="Too many messages, slow down")
+        await manager.send_personal_message(error_event.model_dump_json(), websocket)
+        return
+
     # Валидация Pydantic
     event = SendMessageEvent(**data)
 

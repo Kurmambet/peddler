@@ -76,7 +76,7 @@ class ConnectionManager:
         try:
             await websocket.send_text(message)
         except Exception as e:
-            logger.error(f"Failed to send personal message: {e}")
+            logger.debug(f"Failed to send personal message (connection likely closed): {e}")
 
     async def broadcast_to_chat(self, chat_id: int, message: str):
         """
@@ -93,7 +93,7 @@ class ConnectionManager:
             try:
                 await websocket.send_text(message)
             except Exception as e:
-                logger.error(f"Failed to broadcast to chat {chat_id}: {e}")
+                logger.debug(f"Failed to send to websocket in chat {chat_id}: {e}")
                 # Помечаем сокет как мертвый для очистки
                 dead_connections.append(websocket)
 
@@ -102,6 +102,8 @@ class ConnectionManager:
             async with self._lock:
                 for ws in dead_connections:
                     self.active_connections.get(chat_id, set()).discard(ws)
+
+            logger.debug(f"Cleaned up {len(dead_connections)} dead connections from chat {chat_id}")
 
     def get_chat_participant_count(self, chat_id: int) -> int:
         """Get number of active connections in a chat."""

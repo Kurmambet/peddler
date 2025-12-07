@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     DB_NAME: str
     DB_ECHO: bool = False  # Логировать SQL queries
 
+    REDIS_URL: str = "redis://localhost:6379"
+    USE_REDIS_PUBSUB: bool = True
+
     @property
     def DATABASE_URL(self) -> str:
         return (

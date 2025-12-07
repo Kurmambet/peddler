@@ -1,4 +1,3 @@
-# backend/app/ws/test_websocket.py
 import asyncio
 import json
 
@@ -8,16 +7,18 @@ import websockets
 # Конфигурация
 BASE_URL = "http://localhost:8000"
 WS_URL = "ws://localhost:8000"
-USERNAME = "userA"  # Ваш существующий пользователь
-PASSWORD = "passA12345"
-CHAT_ID = 1  # Существующий чат, где вы участник
+
+# ✅ ДВА разных пользователя
+USER1 = {"username": "userA", "password": "passA12345"}
+USER2 = {"username": "userB", "password": "passB12345"}
+CHAT_ID = 1
 
 
-async def get_token():
-    """Получить JWT токен через HTTP API."""
+async def get_token(username: str, password: str):
+    """Получить JWT токен для конкретного пользователя."""
     async with httpx.AsyncClient() as client:
         response = await client.post(
-            f"{BASE_URL}/api/v1/auth/login", json={"username": USERNAME, "password": PASSWORD}
+            f"{BASE_URL}/api/v1/auth/login", json={"username": username, "password": password}
         )
         response.raise_for_status()
         data = response.json()
@@ -28,7 +29,7 @@ async def test_websocket():
     """Тестирует WebSocket соединение и отправку сообщения."""
 
     print("🔑 Getting auth token...")
-    token = await get_token()
+    token = await get_token(USER1["username"], USER1["password"])
     print(f"✅ Token received: {token[:20]}...")
 
     uri = f"{WS_URL}/api/v1/ws/chats/{CHAT_ID}?token={token}"
@@ -48,11 +49,10 @@ async def test_websocket():
         # 3. Отправляем сообщение
         print("\n💬 Sending message...")
         await ws.send(
-            json.dumps({"type": "send_message", "content": "Hello from WebSocket test! 🚀"})
+            json.dumps({"type": "send_message", "content": f"Hello from {USER1['username']}! 🚀"})
         )
 
-        # 4. Получаем typing indicator (может прийти, если кто-то еще подключен)
-        # и message_created
+        # 4. Получаем события
         for i in range(2):
             response = await asyncio.wait_for(ws.recv(), timeout=5.0)
             event = json.loads(response)
@@ -62,46 +62,71 @@ async def test_websocket():
         print("\n⌨️  Sending typing_stop...")
         await ws.send(json.dumps({"type": "typing_stop"}))
 
-        # 6. Помечаем сообщение как прочитанное (нужен message_id из предыдущего ответа)
-        # Для упрощения пропускаем, но можно добавить
-
         print("\n✅ Test completed successfully!")
 
 
 async def test_multiple_clients():
-    """Тестирует broadcast между двумя клиентами."""
-    print("🔑 Getting auth token...")
-    token = await get_token()
+    """Тестирует broadcast между двумя РАЗНЫМИ пользователями."""
+    print("🔑 Getting auth tokens for both users...")
 
-    uri = f"{WS_URL}/api/v1/ws/chats/{CHAT_ID}?token={token}"
+    # ✅ Два разных токена для двух пользователей
+    token1 = await get_token(USER1["username"], USER1["password"])
+    token2 = await get_token(USER2["username"], USER2["password"])
+
+    print(f"✅ User 1 token: {token1[:20]}...")
+    print(f"✅ User 2 token: {token2[:20]}...")
+
+    uri1 = f"{WS_URL}/api/v1/ws/chats/{CHAT_ID}?token={token1}"
+    uri2 = f"{WS_URL}/api/v1/ws/chats/{CHAT_ID}?token={token2}"
 
     async def client1():
-        async with websockets.connect(uri) as ws:
+        async with websockets.connect(uri1) as ws:
             await ws.recv()  # Connected event
-            print("👤 Client 1: Connected")
+            print(f"👤 Client 1 ({USER1['username']}): Connected")
+
+            # Ждем, чтобы Client 2 тоже подключился
+            await asyncio.sleep(0.5)
 
             # Отправляем сообщение
-            await ws.send(json.dumps({"type": "send_message", "content": "Message from Client 1"}))
+            print("👤 Client 1: Sending message...")
+            await ws.send(
+                json.dumps({"type": "send_message", "content": f"Hello from {USER1['username']}!"})
+            )
 
-            # Получаем подтверждение
+            # Получаем подтверждение (message_created для себя)
             response = await ws.recv()
             event = json.loads(response)
             print(f"👤 Client 1 received: {event['type']}")
 
             await asyncio.sleep(2)
+            print("👤 Client 1: Disconnecting")
 
     async def client2():
-        await asyncio.sleep(0.5)  # Подключаемся чуть позже
-        async with websockets.connect(uri) as ws:
+        await asyncio.sleep(0.3)  # Подключаемся чуть позже
+        async with websockets.connect(uri2) as ws:
             await ws.recv()  # Connected event
-            print("👥 Client 2: Connected")
+            print(f"👥 Client 2 ({USER2['username']}): Connected")
 
-            # Ждем сообщение от Client 1
-            response = await asyncio.wait_for(ws.recv(), timeout=3.0)
-            event = json.loads(response)
-            print(f"👥 Client 2 received: {event['type']} - '{event.get('content', '')}'")
+            # Ждем сообщение от Client 1 через Redis pub/sub
+            try:
+                response = await asyncio.wait_for(ws.recv(), timeout=5.0)
+                event = json.loads(response)
+                print(
+                    f"👥 Client 2 received: {event['type']} from user {event.get('sender_username', 'unknown')}"
+                )
+                print(f"   Content: '{event.get('content', '')}'")
+
+                # Проверяем, что это сообщение от другого пользователя
+                if event.get("sender_username") == USER1["username"]:
+                    print("✅ Cross-client broadcast via Redis works!")
+                else:
+                    print("⚠️  Received unexpected sender")
+
+            except asyncio.TimeoutError:
+                print("❌ Client 2: Timeout waiting for message from Client 1")
 
             await asyncio.sleep(2)
+            print("👥 Client 2: Disconnecting")
 
     print("\n🧪 Testing broadcast between 2 clients...\n")
     await asyncio.gather(client1(), client2())
@@ -113,7 +138,6 @@ if __name__ == "__main__":
     print("WebSocket Test Suite")
     print("=" * 60)
 
-    # Выберите тест
     print("\n1. Single client test")
     print("2. Multiple clients broadcast test")
     choice = input("\nSelect test (1 or 2): ").strip()
