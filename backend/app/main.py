@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import close_db, init_db
+from app.ws import router as ws_router
 
 from .api.v1 import api_router
 
@@ -42,3 +43,4 @@ async def health():
 
 
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(ws_router, prefix="/api/v1/ws", tags=["websocket"])
