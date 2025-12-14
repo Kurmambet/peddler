@@ -1,6 +1,5 @@
 // frontend/src/ws/client.ts
 
-import { ref } from "vue";
 import type { WSEvent } from "../types/events";
 
 export class WebSocketClient {
@@ -11,34 +10,13 @@ export class WebSocketClient {
   private reconnectDelay: number = 1000;
   private messageQueue: any[] = [];
   private eventHandlers = new Map<string, Function[]>();
-  private connected = ref(false);
+  private connected: boolean = false;  // ✅ ПРОСТОЙ ПРИМИТИВ, не ref()
 
   get isConnected(): boolean {
-    console.log(
-      `[WebSocketClient] isConnected getter called. Type: ${typeof this.connected}, Value: ${this.connected}`
-    );
-    if (typeof this.connected !== "object" || !this.connected?.value !== undefined) {
-      console.error(
-        "[WebSocketClient] ❌ CRITICAL: connected is not a Ref! It is:",
-        this.connected
-      );
-    }
-    return this.connected.value;
+    return this.connected;
   }
 
   constructor(chatId: number, token: string) {
-    // ДИАГНОСТИКА: проверяем типы прямо в конструкторе
-    console.log(
-      `[WebSocketClient] Constructor: connected type = ${typeof this.connected}`
-    );
-    console.log(
-      `[WebSocketClient] Constructor: connected.value type = ${typeof this.connected.value}`
-    );
-    console.log(
-      "[WebSocketClient] Constructor: connected object:",
-      this.connected
-    );
-
     let wsProtocol = import.meta.env.VITE_WS_PROTOCOL || "ws";
     let wsHost = import.meta.env.VITE_WS_HOST || "localhost:8000";
 
@@ -66,31 +44,7 @@ export class WebSocketClient {
 
         this.ws.onopen = () => {
           console.log("[WebSocketClient] 🎉 onopen fired!");
-          console.log(
-            "[WebSocketClient] Before assignment - connected type:",
-            typeof this.connected
-          );
-          console.log(
-            "[WebSocketClient] Before assignment - connected object:",
-            this.connected
-          );
-
-          try {
-            this.connected.value = true;
-            console.log("[WebSocketClient] ✅ Successfully set connected.value = true");
-          } catch (err) {
-            console.error(
-              "[WebSocketClient] ❌ ERROR assigning to connected.value:",
-              err
-            );
-            console.error(
-              "[WebSocketClient] this.connected is:",
-              this.connected
-            );
-            reject(err);
-            return;
-          }
-
+          this.connected = true;  // ✅ ПРОСТОЕ ПРИСВОЕНИЕ
           this.reconnectAttempts = 0;
           console.log(
             "[WebSocketClient] ✅ Connected, flushing message queue..."
@@ -103,7 +57,7 @@ export class WebSocketClient {
           console.log(
             `[WebSocketClient] 🔌 onclose fired: code=${event.code} reason=${event.reason}`
           );
-          this.connected.value = false;
+          this.connected = false;
           if (event.code !== 1000 && event.code !== 1001) {
             console.warn(
               "[WebSocketClient] ⚠️ Unexpected close, attempting reconnect..."
@@ -114,7 +68,7 @@ export class WebSocketClient {
 
         this.ws.onerror = (error) => {
           console.error("[WebSocketClient] ❌ onerror fired:", error);
-          this.connected.value = false;
+          this.connected = false;
           reject(error);
         };
 
@@ -126,10 +80,7 @@ export class WebSocketClient {
             );
             this.handleMessage(data);
           } catch (err) {
-            console.error(
-              "[WebSocketClient] ❌ Failed to parse message:",
-              err
-            );
+            console.error("[WebSocketClient] ❌ Failed to parse message:", err);
             console.error("[WebSocketClient] Raw data:", event.data);
           }
         };
@@ -169,7 +120,7 @@ export class WebSocketClient {
       this.ws.close(1000, "Client disconnect");
       this.ws = null;
     }
-    this.connected.value = false;
+    this.connected = false;
   }
 
   private handleMessage(event: WSEvent): void {
@@ -186,9 +137,7 @@ export class WebSocketClient {
 
   private handleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error(
-        "[WebSocketClient] ❌ Max reconnect attempts reached"
-      );
+      console.error("[WebSocketClient] ❌ Max reconnect attempts reached");
       return;
     }
 
