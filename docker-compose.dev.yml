@@ -26,11 +26,11 @@ services:
     image: redis:7-alpine
     container_name: peddler-redis-dev
     restart: unless-stopped
-    command: redis-server --appendonly yes
+    command: redis-server --appendonly yes --requirepass psw123
     volumes:
       - redis_dev_data:/data
     ports:
-      - "${REDIS_PORT}:6379"
+      - "${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5m
@@ -54,9 +54,8 @@ services:
     env_file:
       - .env
     environment:
-      # Переопределяем только Docker-специфичные значения
       DB_HOST: db
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://:psw123@redis:6379
       APP_NAME: Peddler Dev
     ports:
       - "${BACKEND_PORT}:8000"

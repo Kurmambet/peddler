@@ -1,146 +1,173 @@
-// src/ws/client.ts
+// frontend/src/ws/client.ts
+
 import { ref } from "vue";
 import type { WSEvent } from "../types/events";
 
 export class WebSocketClient {
   private ws: WebSocket | null = null;
   private url: string;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
+  private reconnectAttempts: number = 0;
+  private readonly maxReconnectAttempts: number = 5;
+  private reconnectDelay: number = 1000;
   private messageQueue: any[] = [];
   private eventHandlers = new Map<string, Function[]>();
-
-  private _connected = ref(false);
+  private connected = ref(false); // ✅ ПРАВИЛЬНО: ref(false), не reffalse!
 
   get isConnected(): boolean {
-    return this._connected.value;
+    return this.connected.value;
   }
 
   constructor(chatId: number, token: string) {
-    const wsProtocol = import.meta.env.VITE_WS_PROTOCOL || "ws://";
-    const wsHost = import.meta.env.VITE_WS_HOST || "localhost:8000";
-    this.url = `${wsProtocol}${wsHost}/api/v1/ws/chats/${chatId}?token=${token}`;
+    let wsProtocol = import.meta.env.VITE_WS_PROTOCOL || "ws";
+    let wsHost = import.meta.env.VITE_WS_HOST || "localhost:8000";
 
-    console.log(`[WS] Created client for chat ${chatId}`);
+    // Убираем :// если он случайно в протоколе
+    if (wsProtocol.endsWith("://")) {
+      wsProtocol = wsProtocol.replace("://", "");
+    }
+
+    this.url = `${wsProtocol}://${wsHost}/api/v1/ws/chats/${chatId}?token=${token}`;
+    console.log("[WebSocketClient] ✅ Created client for chat", chatId);
+    console.log("[WebSocketClient] WebSocket URL:", this.url);
   }
 
   async connect(): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log("[WS] Already connected");
+      console.log("[WebSocketClient] ℹ️ Already connected");
       return;
     }
 
-    console.log("[WS] Connecting to:", this.url);
+    console.log(`[WebSocketClient] 🔗 Attempting to connect to: ${this.url}`);
 
-    return new Promise<void>((resolve, reject) => {
-      this.ws = new WebSocket(this.url);
+    return new Promise((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(this.url);
+        console.log("[WebSocketClient] ℹ️ Created native WebSocket object");
 
-      this.ws.onopen = () => {
-        console.log("[WS] ✅ Connected");
-        this._connected.value = true; // ✅ РАБОТАЕТ!
-        this.reconnectAttempts = 0;
-        this.flushMessageQueue();
-        resolve();
-      };
+        this.ws.onopen = () => {
+          console.log("[WebSocketClient] 🎉 onopen fired!");
+          this.connected.value = true; // ✅ ТЕПЕРЬ РАБОТАЕТ! Это ref!
+          this.reconnectAttempts = 0;
+          console.log(
+            "[WebSocketClient] ✅ Connected, flushing message queue..."
+          );
+          this.flushMessageQueue();
+          resolve();
+        };
 
-      this.ws.onclose = (event) => {
-        console.log("[WS] ❌ Disconnected:", event.code, event.reason);
-        this._connected.value = false; // ✅ РАБОТАЕТ!
+        this.ws.onclose = (event) => {
+          console.log(
+            `[WebSocketClient] 🔌 onclose fired: code=${event.code} reason=${event.reason}`
+          );
+          this.connected.value = false;
+          if (event.code !== 1000 && event.code !== 1001) {
+            console.warn(
+              "[WebSocketClient] ⚠️ Unexpected close, attempting reconnect..."
+            );
+            this.handleReconnect();
+          }
+        };
 
-        if (event.code !== 1000 && event.code !== 1001) {
-          this.handleReconnect();
-        }
-      };
+        this.ws.onerror = (error) => {
+          console.error("[WebSocketClient] ❌ onerror fired:", error);
+          this.connected.value = false;
+          reject(error);
+        };
 
-      this.ws.onerror = (error) => {
-        console.error("[WS] ❌ Error:", error);
-        this._connected.value = false;
-        reject(error);
-      };
-
-      this.ws.onmessage = (event) => {
-        try {
-          const data: WSEvent = JSON.parse(event.data);
-          console.log("[WS] ⬇️ Received:", data.type, data);
-          this.handleMessage(data);
-        } catch (err) {
-          console.error("[WS] ❌ Failed to parse message:", err, event.data);
-        }
-      };
+        this.ws.onmessage = (event) => {
+          try {
+            const data: WSEvent = JSON.parse(event.data);
+            console.log(
+              `[WebSocketClient] 📩 Received event type="${data.type}"`
+            );
+            this.handleMessage(data);
+          } catch (err) {
+            console.error("[WebSocketClient] ❌ Failed to parse message:", err);
+            console.error("[WebSocketClient] Raw data:", event.data);
+          }
+        };
+      } catch (err) {
+        console.error("[WebSocketClient] ❌ Constructor error:", err);
+        reject(err);
+      }
     });
   }
 
-  send(data: any) {
+  send(data: any): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       const message = JSON.stringify(data);
-      console.log("[WS] ⬆️ Sending:", data.type, data);
+      console.log(`[WebSocketClient] 📤 Sending type="${data.type}"`, data);
       this.ws.send(message);
     } else {
       console.warn(
-        "[WS] ⏸️ Not connected (state:",
-        this.ws?.readyState,
-        "), queueing:",
-        data
+        `[WebSocketClient] ⚠️ Cannot send: readyState=${this.ws?.readyState}, queueing...`
       );
       this.messageQueue.push(data);
     }
   }
 
-  onMessage(type: string, handler: (event: WSEvent) => void) {
+  onMessage(type: string, handler: (event: WSEvent) => void): void {
     if (!this.eventHandlers.has(type)) {
       this.eventHandlers.set(type, []);
     }
     this.eventHandlers.get(type)!.push(handler);
-    console.log(`[WS] 📝 Registered handler for: ${type}`);
+    console.log(
+      `[WebSocketClient] ✅ Registered handler for event type="${type}"`
+    );
   }
 
-  disconnect() {
-    console.log("[WS] 🔌 Disconnecting...");
+  disconnect(): void {
+    console.log("[WebSocketClient] 🔌 Disconnecting...");
     if (this.ws) {
       this.ws.close(1000, "Client disconnect");
       this.ws = null;
-      this._connected.value = false;
     }
+    this.connected.value = false;
   }
 
-  private handleMessage(event: WSEvent) {
+  private handleMessage(event: WSEvent): void {
     const handlers = this.eventHandlers.get(event.type);
     if (handlers && handlers.length > 0) {
       console.log(
-        `[WS] 📞 Calling ${handlers.length} handler(s) for: ${event.type}`
+        `[WebSocketClient] 🔔 Calling ${handlers.length} handler(s) for type="${event.type}"`
       );
       handlers.forEach((handler) => handler(event));
     } else {
-      console.warn(`[WS] ⚠️ No handler registered for: ${event.type}`);
+      console.warn(`[WebSocketClient] ⚠️ No handlers for type="${event.type}"`);
     }
   }
 
-  private handleReconnect() {
+  private handleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("[WS] ❌ Max reconnect attempts reached");
+      console.error("[WebSocketClient] ❌ Max reconnect attempts reached");
       return;
     }
 
     const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts);
     console.log(
-      `[WS] 🔄 Reconnecting in ${delay}ms... (attempt ${
+      `[WebSocketClient] ⏳ Reconnecting in ${delay}ms... (attempt ${
         this.reconnectAttempts + 1
       }/${this.maxReconnectAttempts})`
     );
 
+    this.reconnectAttempts++;
+
     setTimeout(() => {
-      this.reconnectAttempts++;
       this.connect().catch((err) => {
-        console.error("[WS] ❌ Reconnect failed:", err);
+        console.error("[WebSocketClient] ❌ Reconnect failed:", err);
       });
     }, delay);
   }
 
-  private flushMessageQueue() {
-    if (this.messageQueue.length === 0) return;
+  private flushMessageQueue(): void {
+    if (this.messageQueue.length === 0) {
+      return;
+    }
 
-    console.log(`[WS] 📤 Flushing ${this.messageQueue.length} queued messages`);
+    console.log(
+      `[WebSocketClient] 📤 Flushing ${this.messageQueue.length} queued message(s)...`
+    );
+
     while (this.messageQueue.length > 0) {
       const message = this.messageQueue.shift();
       this.send(message);

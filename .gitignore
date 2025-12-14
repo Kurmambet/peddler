@@ -86,7 +86,6 @@ celerybeat-schedule-wal
 
 .no
 .ruff_cache
-notes.txt
 notes.md
 notes.py
 project_structure.md
