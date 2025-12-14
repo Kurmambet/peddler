@@ -8,6 +8,7 @@ python app/ws/test_websocket.py
 
 ```bash
 docker-compose -f docker-compose.dev.yml up -d
+docker-compose -f docker-compose.dev.yml up --build -d
 docker ps
 docker exec -it peddler-redis-dev redis-cli ping
 docker-compose -f docker-compose.dev.yml down

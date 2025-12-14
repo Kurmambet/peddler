@@ -32,7 +32,7 @@ export const useMessagesStore = defineStore("messages", () => {
   };
 
   const addMessage = (event: MessageCreatedEvent) => {
-    const chatId = event.chat_id; // ← snake_case!
+    const chatId = event.chat_id;
 
     if (!messagesByChat.value.has(chatId)) {
       messagesByChat.value.set(chatId, []);
@@ -49,7 +49,6 @@ export const useMessagesStore = defineStore("messages", () => {
       return;
     }
 
-    // Добавляем новое сообщение
     messages.push({
       id: event.id,
       chat_id: event.chat_id,

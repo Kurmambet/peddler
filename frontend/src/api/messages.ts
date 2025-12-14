@@ -1,6 +1,6 @@
 // src/api/messages.ts
 import type { MessageListResponse, MessageRead } from "../types/api";
-import apiClient from "./client";
+import { apiClient } from "./client";
 
 export const messagesAPI = {
   list: (chatId: number, limit: number = 50, offset: number = 0) =>

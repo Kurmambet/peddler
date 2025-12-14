@@ -21,6 +21,9 @@ export const useAuthStore = defineStore("auth", () => {
       localStorage.setItem("access_token", data.access_token);
 
       await loadUser();
+      console.log(
+        `[AuthStore] ✅ Logged in as: ${user.value?.username} (ID: ${user.value?.id})`
+      );
     } catch (err: any) {
       error.value = err.response?.data?.detail || "Login failed";
       throw err;
@@ -33,10 +36,7 @@ export const useAuthStore = defineStore("auth", () => {
     isLoading.value = true;
     error.value = null;
     try {
-      // Регистрация пользователя
       await authAPI.register(username, password);
-
-      // Сразу логинимся
       await login(username, password);
     } catch (err: any) {
       error.value = err.response?.data?.detail || "Registration failed";
@@ -47,6 +47,7 @@ export const useAuthStore = defineStore("auth", () => {
   };
 
   const logout = () => {
+    console.log(`[AuthStore] 🚪 Logging out user: ${user.value?.username}`);
     token.value = null;
     user.value = null;
     localStorage.removeItem("access_token");
@@ -58,8 +59,11 @@ export const useAuthStore = defineStore("auth", () => {
     try {
       const { data } = await authAPI.me();
       user.value = data;
+      console.log(
+        `[AuthStore] 👤 User loaded: ${data.username} (ID: ${data.id})`
+      );
     } catch (err: any) {
-      console.error("Failed to load user:", err);
+      console.error("[AuthStore] ❌ Failed to load user:", err);
       if (err.response?.status === 401) {
         logout();
       }
@@ -68,7 +72,10 @@ export const useAuthStore = defineStore("auth", () => {
 
   const restoreSession = async () => {
     const savedToken = localStorage.getItem("access_token");
-    if (!savedToken) return;
+    if (!savedToken) {
+      console.log("[AuthStore] No saved token found");
+      return;
+    }
 
     token.value = savedToken;
     await loadUser();

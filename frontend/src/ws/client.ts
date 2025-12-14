@@ -1,5 +1,5 @@
 // src/ws/client.ts
-import { ref, type Ref } from "vue";
+import { ref } from "vue";
 import type { WSEvent } from "../types/events";
 
 export class WebSocketClient {
@@ -11,14 +11,18 @@ export class WebSocketClient {
   private messageQueue: any[] = [];
   private eventHandlers = new Map<string, Function[]>();
 
-  public isConnected: Ref<boolean>;
+  private _connected = ref(false);
+
+  get isConnected(): boolean {
+    return this._connected.value;
+  }
 
   constructor(chatId: number, token: string) {
-    this.isConnected = ref(false);
-
     const wsProtocol = import.meta.env.VITE_WS_PROTOCOL || "ws://";
     const wsHost = import.meta.env.VITE_WS_HOST || "localhost:8000";
     this.url = `${wsProtocol}${wsHost}/api/v1/ws/chats/${chatId}?token=${token}`;
+
+    console.log(`[WS] Created client for chat ${chatId}`);
   }
 
   async connect(): Promise<void> {
@@ -34,7 +38,7 @@ export class WebSocketClient {
 
       this.ws.onopen = () => {
         console.log("[WS] ✅ Connected");
-        this.isConnected.value = true;
+        this._connected.value = true; // ✅ РАБОТАЕТ!
         this.reconnectAttempts = 0;
         this.flushMessageQueue();
         resolve();
@@ -42,15 +46,16 @@ export class WebSocketClient {
 
       this.ws.onclose = (event) => {
         console.log("[WS] ❌ Disconnected:", event.code, event.reason);
-        this.isConnected.value = false;
+        this._connected.value = false; // ✅ РАБОТАЕТ!
 
-        if (event.code !== 1000) {
+        if (event.code !== 1000 && event.code !== 1001) {
           this.handleReconnect();
         }
       };
 
       this.ws.onerror = (error) => {
         console.error("[WS] ❌ Error:", error);
+        this._connected.value = false;
         reject(error);
       };
 
@@ -60,7 +65,7 @@ export class WebSocketClient {
           console.log("[WS] ⬇️ Received:", data.type, data);
           this.handleMessage(data);
         } catch (err) {
-          console.error("[WS] Failed to parse message:", err, event.data);
+          console.error("[WS] ❌ Failed to parse message:", err, event.data);
         }
       };
     });
@@ -87,33 +92,33 @@ export class WebSocketClient {
       this.eventHandlers.set(type, []);
     }
     this.eventHandlers.get(type)!.push(handler);
-    console.log(`[WS] Registered handler for: ${type}`);
+    console.log(`[WS] 📝 Registered handler for: ${type}`);
   }
 
   disconnect() {
-    console.log("[WS] Disconnecting...");
+    console.log("[WS] 🔌 Disconnecting...");
     if (this.ws) {
       this.ws.close(1000, "Client disconnect");
       this.ws = null;
-      this.isConnected.value = false;
+      this._connected.value = false;
     }
   }
 
   private handleMessage(event: WSEvent) {
     const handlers = this.eventHandlers.get(event.type);
-    if (handlers) {
+    if (handlers && handlers.length > 0) {
       console.log(
-        `[WS] Calling ${handlers.length} handler(s) for: ${event.type}`
+        `[WS] 📞 Calling ${handlers.length} handler(s) for: ${event.type}`
       );
       handlers.forEach((handler) => handler(event));
     } else {
-      console.warn(`[WS] No handler registered for: ${event.type}`);
+      console.warn(`[WS] ⚠️ No handler registered for: ${event.type}`);
     }
   }
 
   private handleReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("[WS] Max reconnect attempts reached");
+      console.error("[WS] ❌ Max reconnect attempts reached");
       return;
     }
 
@@ -127,7 +132,7 @@ export class WebSocketClient {
     setTimeout(() => {
       this.reconnectAttempts++;
       this.connect().catch((err) => {
-        console.error("[WS] Reconnect failed:", err);
+        console.error("[WS] ❌ Reconnect failed:", err);
       });
     }, delay);
   }

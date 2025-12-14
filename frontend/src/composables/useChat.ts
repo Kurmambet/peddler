@@ -1,5 +1,5 @@
 // src/composables/useChat.ts
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { useChatsStore } from "../stores/chats";
@@ -34,7 +34,7 @@ export function useChat() {
       return;
     }
 
-    if (ws.value?.isConnected.value) {
+    if (ws.value?.isConnected) {
       console.log("[useChat] Already connected");
       return;
     }
@@ -72,11 +72,11 @@ export function useChat() {
     newMessageContent.value = "";
 
     try {
-      const isConnected = ws.value?.isConnected.value;
+      const isConnected = ws.value?.isConnected ?? false;
       console.log(`[useChat] Sending message, WS connected: ${isConnected}`);
 
-      if (isConnected) {
-        ws.value!.send({
+      if (isConnected && ws.value) {
+        ws.value.send({
           type: "send_message",
           content,
         });
@@ -91,14 +91,26 @@ export function useChat() {
     }
   };
 
-  onMounted(async () => {
-    if (!chatId.value) return;
+  watch(
+    chatId,
+    async (newChatId, oldChatId) => {
+      if (oldChatId && ws.value) {
+        console.log(
+          `[useChat] Chat changed from ${oldChatId} to ${newChatId}, disconnecting`
+        );
+        ws.value.disconnect();
+        ws.value = null;
+      }
 
-    console.log(`[useChat] Mounting chat ${chatId.value}`);
-    chatsStore.setCurrentChat(chatId.value);
-    await messagesStore.loadMessages(chatId.value);
-    await connectWebSocket();
-  });
+      if (newChatId) {
+        console.log(`[useChat] Mounting chat ${newChatId}`);
+        chatsStore.setCurrentChat(newChatId);
+        await messagesStore.loadMessages(newChatId);
+        await connectWebSocket();
+      }
+    },
+    { immediate: true }
+  );
 
   onUnmounted(() => {
     console.log(`[useChat] Unmounting chat ${chatId.value}`);
