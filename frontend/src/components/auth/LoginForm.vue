@@ -12,6 +12,7 @@
           type="text"
           placeholder="Username"
           required
+          minlength="3"
           class="w-full px-3 py-2 border rounded-md"
         />
         <input
@@ -42,9 +43,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useAuth } from "../../composables/useAuth";
-import { useAuthStore } from "../../stores/auth";
 
-const authStore = useAuthStore();
 const { handleLogin, isSubmitting } = useAuth();
 const username = ref("");
 const password = ref("");
@@ -54,8 +53,8 @@ const handleSubmit = async () => {
   error.value = null;
   try {
     await handleLogin(username.value, password.value);
-  } catch {
-    error.value = authStore.error || "Login failed";
+  } catch (err: any) {
+    error.value = err.message || err.response?.data?.detail || "Login failed";
   }
 };
 </script>

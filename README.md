@@ -1,5 +1,7 @@
 # 1. Подключись к контейнеру PostgreSQL
 
+docker exec -it peddler-db-dev psql -U peddler -d peddler
+
 # 2. Посмотри таблицы
 
 \dt

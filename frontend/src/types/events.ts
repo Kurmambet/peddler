@@ -1,11 +1,13 @@
 // src/types/events.ts
 export type WSEventType =
+  | "send_message"
   | "message_created"
   | "message_read"
-  | "typing_started"
-  | "typing_stopped"
-  | "user_online"
-  | "user_offline"
+  | "typing_start"
+  | "typing_stop"
+  | "typing_indicator"
+  | "mark_read"
+  | "connected"
   | "error";
 
 export interface BaseEvent {
@@ -18,8 +20,10 @@ export interface MessageCreatedEvent extends BaseEvent {
   id: number;
   chat_id: number;
   sender_id: number;
+  sender_username: string;
   content: string;
   created_at: string;
+  is_read: boolean;
 }
 
 export interface ErrorEvent extends BaseEvent {
@@ -28,4 +32,15 @@ export interface ErrorEvent extends BaseEvent {
   message: string;
 }
 
-export type WSEvent = MessageCreatedEvent | ErrorEvent | BaseEvent;
+export interface ConnectedEvent extends BaseEvent {
+  type: "connected";
+  user_id: number;
+  chat_id: number;
+  message: string;
+}
+
+export type WSEvent =
+  | MessageCreatedEvent
+  | ErrorEvent
+  | ConnectedEvent
+  | BaseEvent;

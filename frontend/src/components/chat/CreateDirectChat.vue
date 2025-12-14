@@ -58,9 +58,11 @@ const createChat = async () => {
   error.value = null;
 
   try {
-    const chat = await chatsStore.createDirectChat(otherUserId.value); //TODO
+    const chat = await chatsStore.createDirectChat(otherUserId.value);
+    console.log("✅ Chat created:", chat);
     await router.push(`/chat/${chat.id}`);
   } catch (err: any) {
+    console.error("❌ Create chat error:", err.response?.data);
     error.value = err.response?.data?.detail || "Не удалось создать чат";
   } finally {
     isLoading.value = false;

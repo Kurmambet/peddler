@@ -12,11 +12,15 @@ export function useChatList() {
 
   onMounted(() => {
     loadChats();
-    intervalId = window.setInterval(loadChats, 5000); // раз в 5 секунд
+
+    // Автообновление каждые 5 секунд
+    intervalId = window.setInterval(loadChats, 5000);
   });
 
   onUnmounted(() => {
-    if (intervalId) window.clearInterval(intervalId);
+    if (intervalId) {
+      window.clearInterval(intervalId);
+    }
   });
 
   return {

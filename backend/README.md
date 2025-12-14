@@ -12,6 +12,8 @@ docker ps
 docker exec -it peddler-redis-dev redis-cli ping
 docker-compose -f docker-compose.dev.yml down
 
+docker-compose -f docker-compose.dev.yml build --no-cache backend
+
 docker exec -it peddler-redis-dev redis-cli MONITOR
 ```
 

@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { useChatsStore } from "../stores/chats";
 import { useMessagesStore } from "../stores/messages";
+import type { MessageCreatedEvent } from "../types/events";
 import { WebSocketClient } from "../ws/client";
 
 export function useChat() {
@@ -22,28 +23,45 @@ export function useChat() {
 
   const currentMessages = computed(() => {
     if (!chatId.value) return [];
-    return messagesStore.getChatMessages(chatId.value);
+    return messagesStore.getChatMessages(chatId.value) || [];
   });
 
   const isLoading = computed(() => messagesStore.isLoading);
 
   const connectWebSocket = async () => {
-    if (!authStore.token || !chatId.value) return;
+    if (!authStore.token || !chatId.value) {
+      console.warn("[useChat] ⚠️ Cannot connect: missing token or chatId");
+      return;
+    }
 
-    // Проверка: уже подключён?
-    if (ws.value && ws.value.isConnected.value) return;
+    if (ws.value?.isConnected.value) {
+      console.log("[useChat] Already connected");
+      return;
+    }
 
     try {
+      console.log(`[useChat] Creating WebSocket for chat ${chatId.value}`);
       ws.value = new WebSocketClient(chatId.value, authStore.token);
-      await ws.value.connect();
 
-      ws.value.onMessage((event) => {
-        if (event.type === "message_created") {
-          messagesStore.addMessage(event);
-        }
+      // Регистрируем обработчики ДО подключения
+      ws.value.onMessage("message_created", (event) => {
+        console.log("[useChat] 📨 Received message_created:", event);
+        messagesStore.addMessage(event as MessageCreatedEvent);
       });
+
+      ws.value.onMessage("error", (event: any) => {
+        console.error("[useChat] ❌ WebSocket error:", event.message);
+      });
+
+      ws.value.onMessage("connected", (event: any) => {
+        console.log("[useChat] ✅ Connected confirmation:", event.message);
+      });
+
+      // Теперь подключаемся
+      await ws.value.connect();
+      console.log("[useChat] ✅ WebSocket connected successfully");
     } catch (err) {
-      console.error("WebSocket connection failed:", err);
+      console.error("[useChat] ❌ WebSocket connection failed:", err);
     }
   };
 
@@ -54,28 +72,36 @@ export function useChat() {
     newMessageContent.value = "";
 
     try {
-      // Если WebSocket подключён, используем его
-      if (ws.value && ws.value.isConnected.value) {
-        ws.value.send({ type: "send_message", content });
+      const isConnected = ws.value?.isConnected.value;
+      console.log(`[useChat] Sending message, WS connected: ${isConnected}`);
+
+      if (isConnected) {
+        ws.value!.send({
+          type: "send_message",
+          content,
+        });
       } else {
-        // Иначе через REST API
+        console.warn("[useChat] ⚠️ WebSocket not connected, using REST API");
         await messagesStore.sendMessage(chatId.value, content);
+        await messagesStore.loadMessages(chatId.value);
       }
     } catch (err) {
-      console.error("Error sending:", err);
-      newMessageContent.value = content; // восстановить текст
+      console.error("[useChat] ❌ Error sending message:", err);
+      newMessageContent.value = content;
     }
   };
 
   onMounted(async () => {
     if (!chatId.value) return;
 
+    console.log(`[useChat] Mounting chat ${chatId.value}`);
     chatsStore.setCurrentChat(chatId.value);
     await messagesStore.loadMessages(chatId.value);
     await connectWebSocket();
   });
 
   onUnmounted(() => {
+    console.log(`[useChat] Unmounting chat ${chatId.value}`);
     ws.value?.disconnect();
   });
 

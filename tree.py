@@ -17,12 +17,12 @@ EXCLUDE_DIRS = {
 SKIP_CONTENT_DIRS = {
     "alembic/versions",
     "backend/alembic",
+    "node_modules",
+    ".vscode",
 }
 
 SKIP_CONTENT_FILES = {
     ".dockerignore",
-    ".env",  # Секреты
-    ".env.example",
     "uv.lock",  # Большой файл зависимостей
     ".gitignore",
     "alembic.ini",  # Конфиг alembic
@@ -32,6 +32,7 @@ SKIP_CONTENT_FILES = {
     "README.md",
     "tree.py",
     "project_structure.md",
+    "package-lock.json",
 }
 
 # Расширения файлов для копирования

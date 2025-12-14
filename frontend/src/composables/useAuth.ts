@@ -8,30 +8,45 @@ export function useAuth() {
   const router = useRouter();
   const isSubmitting = ref(false);
 
-  const handleRegister = async (username: string, password: string) => {
-    isSubmitting.value = true;
-    try {
-      await authStore.register(username, password);
-      await router.push("/login");
-    } finally {
-      isSubmitting.value = false;
-    }
-  };
-
   const handleLogin = async (username: string, password: string) => {
+    if (!username || !password) {
+      throw new Error("Username and password are required");
+    }
+
     isSubmitting.value = true;
     try {
       await authStore.login(username, password);
       await router.push("/");
+    } catch (err: any) {
+      throw err;
     } finally {
       isSubmitting.value = false;
     }
   };
 
-  const handleLogout = () => {
-    authStore.logout();
-    router.push("/login");
+  const handleRegister = async (username: string, password: string) => {
+    if (!username || !password) {
+      throw new Error("Username and password are required");
+    }
+
+    if (password.length < 8) {
+      throw new Error("Password must be at least 8 characters");
+    }
+
+    isSubmitting.value = true;
+    try {
+      await authStore.register(username, password);
+      await router.push("/");
+    } catch (err: any) {
+      throw err;
+    } finally {
+      isSubmitting.value = false;
+    }
   };
 
-  return { isSubmitting, handleRegister, handleLogin, handleLogout };
+  return {
+    isSubmitting,
+    handleLogin,
+    handleRegister,
+  };
 }

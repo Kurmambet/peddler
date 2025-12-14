@@ -12,6 +12,7 @@
           type="text"
           placeholder="Username"
           required
+          minlength="3"
           class="w-full px-3 py-2 border rounded-md"
         />
         <input
@@ -19,6 +20,7 @@
           type="password"
           placeholder="Password"
           required
+          minlength="8"
           class="w-full px-3 py-2 border rounded-md"
         />
         <button
@@ -40,9 +42,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useAuth } from "../../composables/useAuth";
-import { useAuthStore } from "../../stores/auth";
 
-const authStore = useAuthStore();
 const { handleRegister, isSubmitting } = useAuth();
 const username = ref("");
 const password = ref("");
@@ -52,8 +52,9 @@ const handleSubmit = async () => {
   error.value = null;
   try {
     await handleRegister(username.value, password.value);
-  } catch {
-    error.value = authStore.error || "Registration failed";
+  } catch (err: any) {
+    error.value =
+      err.message || err.response?.data?.detail || "Registration failed";
   }
 };
 </script>

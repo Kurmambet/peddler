@@ -27,6 +27,10 @@ FROM python:3.12-slim
 LABEL maintainer="p.vis@gmail.com"
 LABEL description="Peddler Backend API"
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
 # Создаем пользователя без root прав
 RUN groupadd -r appuser && useradd -r -g appuser appuser
 
@@ -52,8 +56,8 @@ ENV PYTHONDONTWRITEBYTECODE=1
 USER appuser
 
 # Проверка здоровья контейнера
-HEALTHCHECK --interval=180s --timeout=10s --start-period=40s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5.0)" || exit 1
+# HEALTHCHECK --interval=180s --timeout=10s --start-period=100s --retries=3 \
+#     CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5.0)" || exit 1
 
 # Экспонируем порт
 EXPOSE 8000
