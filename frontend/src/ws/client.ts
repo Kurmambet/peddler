@@ -11,17 +11,37 @@ export class WebSocketClient {
   private reconnectDelay: number = 1000;
   private messageQueue: any[] = [];
   private eventHandlers = new Map<string, Function[]>();
-  private connected = ref(false); // ✅ ПРАВИЛЬНО: ref(false), не reffalse!
+  private connected = ref(false);
 
   get isConnected(): boolean {
+    console.log(
+      `[WebSocketClient] isConnected getter called. Type: ${typeof this.connected}, Value: ${this.connected}`
+    );
+    if (typeof this.connected !== "object" || !this.connected?.value !== undefined) {
+      console.error(
+        "[WebSocketClient] ❌ CRITICAL: connected is not a Ref! It is:",
+        this.connected
+      );
+    }
     return this.connected.value;
   }
 
   constructor(chatId: number, token: string) {
+    // ДИАГНОСТИКА: проверяем типы прямо в конструкторе
+    console.log(
+      `[WebSocketClient] Constructor: connected type = ${typeof this.connected}`
+    );
+    console.log(
+      `[WebSocketClient] Constructor: connected.value type = ${typeof this.connected.value}`
+    );
+    console.log(
+      "[WebSocketClient] Constructor: connected object:",
+      this.connected
+    );
+
     let wsProtocol = import.meta.env.VITE_WS_PROTOCOL || "ws";
     let wsHost = import.meta.env.VITE_WS_HOST || "localhost:8000";
 
-    // Убираем :// если он случайно в протоколе
     if (wsProtocol.endsWith("://")) {
       wsProtocol = wsProtocol.replace("://", "");
     }
@@ -46,7 +66,31 @@ export class WebSocketClient {
 
         this.ws.onopen = () => {
           console.log("[WebSocketClient] 🎉 onopen fired!");
-          this.connected.value = true; // ✅ ТЕПЕРЬ РАБОТАЕТ! Это ref!
+          console.log(
+            "[WebSocketClient] Before assignment - connected type:",
+            typeof this.connected
+          );
+          console.log(
+            "[WebSocketClient] Before assignment - connected object:",
+            this.connected
+          );
+
+          try {
+            this.connected.value = true;
+            console.log("[WebSocketClient] ✅ Successfully set connected.value = true");
+          } catch (err) {
+            console.error(
+              "[WebSocketClient] ❌ ERROR assigning to connected.value:",
+              err
+            );
+            console.error(
+              "[WebSocketClient] this.connected is:",
+              this.connected
+            );
+            reject(err);
+            return;
+          }
+
           this.reconnectAttempts = 0;
           console.log(
             "[WebSocketClient] ✅ Connected, flushing message queue..."
@@ -82,7 +126,10 @@ export class WebSocketClient {
             );
             this.handleMessage(data);
           } catch (err) {
-            console.error("[WebSocketClient] ❌ Failed to parse message:", err);
+            console.error(
+              "[WebSocketClient] ❌ Failed to parse message:",
+              err
+            );
             console.error("[WebSocketClient] Raw data:", event.data);
           }
         };
@@ -139,7 +186,9 @@ export class WebSocketClient {
 
   private handleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("[WebSocketClient] ❌ Max reconnect attempts reached");
+      console.error(
+        "[WebSocketClient] ❌ Max reconnect attempts reached"
+      );
       return;
     }
 
