@@ -3,7 +3,7 @@
 from app.models.message import Message
 from app.models.user import User
 from app.repositories.message_repository import MessageRepository
-from app.schemas.message import MessageCreate, MessageListResponse
+from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -69,8 +69,20 @@ class MessageService:
         # Переворачиваем для хронологического порядка (старые сначала)
         messages = messages[::-1]
 
+        message_reads = [
+            MessageRead(
+                id=msg.id,
+                chat_id=msg.chat_id,
+                sender_id=msg.sender_id,
+                sender_username=msg.sender.username,
+                content=msg.content,
+                is_read=msg.is_read,
+                created_at=msg.created_at,
+            )
+            for msg in messages
+        ]
         return MessageListResponse(
-            messages=messages, has_more=has_more, next_offset=offset + len(messages)
+            messages=message_reads, has_more=has_more, next_offset=offset + len(messages)
         )
 
     async def mark_message_read(self, chat_id: int, message_id: int, user_id: int) -> Message:

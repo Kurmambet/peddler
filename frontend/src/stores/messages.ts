@@ -53,6 +53,7 @@ export const useMessagesStore = defineStore("messages", () => {
       id: event.id,
       chat_id: event.chat_id,
       sender_id: event.sender_id,
+      sender_username: event.sender_username,
       content: event.content,
       is_read: event.is_read,
       created_at: event.created_at,

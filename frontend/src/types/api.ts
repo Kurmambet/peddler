@@ -24,6 +24,7 @@ export interface MessageRead {
   id: number;
   chat_id: number;
   sender_id: number;
+  sender_username: string;
   content: string;
   is_read: boolean;
   created_at: string;

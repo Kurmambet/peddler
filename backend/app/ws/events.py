@@ -128,7 +128,7 @@ class MessageCreatedEvent(WSEvent):
     id: int  # ID сообщения в БД
     chat_id: int
     sender_id: int
-    sender_username: str  # Для удобства клиента (не нужен доп. запрос)
+    sender_username: str
     content: str
     created_at: datetime
     is_read: bool = False

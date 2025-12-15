@@ -24,7 +24,7 @@
       >
         <!-- Показываем sender_id для отладки -->
         <p v-if="!isOwn(msg)" class="text-xs font-semibold mb-1 text-gray-600">
-          Sender ID: {{ msg.sender_id }} ({{ getSenderName(msg.sender_id) }})
+          {{ msg.sender_username }}
         </p>
         <p class="text-sm">{{ msg.content }}</p>
         <p
@@ -55,13 +55,6 @@ const isOwn = (msg: MessageRead) => {
     `[MessageList] Message ${msg.id} from sender ${msg.sender_id}, current user ${authStore.user?.id} (${authStore.user?.username}), isOwn: ${result}`
   );
   return result;
-};
-
-const getSenderName = (senderId: number) => {
-  // ID 1 = userTest2, ID 2 = userTest1 (по вашей БД)
-  if (senderId === 1) return "userTest2";
-  if (senderId === 2) return "userTest1";
-  return `User ${senderId}`;
 };
 
 const formatTime = (dateStr: string) => {

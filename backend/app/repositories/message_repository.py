@@ -6,6 +6,7 @@ from app.models.chat import Chat, ChatParticipant
 from app.models.message import Message
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 
 class MessageRepository:
@@ -48,6 +49,7 @@ class MessageRepository:
         """Получить сообщения чата с пагинацией"""
         stmt = (
             select(Message)
+            .options(selectinload(Message.sender))
             .where(
                 and_(
                     Message.chat_id == chat_id,
