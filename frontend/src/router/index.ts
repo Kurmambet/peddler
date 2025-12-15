@@ -1,4 +1,5 @@
 // src/router/index.ts
+import { watch } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 
@@ -34,8 +35,25 @@ const router = createRouter({
   routes,
 });
 
-router.beforeEach((to) => {
+// src/router/index.ts
+router.beforeEach(async (to) => {
   const authStore = useAuthStore();
+
+  // Ждём если сессия ещё восстанавливается
+  if (authStore.isLoading) {
+    await new Promise((resolve) => {
+      const unwatch = watch(
+        () => authStore.isLoading,
+        (loading) => {
+          if (!loading) {
+            unwatch();
+            resolve(true);
+          }
+        }
+      );
+    });
+  }
+
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     return "/login";
   }
