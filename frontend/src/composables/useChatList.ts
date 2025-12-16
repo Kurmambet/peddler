@@ -16,7 +16,10 @@ export function useChatList() {
 
   async function loadChats() {
     console.log("[useChatList] 📥 Loading chats...");
-    await chatsStore.loadChats();
+    // только если чатов еще нет
+    if (chats.value.length === 0) {
+      await chatsStore.loadChats();
+    }
     console.log("[useChatList] ✅ Chats loaded:", chats.value.length);
   }
 
@@ -26,7 +29,10 @@ export function useChatList() {
     (newPath) => {
       if (newPath === "/") {
         console.log('[useChatList] 🔄 Entering "/" page, loading chats...');
-        loadChats();
+        // Загружаем только при первом входе
+        if (chats.value.length === 0) {
+          loadChats();
+        }
       }
     },
     { immediate: true } // Выполнить СРАЗУ при инициализации
@@ -36,7 +42,8 @@ export function useChatList() {
   onMounted(() => {
     console.log("[useChatList] 🔧 Mounting, setting auto-refresh...");
     intervalId = window.setInterval(() => {
-      loadChats();
+      // loadChats();
+      console.log("[useChatList] 🔄 Auto-refresh (checking for new chats)");
     }, 5000);
   });
 

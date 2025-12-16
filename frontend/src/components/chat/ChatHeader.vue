@@ -3,7 +3,11 @@
   <div class="px-6 py-4 bg-white border-b flex justify-between items-center">
     <div>
       <h2 class="text-xl font-bold">
-        {{ currentChat?.title || "Direct Chat" }}
+        {{
+          currentChat?.type === "direct"
+            ? currentChat?.other_username
+            : currentChat?.title || "Group Chat"
+        }}
       </h2>
       <p class="text-sm text-gray-500">{{ currentChat?.type }}</p>
     </div>

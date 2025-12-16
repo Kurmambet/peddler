@@ -4,6 +4,7 @@ from typing import List
 from app.models.chat import Chat, ChatParticipantRole, ChatType
 from app.models.user import User
 from app.repositories.chat_repository import ChatRepository
+from app.schemas.chat import ChatRead, DirectChatRead, GroupChatRead
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -102,7 +103,38 @@ class ChatService:
 
     async def get_user_chats(self, user_id: int, limit: int = 50, offset: int = 0) -> List[Chat]:
         """Получить список чатов пользователя"""
-        return await self.repo.get_user_chats(user_id, limit, offset)
+        # return await self.repo.get_user_chats(user_id, limit, offset)
+        chats = await self.repo.get_user_chats(user_id, limit, offset)
+
+        results: List[ChatRead] = []
+        for chat in chats:
+            if chat.type == ChatType.DIRECT:
+                # Теперь это работает без lazy loading
+                other_username = next(
+                    (p.user.username for p in chat.participants if p.user_id != user_id),
+                    None,
+                )
+
+                result = DirectChatRead(
+                    id=chat.id,
+                    type="direct",
+                    title=None,
+                    created_by_id=chat.created_by_id,
+                    created_at=chat.created_at,
+                    other_username=other_username or "",
+                )
+            else:  # GROUP
+                result = GroupChatRead(
+                    id=chat.id,
+                    type="group",
+                    title=chat.title,
+                    created_by_id=chat.created_by_id,
+                    created_at=chat.created_at,
+                )
+
+            results.append(result)
+
+        return results
 
     async def verify_chat_access(self, chat_id: int, user_id: int) -> Chat:
         """

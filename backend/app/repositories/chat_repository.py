@@ -5,6 +5,7 @@ from app.models.chat import Chat, ChatParticipant, ChatParticipantRole, ChatType
 from app.models.user import User
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 
 class ChatRepository:
@@ -79,6 +80,7 @@ class ChatRepository:
         """Получить список чатов пользователя"""
         stmt = (
             select(Chat)
+            .options(selectinload(Chat.participants).selectinload(ChatParticipant.user))
             .join(ChatParticipant, Chat.id == ChatParticipant.chat_id)
             .where(ChatParticipant.user_id == user_id)
             .order_by(Chat.updated_at.desc())

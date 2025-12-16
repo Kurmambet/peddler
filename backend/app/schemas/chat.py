@@ -1,7 +1,7 @@
 # app/schemas/chat.py
 from datetime import datetime
 from enum import Enum as PyEnum
-from typing import List, Optional
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -31,15 +31,35 @@ class ChatParticipantRead(ChatParticipantBase):
 
 
 # Базовая схема для чтения (только основные поля)
-class ChatRead(BaseModel):
+# class ChatRead(BaseModel):
+#     id: int
+#     title: Optional[str] = None
+#     type: ChatType
+#     created_by_id: int
+#     created_at: datetime
+
+#     class Config:
+#         from_attributes = True
+
+
+class DirectChatRead(BaseModel):
     id: int
+    type: Literal["direct"]
     title: Optional[str] = None
-    type: ChatType
+    created_by_id: int
+    created_at: datetime
+    other_username: str
+
+
+class GroupChatRead(BaseModel):
+    id: int
+    type: Literal["group"]
+    title: str
     created_by_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+
+ChatRead = Union[DirectChatRead, GroupChatRead]
 
 
 class ChatCreate(BaseModel):
@@ -55,10 +75,10 @@ class DirectChatCreate(BaseModel):
     # other_user_id: int = Field(..., ge=1)
 
 
-class DirectChatRead(ChatRead):
-    """Просто наследуем от ChatRead - никаких participants"""
+# class DirectChatRead(ChatRead):
+#     """Просто наследуем от ChatRead - никаких participants"""
 
-    pass
+#     pass
 
 
 class GroupChatCreate(ChatCreate):

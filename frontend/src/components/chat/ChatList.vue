@@ -14,7 +14,9 @@
         :to="`/chat/${chat.id}`"
         class="block p-4 border-b hover:bg-gray-50"
       >
-        <h3 class="font-semibold">{{ chat.title || "Direct Chat" }}</h3>
+        <h3 class="font-semibold">
+          {{ chat.type === "direct" ? chat.other_username : chat.title }}
+        </h3>
         <p class="text-sm text-gray-500">{{ chat.type }}</p>
       </router-link>
     </div>
