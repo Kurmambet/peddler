@@ -9,21 +9,22 @@
       </div>
 
       <div class="mb-4">
-        <label class="block text-sm font-medium mb-2">User ID</label>
+        <label class="block text-sm font-medium mb-2">Username</label>
         <input
-          v-model.number="otherUserId"
-          type="number"
-          placeholder="Введи ID пользователя"
+          v-model.number="otherUsername"
+          type="text"
+          placeholder="Введите username"
+          @keyup.enter="createChat"
           class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
         />
         <p class="text-xs text-gray-500 mt-1">
-          Пока что вводи ID вручную (например, 3 или 4)
+          Введите username пользователя, с которым хотите начать чат
         </p>
       </div>
 
       <button
         @click="createChat"
-        :disabled="!otherUserId || isLoading"
+        :disabled="!otherUsername || isLoading"
         class="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
       >
         {{ isLoading ? "Создаём..." : "Создать чат" }}
@@ -47,22 +48,24 @@ import { useChatsStore } from "../../stores/chats";
 const router = useRouter();
 const chatsStore = useChatsStore();
 
-const otherUserId = ref<number | null>(null);
+// const otherUserId = ref<number | null>(null);
+const otherUsername = ref<string>("");
+
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 
 const createChat = async () => {
-  if (!otherUserId.value) return;
+  if (!otherUsername.value) return;
 
   isLoading.value = true;
   error.value = null;
 
   try {
-    const chat = await chatsStore.createDirectChat(otherUserId.value);
+    const chat = await chatsStore.createDirectChat(otherUsername.value);
     console.log("✅ Chat created:", chat);
     await router.push(`/chat/${chat.id}`);
   } catch (err: any) {
-    console.error("❌ Create chat error:", err.response?.data);
+    console.error("❌ Create chat error:", err);
     error.value = err.response?.data?.detail || "Не удалось создать чат";
   } finally {
     isLoading.value = false;

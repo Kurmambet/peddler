@@ -13,7 +13,7 @@ class ChatService:
         self.repo = ChatRepository(db)
         self.db = db
 
-    async def create_or_get_direct_chat(self, current_user: User, other_user_id: int) -> Chat:
+    async def create_or_get_direct_chat(self, current_user: User, other_username: str) -> Chat:
         """
         Создать или получить существующий direct-чат.
         Бизнес-правила:
@@ -21,7 +21,7 @@ class ChatService:
         - Один direct-чат на пару пользователей
         """
         # Проверка: другой пользователь существует
-        other_user = await self.repo.get_user_by_id(other_user_id)
+        other_user = await self.repo.get_user_by_username(other_username)
         if not other_user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 

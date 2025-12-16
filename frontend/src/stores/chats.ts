@@ -32,11 +32,11 @@ export const useChatsStore = defineStore("chats", () => {
     currentChatId.value = chatId;
   };
 
-  const createDirectChat = async (otherUserId: number) => {
+  const createDirectChat = async (otherUsername: string) => {
     isLoading.value = true;
     error.value = null;
     try {
-      const { data } = await chatsAPI.createDirectChat(otherUserId);
+      const { data } = await chatsAPI.createDirectChat(otherUsername);
 
       // Добавить в список, если его там нет
       if (!chats.value.find((c) => c.id === data.id)) {

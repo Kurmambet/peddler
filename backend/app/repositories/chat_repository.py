@@ -16,6 +16,11 @@ class ChatRepository:
         result = await self.db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
 
+    async def get_user_by_username(self, username: str) -> Optional[User]:
+        """Получить пользователя по username"""
+        result = await self.db.execute(select(User).where(User.username == username))
+        return result.scalar_one_or_none()
+
     async def find_direct_chat(self, user1_id: int, user2_id: int) -> Optional[Chat]:
         """Найти существующий direct-чат между двумя пользователями"""
         # Получаем ID чатов, где есть оба пользователя

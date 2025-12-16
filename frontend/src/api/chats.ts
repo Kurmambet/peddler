@@ -8,8 +8,10 @@ export const chatsAPI = {
 
   getChat: (chatId: number) => apiClient.get<ChatRead>(`/chats/${chatId}`),
 
-  createDirectChat: (otherUserId: number) =>
-    apiClient.post<ChatRead>("/chats/direct", { other_user_id: otherUserId }),
+  createDirectChat: (otherUsername: string) =>
+    apiClient.post<ChatRead>("/chats/direct", {
+      other_username: otherUsername,
+    }),
 
   createGroupChat: (title: string, participantIds: number[]) =>
     apiClient.post<ChatRead>("/chats/group", {

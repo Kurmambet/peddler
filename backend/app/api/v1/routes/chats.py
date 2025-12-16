@@ -25,7 +25,7 @@ async def create_or_get_direct_chat(
     service: ChatService = Depends(get_chat_service),
 ) -> Chat:
     """Создаёт или возвращает существующий direct-чат"""
-    return await service.create_or_get_direct_chat(current_user, request.other_user_id)
+    return await service.create_or_get_direct_chat(current_user, request.other_username)
 
 
 @router.post("/group", response_model=ChatRead, status_code=status.HTTP_201_CREATED)

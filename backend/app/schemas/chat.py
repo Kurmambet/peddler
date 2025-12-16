@@ -51,7 +51,8 @@ class ChatCreate(BaseModel):
 class DirectChatCreate(BaseModel):
     """Для создания/получения direct-чата"""
 
-    other_user_id: int = Field(..., ge=1)
+    other_username: str = Field(..., min_length=1, max_length=50)
+    # other_user_id: int = Field(..., ge=1)
 
 
 class DirectChatRead(ChatRead):
