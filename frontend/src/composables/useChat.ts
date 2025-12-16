@@ -5,6 +5,7 @@ import { useAuthStore } from "../stores/auth";
 import { useChatsStore } from "../stores/chats";
 import { useMessagesStore } from "../stores/messages";
 import type { MessageCreatedEvent } from "../types/events";
+import { splitMessage } from "../utils/messageUtils";
 import { WebSocketClient } from "../ws/client";
 
 export function useChat() {
@@ -112,40 +113,58 @@ export function useChat() {
     const wsConnected = ws.value?.isConnected ?? false;
 
     console.log("[useChat] === Sending message ===");
-    console.log("[useChat] Content:", content);
+    console.log("[useChat] Content length:", content.length);
     console.log("[useChat] ChatID:", chatId.value);
     console.log("[useChat] WebSocket connected:", wsConnected);
-    console.log("[useChat] WS Object:", {
-      exists: !!ws.value,
-      isConnected: wsConnected,
-      readyState: (ws.value as any)?.ws?.readyState,
-    });
+
+    // РАЗДЕЛЯЕМ СООБЩЕНИЕ НА ЧАСТИ
+    const messageParts = splitMessage(content);
+    console.log(`[useChat] 📤 Splitting into ${messageParts.length} part(s)`);
 
     // Очищаем поле сразу
     newMessageContent.value = "";
 
     try {
-      if (wsConnected && ws.value) {
-        console.log("[useChat] 📤 Using WebSocket to send");
-        ws.value.send({
-          type: "send_message",
-          content,
-        });
-        console.log("[useChat] ✅ Message queued on WebSocket");
-      } else {
-        console.warn(
-          "[useChat] ⚠️ WebSocket not connected, falling back to REST API"
-        );
-        console.log("[useChat] 📤 Using REST API to send");
+      // ✅ ОТПРАВЛЯЕМ КАЖДУЮ ЧАСТЬ
+      for (let i = 0; i < messageParts.length; i++) {
+        const part = messageParts[i];
 
-        // REST API fallback
-        const sentMessage = await messagesStore.sendMessage(
-          chatId.value,
-          content
-        );
-        console.log("[useChat] ✅ Message sent via REST:", sentMessage.id);
+        if (wsConnected && ws.value) {
+          console.log(
+            `[useChat] 📤 Sending part ${i + 1}/${
+              messageParts.length
+            } via WebSocket (${part.length} chars)`
+          );
+          ws.value.send({
+            type: "send_message",
+            content: part,
+          });
+          console.log(`[useChat] ✅ Part ${i + 1} queued on WebSocket`);
+        } else {
+          console.warn(
+            `[useChat] ⚠️ WebSocket not connected, using REST API for part ${
+              i + 1
+            }/${messageParts.length}`
+          );
 
-        // Перезагружаем сообщения для актуальности
+          // REST API fallback
+          const sentMessage = await messagesStore.sendMessage(
+            chatId.value,
+            part
+          );
+          console.log(
+            `[useChat] ✅ Part ${i + 1} sent via REST (ID: ${sentMessage.id})`
+          );
+        }
+
+        // ⏱️ Небольшая задержка между частями
+        if (i < messageParts.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+      }
+
+      // Перезагружаем сообщения для актуальности (если использовали REST API)
+      if (!wsConnected) {
         await messagesStore.loadMessages(chatId.value);
       }
     } catch (err) {

@@ -1,3 +1,5 @@
+<!-- src/components/chat/MessageList.vue -->
+
 <template>
   <div class="flex flex-col p-4 space-y-4">
     <div v-if="isLoading" class="text-center text-gray-500">
@@ -16,17 +18,16 @@
       :class="{ 'justify-end': isOwn(msg) }"
     >
       <div
-        class="max-w-xs px-4 py-2 rounded-lg"
+        class="max-w-md px-4 py-2 rounded-lg break-words"
         :class="{
           'bg-blue-600 text-white': isOwn(msg),
           'bg-gray-200 text-gray-900': !isOwn(msg),
         }"
       >
-        <!-- Показываем sender_id для отладки -->
         <p v-if="!isOwn(msg)" class="text-xs font-semibold mb-1 text-gray-600">
           {{ msg.sender_username }}
         </p>
-        <p class="text-sm">{{ msg.content }}</p>
+        <p class="text-sm whitespace-pre-wrap">{{ msg.content }}</p>
         <p
           class="text-xs mt-1"
           :class="{

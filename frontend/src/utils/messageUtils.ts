@@ -1,4 +1,4 @@
-// src/utils/messageUtils.ts
+// frontend/src/utils/messageUtils.ts
 
 const MAX_MESSAGE_LENGTH = 5000;
 
