@@ -4,7 +4,7 @@ from typing import List
 from app.models.chat import Chat, ChatParticipantRole, ChatType
 from app.models.user import User
 from app.repositories.chat_repository import ChatRepository
-from app.schemas.chat import ChatRead, DirectChatRead, GroupChatRead
+from app.schemas.chat import ChatRead, DirectChatRead, GroupChatCreate, GroupChatRead
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -53,50 +53,47 @@ class ChatService:
     async def create_group_chat(
         self,
         current_user: User,
-        title: str,
-        participant_ids: List[int],
+        chat_in: GroupChatCreate,  # Используем схему вместо параметров
     ) -> Chat:
         """
         Создать групповой чат.
         Бизнес-правила:
-        - Минимум 2 участника
-        - Все участники должны существовать
-        - Создатель автоматически владелец
+        - Создатель всегда добавляется как OWNER
+        - Остальные добавляются как MEMBER
+        - Все participants должны существовать
+        - Создатель не должен быть в списке participant_usernames
         """
-        # Добавляем текущего пользователя, если его нет
-        participant_ids_set = set(participant_ids)
-        if current_user.id not in participant_ids_set:
-            participant_ids_set.add(current_user.id)
+        # Получаем объекты пользователей по username
+        participants_data = []
+        for username in chat_in.participant_usernames:
+            user = await self.repo.get_user_by_username(username)
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail=f"User '{username}' not found"
+                )
 
-        # Бизнес-правило: минимум 2 участника
-        if len(participant_ids_set) < 2:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Group must have at least 2 participants",
-            )
+            # Проверяем что создатель не в списке
+            if user.id == current_user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Creator is automatically added, don't include yourself",
+                )
 
-        # Проверяем, что все пользователи существуют
-        existing_user_ids = await self.repo.check_users_exist(list(participant_ids_set))
-        if len(existing_user_ids) != len(participant_ids_set):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="Some users not found"
-            )
+            participants_data.append(user)
 
         # Создаём чат
         new_chat = await self.repo.create_chat(
             chat_type=ChatType.GROUP,
             created_by_id=current_user.id,
-            title=title,
+            title=chat_in.title,
         )
 
-        # Добавляем участников
-        for user_id in participant_ids_set:
-            role = (
-                ChatParticipantRole.OWNER
-                if user_id == current_user.id
-                else ChatParticipantRole.MEMBER
-            )
-            await self.repo.add_participant(new_chat.id, user_id, role)
+        # Добавляем создателя как OWNER
+        await self.repo.add_participant(new_chat.id, current_user.id, ChatParticipantRole.OWNER)
+
+        # Добавляем других участников как MEMBER
+        for user in participants_data:
+            await self.repo.add_participant(new_chat.id, user.id, ChatParticipantRole.MEMBER)
 
         await self.db.commit()
         return new_chat

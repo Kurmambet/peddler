@@ -10,6 +10,11 @@ export const useChatsStore = defineStore("chats", () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  const resetCurrentChat = () => {
+    console.log("[ChatsStore] 🔄 Resetting current chat");
+    currentChatId.value = null;
+  };
+
   const currentChat = computed(
     () => chats.value.find((c) => c.id === currentChatId.value) || null
   );
@@ -63,5 +68,6 @@ export const useChatsStore = defineStore("chats", () => {
     loadChats,
     setCurrentChat,
     createDirectChat,
+    resetCurrentChat,
   };
 });

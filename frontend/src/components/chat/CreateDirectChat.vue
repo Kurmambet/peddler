@@ -32,6 +32,7 @@
 
       <router-link
         to="/"
+        @click="resetChat"
         class="block mt-4 text-center text-sm text-gray-600 hover:text-gray-900"
       >
         ← Назад к чатам
@@ -70,5 +71,10 @@ const createChat = async () => {
   } finally {
     isLoading.value = false;
   }
+};
+// TODO когда нормальный фронт буду делать это заменить на редирект на главную страницу
+const resetChat = () => {
+  console.log("[Component] 🔄 Resetting current chat before navigation");
+  chatsStore.resetCurrentChat();
 };
 </script>

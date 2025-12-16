@@ -1,6 +1,5 @@
 # app/schemas/__init__.py
 from app.schemas.chat import (
-    ChatCreate,
     ChatParticipantBase,
     ChatParticipantRead,
     ChatRead,
@@ -20,7 +19,6 @@ __all__ = [
     "MessageRead",
     "MessageListResponse",
     "ChatRead",
-    "ChatCreate",
     "DirectChatCreate",
     "DirectChatRead",
     "GroupChatCreate",

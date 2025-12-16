@@ -16,35 +16,32 @@ export function useChatList() {
 
   async function loadChats() {
     console.log("[useChatList] 📥 Loading chats...");
-    // только если чатов еще нет
     if (chats.value.length === 0) {
       await chatsStore.loadChats();
     }
     console.log("[useChatList] ✅ Chats loaded:", chats.value.length);
   }
 
-  // watch на route
+  // Watch на route path
   watch(
     () => route.path,
     (newPath) => {
-      if (newPath === "/") {
-        console.log('[useChatList] 🔄 Entering "/" page, loading chats...');
-        // Загружаем только при первом входе
-        if (chats.value.length === 0) {
-          loadChats();
-        }
+      const shouldLoadChats =
+        newPath === "/" ||
+        newPath.startsWith("/chat/") ||
+        newPath === "/create-direct" ||
+        newPath === "/create-group";
+
+      if (shouldLoadChats) {
+        console.log(`[useChatList] 🔄 Entering "${newPath}", loading chats...`);
+        loadChats();
       }
     },
-    { immediate: true } // Выполнить СРАЗУ при инициализации
+    { immediate: true }
   );
 
-  // Автообновление каждые 5 секунд
   onMounted(() => {
     console.log("[useChatList] 🔧 Mounting, setting auto-refresh...");
-    intervalId = window.setInterval(() => {
-      // loadChats();
-      console.log("[useChatList] 🔄 Auto-refresh (checking for new chats)");
-    }, 5000);
   });
 
   onUnmounted(() => {

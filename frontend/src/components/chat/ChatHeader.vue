@@ -6,7 +6,7 @@
         {{
           currentChat?.type === "direct"
             ? currentChat?.other_username
-            : currentChat?.title || "Group Chat"
+            : currentChat?.title || ""
         }}
       </h2>
       <p class="text-sm text-gray-500">{{ currentChat?.type }}</p>

@@ -30,18 +30,6 @@ class ChatParticipantRead(ChatParticipantBase):
         from_attributes = True
 
 
-# Базовая схема для чтения (только основные поля)
-# class ChatRead(BaseModel):
-#     id: int
-#     title: Optional[str] = None
-#     type: ChatType
-#     created_by_id: int
-#     created_at: datetime
-
-#     class Config:
-#         from_attributes = True
-
-
 class DirectChatRead(BaseModel):
     id: int
     type: Literal["direct"]
@@ -62,28 +50,20 @@ class GroupChatRead(BaseModel):
 ChatRead = Union[DirectChatRead, GroupChatRead]
 
 
-class ChatCreate(BaseModel):
-    title: Optional[str] = Field(None, max_length=255)
-    type: ChatType = ChatType.DIRECT
-    participant_ids: List[int] = Field(..., min_items=2)
-
-
 class DirectChatCreate(BaseModel):
     """Для создания/получения direct-чата"""
 
+    type: Literal["direct"] = "direct"
     other_username: str = Field(..., min_length=1, max_length=50)
-    # other_user_id: int = Field(..., ge=1)
 
 
-# class DirectChatRead(ChatRead):
-#     """Просто наследуем от ChatRead - никаких participants"""
-
-#     pass
-
-
-class GroupChatCreate(ChatCreate):
-    """Для создания группы"""
+class GroupChatCreate(BaseModel):
+    """Для создания группового чата"""
 
     title: str = Field(..., min_length=1, max_length=255)
-    type: ChatType = ChatType.GROUP
-    participant_ids: List[int] = Field(..., min_items=2)
+    type: Literal["group"] = "group"
+    participant_usernames: List[str] = Field(
+        ...,
+        min_items=1,  # Минимум 1 участник (помимо создателя)
+        description="Usernames of participants to add (creator is added automatically)",
+    )
