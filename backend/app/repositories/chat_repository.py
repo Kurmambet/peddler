@@ -5,6 +5,7 @@ from app.models.chat import Chat, ChatParticipant, ChatParticipantRole, ChatType
 from app.models.user import User
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 
 class ChatRepository:
@@ -14,6 +15,11 @@ class ChatRepository:
     async def get_user_by_id(self, user_id: int) -> Optional[User]:
         """Получить пользователя по ID"""
         result = await self.db.execute(select(User).where(User.id == user_id))
+        return result.scalar_one_or_none()
+
+    async def get_user_by_username(self, username: str) -> Optional[User]:
+        """Получить пользователя по username"""
+        result = await self.db.execute(select(User).where(User.username == username))
         return result.scalar_one_or_none()
 
     async def find_direct_chat(self, user1_id: int, user2_id: int) -> Optional[Chat]:
@@ -74,6 +80,7 @@ class ChatRepository:
         """Получить список чатов пользователя"""
         stmt = (
             select(Chat)
+            .options(selectinload(Chat.participants).selectinload(ChatParticipant.user))
             .join(ChatParticipant, Chat.id == ChatParticipant.chat_id)
             .where(ChatParticipant.user_id == user_id)
             .order_by(Chat.updated_at.desc())

@@ -5,9 +5,15 @@ from app.api.dependencies import get_current_user
 from app.database import get_db
 from app.models.chat import Chat
 from app.models.user import User
-from app.schemas.chat import ChatRead, DirectChatCreate, DirectChatRead, GroupChatCreate
+from app.schemas.chat import (
+    ChatRead,
+    DirectChatCreate,
+    DirectChatRead,
+    GroupChatCreate,
+    GroupChatRead,
+)
 from app.services.chat_service import ChatService
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["chats"])
@@ -25,21 +31,17 @@ async def create_or_get_direct_chat(
     service: ChatService = Depends(get_chat_service),
 ) -> Chat:
     """Создаёт или возвращает существующий direct-чат"""
-    return await service.create_or_get_direct_chat(current_user, request.other_user_id)
+    return await service.create_or_get_direct_chat(current_user, request.other_username)
 
 
-@router.post("/group", response_model=ChatRead, status_code=status.HTTP_201_CREATED)
+@router.post("/group", response_model=GroupChatRead)
 async def create_group_chat(
-    request: GroupChatCreate,
+    request: GroupChatCreate,  # Используем схему
     current_user: User = Depends(get_current_user),
     service: ChatService = Depends(get_chat_service),
 ) -> Chat:
     """Создаёт новый групповой чат"""
-    return await service.create_group_chat(
-        current_user,
-        request.title,
-        request.participant_ids,
-    )
+    return await service.create_group_chat(current_user, request)
 
 
 @router.get("", response_model=List[ChatRead])

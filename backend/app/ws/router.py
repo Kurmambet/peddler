@@ -235,9 +235,6 @@ async def handle_send_message(
         is_read=message.is_read,
     )
 
-    # Отправляем всем участникам чата (включая отправителя)
-    # await manager.broadcast_to_chat(chat_id, message_event.model_dump_json())
-
     # публикуем в Redis вместо прямого broadcast
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
 
