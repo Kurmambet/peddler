@@ -18,7 +18,7 @@
       :class="{ 'justify-end': isOwn(msg) }"
     >
       <div
-        class="max-w-md px-4 py-2 rounded-lg break-words"
+        class="max-w-md px-4 py-2 rounded-lg wrap-break-word"
         :class="{
           'bg-blue-600 text-white': isOwn(msg),
           'bg-gray-200 text-gray-900': !isOwn(msg),

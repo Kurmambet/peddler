@@ -13,14 +13,14 @@
           placeholder="Username"
           required
           minlength="3"
-          class="w-full px-3 py-2 border rounded-md"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-blue-600 focus:outline-none"
         />
         <input
           v-model="password"
           type="password"
           placeholder="Password"
           required
-          class="w-full px-3 py-2 border rounded-md"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:border-blue-600 focus:outline-none"
         />
         <button
           type="submit"
