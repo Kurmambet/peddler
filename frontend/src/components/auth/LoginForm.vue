@@ -1,39 +1,59 @@
 <!-- src/components/auth/LoginForm.vue -->
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50">
+  <div class="min-h-screen flex items-center justify-center bg-app-bg p-4">
     <div class="max-w-md w-full space-y-8">
-      <h2 class="text-center text-3xl font-bold">Sign in to Peddler</h2>
+      <div class="text-center">
+        <h2 class="text-3xl font-bold text-app-text">Sign in to Peddler</h2>
+        <p class="text-app-text-secondary text-sm mt-2">Welcome back</p>
+      </div>
+
       <form @submit.prevent="handleSubmit" class="space-y-6">
-        <div v-if="error" class="rounded-md bg-red-50 p-4 text-red-700">
+        <!-- Error Message -->
+        <div
+          v-if="error"
+          class="rounded-md bg-app-error-subtle p-4 text-app-error text-sm"
+        >
           {{ error }}
         </div>
-        <input
+
+        <!-- Username Input -->
+        <Input
           v-model="username"
           type="text"
-          placeholder="Username"
-          required
-          minlength="3"
-          class="w-full px-3 py-2 border rounded-md"
+          label="Username"
+          placeholder="Enter your username"
+          @keyup.enter="handleSubmit"
         />
-        <input
+
+        <!-- Password Input -->
+        <Input
           v-model="password"
           type="password"
-          placeholder="Password"
-          required
-          class="w-full px-3 py-2 border rounded-md"
+          label="Password"
+          placeholder="Enter your password"
+          @keyup.enter="handleSubmit"
         />
-        <button
+
+        <!-- Submit Button -->
+        <Button
           type="submit"
+          variant="primary"
           :disabled="isSubmitting"
-          class="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+          :is-loading="isSubmitting"
+          full-width
         >
           {{ isSubmitting ? "Signing in..." : "Sign In" }}
-        </button>
-        <p class="text-center text-sm">
+        </Button>
+
+        <!-- Register Link -->
+        <p class="text-center text-sm text-app-text-secondary">
           No account?
-          <router-link to="/register" class="text-blue-600"
-            >Register</router-link
+          <router-link
+            to="/register"
+            class="text-app-primary hover:text-app-primary-hover"
           >
+            Register
+          </router-link>
         </p>
       </form>
     </div>
@@ -43,6 +63,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useAuth } from "../../composables/useAuth";
+import Button from "../ui/Button.vue";
+import Input from "../ui/Input.vue";
 
 const { handleLogin, isSubmitting } = useAuth();
 const username = ref("");

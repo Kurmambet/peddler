@@ -1,39 +1,64 @@
 <!-- src/components/chat/ChatList.vue -->
 <template>
-  <div class="flex flex-col h-full">
-    <div class="p-4 border-b">
-      <h1 class="text-xl font-bold">Chats</h1>
+  <div class="flex flex-col h-full bg-app-bg">
+    <!-- Header -->
+    <div class="p-4 border-b border-app-border bg-app-surface flex-shrink-0">
+      <h1 class="text-xl font-bold text-app-text">Chats</h1>
     </div>
-    <div v-if="isLoading" class="p-4 text-gray-500">Loading...</div>
-    <div v-else-if="error" class="p-4 text-red-600">{{ error }}</div>
-    <div v-else class="flex-1 overflow-y-auto">
-      <div v-if="chats.length === 0" class="p-4 text-gray-500">No chats</div>
+
+    <!-- Chat list - СКРОЛЯБЕЛЬНАЯ ЧАСТЬ -->
+    <div class="flex-1 overflow-y-auto">
+      <!-- Loading -->
+      <div v-if="isLoading" class="p-4 text-app-text-secondary">
+        <Skeleton width="100%" height="h-12" class="mb-2" />
+        <Skeleton width="100%" height="h-12" class="mb-2" />
+      </div>
+
+      <!-- Error -->
+      <div
+        v-else-if="error"
+        class="p-4 bg-app-error-subtle text-app-error text-sm rounded-md m-4"
+      >
+        {{ error }}
+      </div>
+
+      <!-- Empty -->
+      <div
+        v-else-if="chats.length === 0"
+        class="p-4 text-app-text-secondary text-center"
+      >
+        No chats yet
+      </div>
+
+      <!-- Chats -->
       <router-link
         v-for="chat in chats"
         :key="chat.id"
         :to="`/chat/${chat.id}`"
-        class="block p-4 border-b hover:bg-gray-50"
+        class="block p-4 border-b border-app-border hover:bg-app-surface transition-colors"
       >
-        <h3 class="font-semibold">
+        <h3 class="font-semibold text-app-text">
           {{ chat.type === "direct" ? chat.other_username : chat.title }}
         </h3>
-        <p class="text-sm text-gray-500">{{ chat.type }}</p>
+        <p class="text-xs text-app-text-secondary mt-1">
+          {{ chat.type === "direct" ? "Direct" : "Group" }}
+        </p>
       </router-link>
     </div>
-  </div>
 
-  <div class="p-4 border-t border-gray-200">
-    <router-link
-      to="/users"
-      class="w-full block text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-    >
-      Начать чат
-    </router-link>
+    <!-- Button - sticky внизу -->
+    <div class="p-4 border-t border-app-border bg-app-surface flex-shrink-0">
+      <router-link to="/users">
+        <Button variant="primary" full-width> New Chat </Button>
+      </router-link>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { useChatList } from "../../composables/useChatList";
+import Button from "../ui/Button.vue";
+import Skeleton from "../ui/Skeleton.vue";
 
 const { chats, isLoading, error } = useChatList();
 </script>
