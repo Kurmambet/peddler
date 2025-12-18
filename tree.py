@@ -39,7 +39,7 @@ SKIP_CONTENT_FILES = {
 INCLUDE_EXTENSIONS = {
     ".py",
     # ".txt",
-    ".md",
+    # ".md",
     ".yml",
     ".yaml",
     ".toml",
