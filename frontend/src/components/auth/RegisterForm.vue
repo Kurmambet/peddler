@@ -9,10 +9,7 @@
 
       <form @submit.prevent="handleSubmit" class="space-y-6">
         <!-- Error Message -->
-        <div
-          v-if="error"
-          class="rounded-md bg-app-error-subtle p-4 text-app-error text-sm"
-        >
+        <div v-if="error" class="rounded-md status--error p-4 text-sm">
           {{ error }}
         </div>
 

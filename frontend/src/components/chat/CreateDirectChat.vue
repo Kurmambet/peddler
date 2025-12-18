@@ -12,10 +12,7 @@
         </div>
 
         <!-- Error Message -->
-        <div
-          v-if="error"
-          class="p-3 bg-app-error-subtle text-app-error rounded-md text-sm"
-        >
+        <div v-if="error" class="p-4 status--error rounded-md text-sm">
           {{ error }}
         </div>
 
