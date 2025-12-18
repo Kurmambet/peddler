@@ -11,6 +11,7 @@ EXCLUDE_DIRS = {
     ".vscode",
     "postgres_dev_data",
     "redis_dev_data",
+    "backend",
 }
 
 # Файлы/директории, которые НЕ нужно копировать содержимое
