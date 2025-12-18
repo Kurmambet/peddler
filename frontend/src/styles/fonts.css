@@ -738,540 +738,332 @@ select.form-control {
 }
 
 /* END PERPLEXITY DESIGN SYSTEM */
+
 /* ============================================================================
-   src/styles/variables.css
+   src/styles/fonts.css
    
-   CSS Custom Properties для темизации приложения.
-   Поддерживает темный режим (основной) и светлый режим.
-   Adapted to Perplexity Design System.
-   
-   Использование:
-   - bg-app-bg / bg-app-surface / bg-app-card
-   - text-app-text / text-app-text-secondary
-   - border-app-border
-   - bg-app-primary / hover:bg-app-primary-hover
+   Font configuration adhering to Perplexity design system.
+   Uses FKGroteskNeue as primary font with system font fallbacks.
    ============================================================================ */
 
 /* ============================================================================
-   СВЕТЛЫЙ РЕЖИМ (Light Mode) — для дневного использования
+   BASE FONTS
    ============================================================================ */
 
-:root {
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Цвета фона */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  /* Основной фон приложения */
-  --color-bg: 252 252 249;
-
-  /* Фон контейнеров (чуть темнее основного) */
-  --color-surface: 255 255 253;
-
-  /* Фон карточек и модалей */
-  --color-card: 255 255 253;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Цвета текста */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  /* Основной текст */
-  --color-text: 19 52 59;
-
-  /* Вторичный текст (подписи, хинты, дата/время) */
-  --color-text-secondary: 98 108 113;
-
-  /* Текст на цветном фоне (кнопки, etc) */
-  --color-text-inverse: 252 252 249;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Границы и разделители */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  /* Основная граница */
-  --color-border: 94 82 64;
-
-  /* Более заметная граница */
-  --color-border-strong: 94 82 64;
-
-  /* Едва заметная граница */
-  --color-border-subtle: 94 82 64;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Основные цвета (Primary/Brand) */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  /* Основной цвет бренда (кнопки, ссылки) */
-  --color-primary: 33 128 141;
-
-  /* Hover состояние */
-  --color-primary-hover: 29 116 128;
-
-  /* Active состояние */
-  --color-primary-active: 26 104 115;
-
-  /* Слегка прозрачный фон для active элементов */
-  --color-primary-subtle: 33 128 141;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Статусные цвета */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  /* Успех (зелёный) */
-  --color-success: 33 128 141;
-  --color-success-hover: 29 116 128;
-  --color-success-subtle: 33 128 141;
-
-  /* Ошибка (красный) */
-  --color-error: 192 21 47;
-  --color-error-hover: 192 21 47;
-  --color-error-subtle: 192 21 47;
-
-  /* Предупреждение (жёлтый) */
-  --color-warning: 168 75 47;
-  --color-warning-hover: 168 75 47;
-  --color-warning-subtle: 168 75 47;
-
-  /* Информация (голубой) */
-  --color-info: 98 108 113;
-  --color-info-hover: 98 108 113;
-  --color-info-subtle: 98 108 113;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Специальные цвета для чата */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  /* Фон входящего сообщения */
-  --color-message-incoming: 94 82 64;
-
-  /* Фон исходящего сообщения */
-  --color-message-outgoing: 33 128 141;
-
-  /* Текст на сообщениях */
-  --color-message-text-incoming: 19 52 59;
-  --color-message-text-outgoing: 252 252 249;
-
-  /* Фон типирования */
-  --color-typing: 94 82 64;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Интерактивные элементы */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  /* Фон для элементов, которые в фокусе */
-  --color-focus-ring: 33 128 141;
-
-  /* Фон для disabled элементов */
-  --color-disabled: 94 82 64;
-
-  /* Текст для disabled элементов */
-  --color-disabled-text: 98 108 113;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Аватары (цвета для инициалов) */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  --color-avatar-1: 33 128 141;
-  --color-avatar-2: 45 166 178;
-  --color-avatar-3: 50 184 198;
-  --color-avatar-4: 29 116 128;
-  --color-avatar-5: 168 75 47;
-  --color-avatar-6: 192 21 47;
+html,
+body {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--color-text);
+  letter-spacing: 0;
 }
 
 /* ============================================================================
-   ТЁМНЫЙ РЕЖИМ (Dark Mode) — ОСНОВНОЙ РЕЖИМ ДЛЯ ПРИЛОЖЕНИЯ
+   MONOSPACE FONTS (для кода, дат, чисел)
    ============================================================================ */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    /* ─────────────────────────────────────────────────────────────────────── */
-    /* Цвета фона */
-    /* ─────────────────────────────────────────────────────────────────────── */
+code,
+pre,
+kbd,
+samp {
+  font-family: var(--font-family-mono);
+  font-size: calc(var(--font-size-base) * 0.95);
+}
 
-    /* Основной фон (очень тёмный) */
-    --color-bg: 31 33 33;
+/* ============================================================================
+   СПЕЦИАЛЬНЫЕ ШРИФТЫ ДЛЯ ЭЛЕМЕНТОВ
+   ============================================================================ */
 
-    /* Фон контейнеров */
-    --color-surface: 38 40 40;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: inherit;
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-tight);
+  letter-spacing: var(--letter-spacing-tight);
+  color: var(--color-text);
+}
 
-    /* Фон карточек */
-    --color-card: 38 40 40;
+button,
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  font-family: inherit;
+  font-weight: var(--font-weight-medium);
+}
 
-    /* ─────────────────────────────────────────────────────────────────────── */
-    /* Цвета текста */
-    /* ─────────────────────────────────────────────────────────────────────── */
+input,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: var(--line-height-normal);
+}
 
-    /* Основной текст (белый) */
-    --color-text: 245 245 245;
+/* ============================================================================
+   ОПТИМИЗАЦИЯ РЕНДЕРИНГА ТЕКСТА
+   ============================================================================ */
 
-    /* Вторичный текст (серый) */
-    --color-text-secondary: 167 169 169;
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
 
-    /* Текст на цветном фоне */
-    --color-text-inverse: 19 52 59;
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 
-    /* ─────────────────────────────────────────────────────────────────────── */
-    /* Границы */
-    /* ─────────────────────────────────────────────────────────────────────── */
-
-    /* Основная граница */
-    --color-border: 119 124 124;
-
-    /* Более заметная граница */
-    --color-border-strong: 119 124 124;
-
-    /* Едва заметная граница */
-    --color-border-subtle: 119 124 124;
-
-    /* ─────────────────────────────────────────────────────────────────────── */
-    /* Основные цвета */
-    /* ─────────────────────────────────────────────────────────────────────── */
-
-    /* Primary цвет (может быть ярче в тёмном режиме) */
-    --color-primary: 50 184 198;
-
-    /* Hover */
-    --color-primary-hover: 45 166 178;
-
-    /* Active */
-    --color-primary-active: 41 150 161;
-
-    /* Subtle фон */
-    --color-primary-subtle: 50 184 198;
-
-    /* ─────────────────────────────────────────────────────────────────────── */
-    /* Статусные цвета */
-    /* ─────────────────────────────────────────────────────────────────────── */
-
-    /* Успех */
-    --color-success: 50 184 198;
-    --color-success-hover: 45 166 178;
-    --color-success-subtle: 50 184 198;
-
-    /* Ошибка */
-    --color-error: 255 84 89;
-    --color-error-hover: 255 84 89;
-    --color-error-subtle: 255 84 89;
-
-    /* Предупреждение */
-    --color-warning: 230 129 97;
-    --color-warning-hover: 230 129 97;
-    --color-warning-subtle: 230 129 97;
-
-    /* Информация */
-    --color-info: 167 169 169;
-    --color-info-hover: 167 169 169;
-    --color-info-subtle: 167 169 169;
-
-    /* ─────────────────────────────────────────────────────────────────────── */
-    /* Специальные цвета для чата */
-    /* ─────────────────────────────────────────────────────────────────────── */
-
-    /* Входящее сообщение (серое) */
-    --color-message-incoming: 119 124 124;
-
-    /* Исходящее сообщение (голубое) */
-    --color-message-outgoing: 50 184 198;
-
-    /* Текст на входящем сообщении */
-    --color-message-text-incoming: 245 245 245;
-
-    /* Текст на исходящем сообщении */
-    --color-message-text-outgoing: 19 52 59;
-
-    /* Типирование */
-    --color-typing: 119 124 124;
-
-    /* ─────────────────────────────────────────────────────────────────────── */
-    /* Интерактивные элементы */
-    /* ─────────────────────────────────────────────────────────────────────── */
-
-    /* Focus ring */
-    --color-focus-ring: 50 184 198;
-
-    /* Disabled */
-    --color-disabled: 119 124 124;
-
-    /* Disabled text */
-    --color-disabled-text: 167 169 169;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
 /* ============================================================================
-   РУЧНОЕ ПЕРЕКЛЮЧЕНИЕ ТЕМЫ (для кнопки "Light/Dark")
+   СТИЛИЗАЦИЯ ТЕКСТА
    ============================================================================ */
 
-/* Светлый режим (когда у пользователя есть класс light-mode) */
-[data-theme="light"] {
-  --color-bg: 252 252 249;
-  --color-surface: 255 255 253;
-  --color-card: 255 255 253;
-  --color-text: 19 52 59;
-  --color-text-secondary: 98 108 113;
-  --color-text-inverse: 252 252 249;
-  --color-border: 94 82 64;
-  --color-border-strong: 94 82 64;
-  --color-border-subtle: 94 82 64;
-  --color-primary: 33 128 141;
-  --color-primary-hover: 29 116 128;
-  --color-primary-active: 26 104 115;
-  --color-primary-subtle: 33 128 141;
-  --color-success: 33 128 141;
-  --color-success-hover: 29 116 128;
-  --color-success-subtle: 33 128 141;
-  --color-error: 192 21 47;
-  --color-error-hover: 192 21 47;
-  --color-error-subtle: 192 21 47;
-  --color-warning: 168 75 47;
-  --color-warning-hover: 168 75 47;
-  --color-warning-subtle: 168 75 47;
-  --color-info: 98 108 113;
-  --color-info-hover: 98 108 113;
-  --color-info-subtle: 98 108 113;
-  --color-message-incoming: 94 82 64;
-  --color-message-outgoing: 33 128 141;
-  --color-message-text-incoming: 19 52 59;
-  --color-message-text-outgoing: 252 252 249;
-  --color-typing: 94 82 64;
-  --color-focus-ring: 33 128 141;
-  --color-disabled: 94 82 64;
-  --color-disabled-text: 98 108 113;
+a {
+  text-decoration: none;
+  color: var(--color-primary);
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
-/* Тёмный режим (когда у пользователя есть класс dark-mode) */
-[data-theme="dark"] {
-  --color-bg: 31 33 33;
-  --color-surface: 38 40 40;
-  --color-card: 38 40 40;
-  --color-text: 245 245 245;
-  --color-text-secondary: 167 169 169;
-  --color-text-inverse: 19 52 59;
-  --color-border: 119 124 124;
-  --color-border-strong: 119 124 124;
-  --color-border-subtle: 119 124 124;
-  --color-primary: 50 184 198;
-  --color-primary-hover: 45 166 178;
-  --color-primary-active: 41 150 161;
-  --color-primary-subtle: 50 184 198;
-  --color-success: 50 184 198;
-  --color-success-hover: 45 166 178;
-  --color-success-subtle: 50 184 198;
-  --color-error: 255 84 89;
-  --color-error-hover: 255 84 89;
-  --color-error-subtle: 255 84 89;
-  --color-warning: 230 129 97;
-  --color-warning-hover: 230 129 97;
-  --color-warning-subtle: 230 129 97;
-  --color-info: 167 169 169;
-  --color-info-hover: 167 169 169;
-  --color-info-subtle: 167 169 169;
-  --color-message-incoming: 119 124 124;
-  --color-message-outgoing: 50 184 198;
-  --color-message-text-incoming: 245 245 245;
-  --color-message-text-outgoing: 19 52 59;
-  --color-typing: 119 124 124;
-  --color-focus-ring: 50 184 198;
-  --color-disabled: 119 124 124;
-  --color-disabled-text: 167 169 169;
+a:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: var(--space-2);
+}
+
+::selection {
+  background-color: var(--color-primary);
+  color: var(--color-btn-primary-text);
+}
+
+::-moz-selection {
+  background-color: var(--color-primary);
+  color: var(--color-btn-primary-text);
 }
 
 /* ============================================================================
-   SPACING (Стандартные отступы)
+   ЛИГАТУРЫ И СПЕЦИАЛЬНЫЕ ТИПОГРАФСКИЕ ВОЗМОЖНОСТИ
    ============================================================================ */
 
-:root {
-  --spacing-xs: 0.25rem; /* 4px */
-  --spacing-sm: 0.5rem; /* 8px */
-  --spacing-md: 1rem; /* 16px */
-  --spacing-lg: 1.5rem; /* 24px */
-  --spacing-xl: 2rem; /* 32px */
-  --spacing-2xl: 3rem; /* 48px */
-  --spacing-3xl: 4rem; /* 64px */
+body {
+  font-feature-settings: "kern" 1, "liga" 1;
+}
 
-  /* Гаттеры (отступы контейнеров) */
-  --gutter-mobile: 1rem;
-  --gutter-desktop: 1.5rem;
+code,
+pre {
+  font-feature-settings: "kern" 0, "liga" 0;
 }
 
 /* ============================================================================
-   ТИПОГРАФИЯ (Font Sizes)
+   РАЗМЕРЫ ШРИФТОВ ПО УМОЛЧАНИЮ
    ============================================================================ */
 
-:root {
-  --font-size-xs: 0.6875rem; /* 11px */
-  --font-size-sm: 0.75rem; /* 12px */
-  --font-size-base: 0.875rem; /* 14px */
-  --font-size-md: 0.875rem; /* 14px */
-  --font-size-lg: 1rem; /* 16px */
-  --font-size-xl: 1.125rem; /* 18px */
-  --font-size-2xl: 1.25rem; /* 20px */
-  --font-size-3xl: 1.5rem; /* 24px */
-  --font-size-4xl: 1.875rem; /* 30px */
-
-  /* Line heights */
-  --line-height-tight: 1.2;
-  --line-height-normal: 1.5;
-  --line-height-relaxed: 1.75;
-
-  /* Font weights */
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 550;
-  --font-weight-bold: 600;
+html {
+  font-size: var(--font-size-base);
 }
 
-/* ============================================================================
-   Z-INDEX (Слои) — ВАЖНО: используй эти значения везде!
-   ============================================================================ */
-
-:root {
-  --z-hide: -1;
-  --z-auto: 0;
-  --z-base: 1;
-  --z-elevated: 10;
-  --z-sticky: 20;
-  --z-fixed: 30;
-  --z-dropdown: 1000;
-  --z-modal-backdrop: 1040;
-  --z-modal: 1050;
-  --z-popover: 1060;
-  --z-tooltip: 1070;
-  --z-notification: 1080;
-  --z-debugger: 9999;
-}
-
-/* ============================================================================
-   BORDER RADIUS
-   ============================================================================ */
-
-:root {
-  --radius-none: 0;
-  --radius-sm: 0.375rem; /* 6px */
-  --radius-base: 0.5rem; /* 8px */
-  --radius-md: 0.75rem; /* 12px */
-  --radius-lg: 1rem; /* 16px */
-  --radius-xl: 1.5rem; /* 24px */
-  --radius-full: 9999px;
-}
-
-/* ============================================================================
-   TRANSITIONS & ANIMATIONS
-   ============================================================================ */
-
-:root {
-  /* Длительность переходов */
-  --duration-fast: 150ms;
-  --duration-normal: 250ms;
-  --duration-slow: 300ms;
-  --duration-slower: 500ms;
-
-  /* Функции easing */
-  --ease-in: cubic-bezier(0.4, 0, 1, 1);
-  --ease-out: cubic-bezier(0, 0, 0.2, 1);
-  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-/* ============================================================================
-   SHADOWS (Тени для глубины)
-   ============================================================================ */
-
-:root {
-  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.02);
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.04),
-    0 2px 4px -1px rgba(0, 0, 0, 0.02);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.04),
-    0 4px 6px -2px rgba(0, 0, 0, 0.02);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.04),
-    0 8px 10px -6px rgba(0, 0, 0, 0.02);
-
-  /* Для тёмного режима (более мягкие тени) */
-  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.03);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.1),
-      inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+@media (min-width: 1024px) {
+  html {
+    font-size: var(--font-size-base);
   }
 }
 
-[data-theme="dark"] {
-  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.1),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.15);
-}
-
-[data-theme="light"] {
-  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.03);
-}
-
 /* ============================================================================
-   BREAKPOINTS (для ручного использования, если нужно)
+   LINE HEIGHT (высота строк для комфортного чтения)
    ============================================================================ */
 
-:root {
-  --breakpoint-xs: 320px;
-  --breakpoint-sm: 640px;
-  --breakpoint-md: 768px;
-  --breakpoint-lg: 1024px;
-  --breakpoint-xl: 1280px;
-  --breakpoint-2xl: 1536px;
+body {
+  line-height: var(--line-height-normal);
+}
+
+p {
+  line-height: 1.6;
+  color: var(--color-text);
 }
 
 /* ============================================================================
-   УТИЛИТЫ ДЛЯ БЫСТРОГО ИСПОЛЬЗОВАНИЯ
+   LETTER SPACING (расстояние между буквами)
    ============================================================================ */
 
-/* Скрытый, но доступный для скринридеров текст */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border-width: 0;
+body {
+  letter-spacing: 0;
 }
 
-/* Плавный переход для всех элементов (опционально) */
-.transition-smooth {
-  transition: all var(--duration-normal) var(--ease-spring);
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  letter-spacing: var(--letter-spacing-tight);
 }
 
-/* Focus styles для accessibility */
-:focus-visible {
-  outline: 2px solid rgb(var(--color-primary));
-  outline-offset: 2px;
-  box-shadow: 0 0 0 3px rgba(var(--color-primary), 0.4);
+button,
+label,
+input[type="button"],
+input[type="submit"],
+.btn,
+.label {
+  letter-spacing: 0.02em;
 }
 
 /* ============================================================================
-   RESPONSIVE BREAKPOINT - Mobile Portrait (480px)
+   КОНТРОЛЬ ПЕРЕНОСОВ И РАЗРЫВОВ
+   ============================================================================ */
+
+p,
+li,
+dt,
+dd {
+  -webkit-hyphens: auto;
+  -moz-hyphens: auto;
+  hyphens: auto;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  hyphens: none;
+}
+
+/* ============================================================================
+   ЧИСЛА И ТАБЛИЦЫ (Tabular Numerals)
+   ============================================================================ */
+
+time,
+[role="time"],
+.time {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ============================================================================
+   EMOJI И СПЕЦИАЛЬНЫЕ СИМВОЛЫ
+   ============================================================================ */
+
+body {
+  font-family: var(--font-family-base);
+}
+
+/* ============================================================================
+   DARK MODE ОПТИМИЗАЦИЯ ТЕКСТА
+   ============================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  body {
+    -webkit-font-smoothing: antialiased;
+    color: var(--color-text);
+  }
+}
+
+/* ============================================================================
+   MOBILE RESPONSIVE (Portrait)
    ============================================================================ */
 
 @media (max-width: 480px) {
-  :root {
-    --font-size-xs: 0.625rem; /* 10px */
-    --font-size-sm: 0.6875rem; /* 11px */
-    --font-size-base: 0.8125rem; /* 13px */
-    --font-size-md: 0.8125rem; /* 13px */
-    --font-size-lg: 0.9375rem; /* 15px */
-    --font-size-xl: 1.0625rem; /* 17px */
-    --font-size-2xl: 1.1875rem; /* 19px */
-    --font-size-3xl: 1.375rem; /* 22px */
-    --font-size-4xl: 1.625rem; /* 26px */
+  html {
+    font-size: var(--font-size-base);
+  }
 
-    --spacing-md: 0.75rem; /* 12px */
-    --spacing-lg: 1rem; /* 16px */
-    --spacing-xl: 1.5rem; /* 24px */
-    --spacing-2xl: 2rem; /* 32px */
-    --spacing-3xl: 3rem; /* 48px */
+  body {
+    line-height: var(--line-height-normal);
+  }
 
-    --gutter-mobile: 0.75rem;
+  h1 {
+    font-size: var(--font-size-3xl);
+  }
+
+  h2 {
+    font-size: var(--font-size-2xl);
+  }
+
+  h3 {
+    font-size: var(--font-size-xl);
+  }
+
+  h4 {
+    font-size: var(--font-size-lg);
+  }
+
+  h5 {
+    font-size: var(--font-size-md);
+  }
+
+  h6 {
+    font-size: var(--font-size-sm);
+  }
+
+  p {
+    font-size: var(--font-size-base);
+    line-height: 1.6;
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-size: var(--font-size-sm);
+  }
+
+  button,
+  [role="button"],
+  input[type="button"],
+  input[type="submit"],
+  input[type="reset"] {
+    font-size: var(--font-size-sm);
+  }
+
+  input,
+  textarea,
+  select {
+    font-size: var(--font-size-base);
+  }
+}
+
+/* ============================================================================
+   PRINT STYLES (при печати)
+   ============================================================================ */
+
+@media print {
+  html {
+    font-size: 12pt;
+  }
+
+  body {
+    line-height: 1.6;
+    color: var(--color-black);
+    background: var(--color-white);
+  }
+
+  a {
+    text-decoration: underline;
+    color: var(--color-text);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--color-black);
   }
 }
