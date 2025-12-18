@@ -1,6 +1,8 @@
 <!-- src/components/chat/ChatHeader.vue -->
 <template>
-  <div class="px-6 py-4 bg-white border-b flex justify-between items-center">
+  <div
+    class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white"
+  >
     <div>
       <h2 class="text-xl font-bold">
         {{

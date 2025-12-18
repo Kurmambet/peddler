@@ -12,6 +12,12 @@ EXCLUDE_DIRS = {
     "postgres_dev_data",
     "redis_dev_data",
     "backend",
+    "api",
+    "router",
+    "types",
+    "utils",
+    "stores",
+    "ws",
 }
 
 # Файлы/директории, которые НЕ нужно копировать содержимое

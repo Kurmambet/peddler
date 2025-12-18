@@ -1,8 +1,8 @@
 <!-- src/components/chat/ChatList.vue -->
 <template>
-  <div class="flex flex-col h-full">
-    <div class="p-4 border-b">
-      <h1 class="text-xl font-bold">Chats</h1>
+  <div class="flex flex-col h-full bg-white border-r border-gray-200">
+    <div class="p-4 border-b border-gray-200">
+      <h1 class="text-xl font-bold text-gray-900">Chats</h1>
     </div>
     <div v-if="isLoading" class="p-4 text-gray-500">Loading...</div>
     <div v-else-if="error" class="p-4 text-red-600">{{ error }}</div>
@@ -12,9 +12,9 @@
         v-for="chat in chats"
         :key="chat.id"
         :to="`/chat/${chat.id}`"
-        class="block p-4 border-b hover:bg-gray-50"
+        class="block px-4 py-3 border-b border-gray-200 hover:bg-gray-50 transition"
       >
-        <h3 class="font-semibold">
+        <h3 class="font-medium text-gray-900">
           {{ chat.type === "direct" ? chat.other_username : chat.title }}
         </h3>
         <p class="text-sm text-gray-500">{{ chat.type }}</p>
@@ -25,7 +25,7 @@
   <div class="p-4 border-t border-gray-200">
     <router-link
       to="/users"
-      class="w-full block text-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+      class="block w-full text-center py-2.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
     >
       Начать чат
     </router-link>

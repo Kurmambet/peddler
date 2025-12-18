@@ -1,7 +1,7 @@
 <!-- src/components/chat/CreateDirectChat.vue -->
 <template>
   <div class="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-    <div class="max-w-md w-full bg-white rounded-lg shadow p-6">
+    <div class="max-w-md w-full bg-white/0 rounded-lg shadow p-6">
       <h2 class="text-2xl font-bold mb-4">Создать чат</h2>
 
       <div v-if="error" class="mb-4 p-3 bg-red-50 text-red-700 rounded">
