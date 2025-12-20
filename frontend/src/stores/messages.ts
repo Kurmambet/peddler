@@ -8,26 +8,72 @@ import type { MessageCreatedEvent } from "../types/events";
 export const useMessagesStore = defineStore("messages", () => {
   const messagesByChat = ref<Map<number, MessageRead[]>>(new Map());
   const isLoading = ref(false);
+  const isLoadingMore = ref(false);
+  const hasMore = ref<Map<number, boolean>>(new Map());
   const error = ref<string | null>(null);
 
   const getChatMessages = (chatId: number): MessageRead[] => {
     return messagesByChat.value.get(chatId) || [];
   };
 
-  const loadMessages = async (chatId: number) => {
+  const getHasMore = (chatId: number): boolean => {
+    return hasMore.value.get(chatId) ?? true;
+  };
+
+  const loadMessages = async (chatId: number, limit = 50) => {
     isLoading.value = true;
     error.value = null;
     try {
-      const { data } = await messagesAPI.list(chatId);
+      const { data } = await messagesAPI.list(chatId, limit, 0);
       messagesByChat.value.set(chatId, data.messages);
+      hasMore.value.set(chatId, data.has_more);
       console.log(
-        `[MessagesStore] Loaded ${data.messages.length} messages for chat ${chatId}`
+        `[MessagesStore] Loaded ${data.messages.length} messages for chat ${chatId}, has_more: ${data.has_more}`
       );
     } catch (err: any) {
       error.value = err.response?.data?.detail || "Failed to load messages";
       console.error("Load messages error:", err);
     } finally {
       isLoading.value = false;
+    }
+  };
+
+  const loadMoreMessages = async (chatId: number, limit = 50) => {
+    // Проверяем есть ли ещё сообщения
+    if (!getHasMore(chatId)) {
+      console.log("[MessagesStore] No more messages to load");
+      return;
+    }
+
+    isLoadingMore.value = true;
+    error.value = null;
+    try {
+      const currentMessages = getChatMessages(chatId);
+      const offset = currentMessages.length;
+
+      console.log(
+        `[MessagesStore] Loading more messages: offset=${offset}, limit=${limit}`
+      );
+
+      const { data } = await messagesAPI.list(chatId, limit, offset);
+
+      // Добавляем старые сообщения В НАЧАЛО массива
+      const allMessages = [...data.messages, ...currentMessages];
+      messagesByChat.value.set(chatId, allMessages);
+      hasMore.value.set(chatId, data.has_more);
+
+      console.log(
+        `[MessagesStore] Loaded ${data.messages.length} more messages, total: ${allMessages.length}, has_more: ${data.has_more}`
+      );
+
+      return data.messages.length; // Возвращаем количество загруженных
+    } catch (err: any) {
+      error.value =
+        err.response?.data?.detail || "Failed to load more messages";
+      console.error("Load more messages error:", err);
+      return 0;
+    } finally {
+      isLoadingMore.value = false;
     }
   };
 
@@ -79,9 +125,12 @@ export const useMessagesStore = defineStore("messages", () => {
   return {
     messagesByChat,
     isLoading,
+    isLoadingMore,
     error,
     getChatMessages,
+    getHasMore,
     loadMessages,
+    loadMoreMessages,
     addMessage,
     sendMessage,
   };
