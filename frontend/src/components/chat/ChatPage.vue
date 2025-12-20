@@ -1,11 +1,50 @@
 <!-- src/components/chat/ChatPage.vue -->
 <template>
   <div class="h-screen flex bg-app-bg overflow-hidden">
-    <!-- SIDEBAR - СКРЫТА НА МОБИЛЕ, ВИДНА НА ДЕСКТОПЕ -->
+    <!-- MOBILE OVERLAY (затемнение при открытом drawer) -->
+    <div
+      v-if="isMobileSidebarOpen"
+      class="fixed inset-0 bg-black/50 z-40 md:hidden"
+      @click="isMobileSidebarOpen = false"
+    ></div>
+
+    <!-- SIDEBAR - Desktop: всегда видна, Mobile: drawer -->
     <aside
-      class="hidden md:flex md:w-80 md:flex-col bg-app-surface border-r border-app-border overflow-hidden flex-shrink-0"
+      :class="[
+        'fixed md:relative inset-y-0 left-0 z-50 w-80 flex flex-col bg-app-surface border-r border-app-border overflow-hidden flex-shrink-0 transform transition-transform duration-300 ease-in-out',
+        isMobileSidebarOpen
+          ? 'translate-x-0'
+          : '-translate-x-full md:translate-x-0',
+        'md:flex',
+      ]"
     >
-      <ChatList />
+      <!-- MOBILE: Кнопка закрытия -->
+      <div
+        class="md:hidden flex justify-between items-center px-4 py-3 border-b border-app-border"
+      >
+        <h2 class="text-lg font-semibold text-app-text">Chats</h2>
+        <button
+          @click="isMobileSidebarOpen = false"
+          class="p-2 rounded-lg hover:bg-app-primary/10 transition-colors"
+          aria-label="Close sidebar"
+        >
+          <svg
+            class="w-5 h-5 text-app-text"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <ChatList @chat-selected="isMobileSidebarOpen = false" />
     </aside>
 
     <!-- MAIN CONTENT -->
@@ -14,7 +53,7 @@
       <div
         class="sticky top-0 z-10 bg-app-surface border-b border-app-border flex-shrink-0"
       >
-        <ChatHeader />
+        <ChatHeader @open-sidebar="isMobileSidebarOpen = true" />
       </div>
 
       <!-- MESSAGES -->
@@ -33,8 +72,11 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from "vue";
 import ChatHeader from "./ChatHeader.vue";
 import ChatList from "./ChatList.vue";
 import MessageInput from "./MessageInput.vue";
 import MessageList from "./MessageList.vue";
+
+const isMobileSidebarOpen = ref(false);
 </script>
