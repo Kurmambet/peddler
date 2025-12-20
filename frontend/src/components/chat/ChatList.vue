@@ -17,7 +17,7 @@
       <!-- Error -->
       <div
         v-else-if="error"
-        class="p-4 bg-app-error-subtle text-app-error text-sm rounded-md m-4"
+        class="rounded-md p-4 bg-app-error/10 border border-app-error/30 text-app-error text-sm"
       >
         {{ error }}
       </div>

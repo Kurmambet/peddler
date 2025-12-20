@@ -37,9 +37,7 @@ SKIP_CONTENT_FILES = {
     "project_structure.md",
     "package-lock.json",
     "FKGroteskNeue.woff2",
-    "docker-compose.yml",
     "docker-compose.dev.yml",
-    "docker-compose.prod.yml",
 }
 
 # Расширения файлов для копирования
