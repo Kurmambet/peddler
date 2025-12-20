@@ -1,14 +1,13 @@
 # app/models/user.py
 
+from datetime import datetime
 from typing import List
 
-from sqlalchemy import Boolean, String
+from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
 from app.models.base import BaseModel
-
-# from app.models.chat import Chat, ChatParticipant
-# from app.models.message import Message
 
 
 class User(BaseModel):
@@ -17,6 +16,12 @@ class User(BaseModel):
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Online status
+    is_online: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    last_seen: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True, server_default=func.now()
+    )
 
     # Сообщения, которые отправил пользователь
     sent_messages: Mapped[List["Message"]] = relationship(

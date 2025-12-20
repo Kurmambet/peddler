@@ -1,9 +1,13 @@
 # app/ws/manager.py
 import asyncio
 import logging
+from datetime import datetime
 from typing import Dict, Set
 
 from fastapi import WebSocket
+from sqlalchemy import update
+
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -108,3 +112,21 @@ class ConnectionManager:
     def get_chat_participant_count(self, chat_id: int) -> int:
         """Get number of active connections in a chat."""
         return len(self.active_connections.get(chat_id, set()))
+
+    async def set_user_online(self, user_id: int, db):
+        """Пометить пользователя как онлайн"""
+
+        stmt = update(User).where(User.id == user_id).values(is_online=True)
+        await db.execute(stmt)
+        await db.commit()
+
+    async def set_user_offline(self, user_id: int, db):
+        """Пометить пользователя как оффлайн"""
+
+        stmt = (
+            update(User)
+            .where(User.id == user_id)
+            .values(is_online=False, last_seen=datetime.utcnow())
+        )
+        await db.execute(stmt)
+        await db.commit()
