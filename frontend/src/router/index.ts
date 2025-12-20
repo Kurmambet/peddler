@@ -28,6 +28,12 @@ const routes = [
     component: () => import("@/components/chat/CreateDirectChat.vue"),
     meta: { requiresAuth: true },
   },
+  {
+    path: "/testt",
+    name: "testt",
+    component: () => import("@/components/chat/MessageItem.vue"),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({

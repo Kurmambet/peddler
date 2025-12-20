@@ -41,15 +41,44 @@ export interface GroupChatRead {
 
 export type ChatRead = DirectChatRead | GroupChatRead;
 
+// export interface MessageRead {
+//   id: number;
+//   chat_id: number;
+//   sender_id: number;
+//   sender_username: string;
+//   content: string;
+//   is_read: boolean;
+//   created_at: string;
+//   updated_at: string;
+// }
+export type MessageType =
+  | "text"
+  | "image"
+  | "video"
+  | "voice"
+  | "video_note"
+  | "file"
+  | "call";
+
 export interface MessageRead {
   id: number;
   chat_id: number;
   sender_id: number;
-  sender_username: string;
+  sender?: UserRead;
   content: string;
-  is_read: boolean;
+  message_type: MessageType;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
+  is_read: boolean;
+  is_edited?: boolean;
+  reply_to_id?: number;
+  media_url?: string;
+  thumbnail_url?: string;
+  file_name?: string;
+  file_size?: number;
+  duration?: string;
+  call_duration?: number;
+  call_status?: "missed" | "completed" | "declined";
 }
 
 export interface MessageListResponse {
