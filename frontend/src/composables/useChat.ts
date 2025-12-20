@@ -4,9 +4,13 @@ import { useRoute } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { useChatsStore } from "../stores/chats";
 import { useMessagesStore } from "../stores/messages";
-import type { MessageCreatedEvent } from "../types/events";
+import type {
+  MessageCreatedEvent,
+  TypingIndicatorEvent,
+} from "../types/events";
 import { splitMessage } from "../utils/messageUtils";
 import { WebSocketClient } from "../ws/client";
+import { useTyping } from "./useTyping";
 
 export function useChat() {
   const route = useRoute();
@@ -22,6 +26,9 @@ export function useChat() {
   const ws = ref<WebSocketClient | null>(null);
   const newMessageContent = ref("");
 
+  // Typing indicator
+  const typing = useTyping();
+
   const currentMessages = computed(() => {
     if (!chatId.value) return [];
     return messagesStore.getChatMessages(chatId.value);
@@ -36,7 +43,6 @@ export function useChat() {
   async function connectWebSocket() {
     console.log("[useChat] === Starting WebSocket connection ===");
 
-    // Проверки предварительные
     if (!authStore.token) {
       console.warn("[useChat] ⚠️ No auth token found");
       return;
@@ -47,7 +53,6 @@ export function useChat() {
       return;
     }
 
-    // Если уже подключены
     if (ws.value?.isConnected) {
       console.log("[useChat] ℹ️ Already connected to WebSocket");
       return;
@@ -63,10 +68,29 @@ export function useChat() {
       await ws.value.connect();
       console.log("[useChat] ✅ WebSocket connected successfully!");
 
-      // Регистрируем обработчики ПОСЛЕ успешного подключения
+      // Регистрируем обработчики
       ws.value.onMessage("message_created", (event: any) => {
         console.log("[useChat] 📨 message_created event received:", event);
         messagesStore.addMessage(event as MessageCreatedEvent);
+      });
+
+      ws.value.onMessage("typing_indicator", (event: any) => {
+        console.log("[useChat] ⌨️ typing_indicator event:", event);
+        const typingEvent = event as TypingIndicatorEvent;
+
+        // Игнорируем свои события
+        if (typingEvent.user_id === authStore.user?.id) {
+          console.log("[useChat] Ignoring own typing indicator");
+          return;
+        }
+
+        if (typingEvent.is_typing) {
+          console.log(`[useChat] ${typingEvent.username} started typing`);
+          typing.addTypingUser(typingEvent.user_id, typingEvent.username);
+        } else {
+          console.log(`[useChat] ${typingEvent.username} stopped typing`);
+          typing.removeTypingUser(typingEvent.username);
+        }
       });
 
       ws.value.onMessage("error", (event: any) => {
@@ -75,10 +99,6 @@ export function useChat() {
 
       ws.value.onMessage("connected", (event: any) => {
         console.log("[useChat] 🎉 connected event received:", event);
-      });
-
-      ws.value.onMessage("typing_indicator", (event: any) => {
-        console.log("[useChat] ⌨️ typing_indicator event:", event);
       });
 
       ws.value.onMessage("message_read", (event: any) => {
@@ -90,7 +110,6 @@ export function useChat() {
       if (err instanceof Error) {
         console.error("[useChat] Stack trace:", err.stack);
       }
-      // НЕ выбрасываем ошибку - даем REST API fallback возможность сработать
     }
   }
 
@@ -109,6 +128,13 @@ export function useChat() {
       return;
     }
 
+    // Остановить typing перед отправкой
+    typing.sendTypingStop(() => {
+      if (ws.value?.isConnected) {
+        ws.value.send({ type: "typing_stop" });
+      }
+    });
+
     const content = newMessageContent.value;
     const wsConnected = ws.value?.isConnected ?? false;
 
@@ -117,15 +143,12 @@ export function useChat() {
     console.log("[useChat] ChatID:", chatId.value);
     console.log("[useChat] WebSocket connected:", wsConnected);
 
-    // РАЗДЕЛЯЕМ СООБЩЕНИЕ НА ЧАСТИ
     const messageParts = splitMessage(content);
     console.log(`[useChat] 📤 Splitting into ${messageParts.length} part(s)`);
 
-    // Очищаем поле сразу
     newMessageContent.value = "";
 
     try {
-      // ✅ ОТПРАВЛЯЕМ КАЖДУЮ ЧАСТЬ
       for (let i = 0; i < messageParts.length; i++) {
         const part = messageParts[i];
 
@@ -147,7 +170,6 @@ export function useChat() {
             }/${messageParts.length}`
           );
 
-          // REST API fallback
           const sentMessage = await messagesStore.sendMessage(
             chatId.value,
             part
@@ -157,23 +179,43 @@ export function useChat() {
           );
         }
 
-        // ⏱️ Небольшая задержка между частями
         if (i < messageParts.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
 
-      // Перезагружаем сообщения для актуальности (если использовали REST API)
       if (!wsConnected) {
         await messagesStore.loadMessages(chatId.value);
       }
     } catch (err) {
       console.error("[useChat] ❌ Error sending message:", err);
-      // Восстанавливаем текст при ошибке
       newMessageContent.value = content;
       throw err;
     }
   }
+
+  // =====================================================================
+  // Typing handler для input
+  // =====================================================================
+  const handleTyping = () => {
+    if (!newMessageContent.value.trim()) {
+      // Пустое поле → стоп
+      typing.sendTypingStop(() => {
+        if (ws.value?.isConnected) {
+          console.log("[useChat] Sending typing_stop");
+          ws.value.send({ type: "typing_stop" });
+        }
+      });
+    } else {
+      // Есть текст → старт
+      typing.sendTypingStart(() => {
+        if (ws.value?.isConnected) {
+          console.log("[useChat] Sending typing_start");
+          ws.value.send({ type: "typing_start" });
+        }
+      });
+    }
+  };
 
   // =====================================================================
   // Chat Changing
@@ -189,6 +231,7 @@ export function useChat() {
       // Отключаемся от старого чата
       if (oldChatId && ws.value) {
         console.log(`[useChat] 🔌 Disconnecting from chat #${oldChatId}`);
+        typing.cleanup();
         ws.value.disconnect();
         ws.value = null;
       }
@@ -216,6 +259,7 @@ export function useChat() {
     console.log(
       `[useChat] 🧹 Unmounting chat composable for chat #${chatId.value}`
     );
+    typing.cleanup();
     if (ws.value) {
       ws.value.disconnect();
       ws.value = null;
@@ -232,5 +276,7 @@ export function useChat() {
     newMessageContent,
     isLoading,
     sendMessage,
+    handleTyping,
+    typingText: typing.typingText,
   };
 }

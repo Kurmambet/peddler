@@ -19,9 +19,9 @@ SKIP_CONTENT_DIRS = {
     "backend/alembic",
     "node_modules",
     ".vscode",
-    "backend",
-    "api",
-    "stores",
+    # "backend",
+    # "api",
+    # "stores",
 }
 
 SKIP_CONTENT_FILES = {
@@ -37,7 +37,7 @@ SKIP_CONTENT_FILES = {
     "project_structure.md",
     "package-lock.json",
     "FKGroteskNeue.woff2",
-    "docker-compose.dev.yml",
+    # "docker-compose.dev.yml",
 }
 
 # Расширения файлов для копирования

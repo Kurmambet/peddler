@@ -7,6 +7,7 @@
         type="text"
         placeholder="Type a message..."
         class="flex-1"
+        @input="handleTyping"
         @keydown.enter="handleSubmit"
       />
       <Button
@@ -30,7 +31,7 @@ import { useChat } from "../../composables/useChat";
 import Button from "../ui/Button.vue";
 import Input from "../ui/Input.vue";
 
-const { newMessageContent, sendMessage } = useChat();
+const { newMessageContent, sendMessage, handleTyping } = useChat();
 
 const handleSubmit = async () => {
   try {

@@ -1,6 +1,8 @@
 <!-- src/components/chat/ChatHeader.vue -->
 <template>
-  <div class="px-4 md:px-6 py-4 bg-app-surface flex items-center gap-4">
+  <div
+    class="px-4 md:px-6 py-3 bg-app-surface flex items-center gap-4 border-b border-app-border"
+  >
     <!-- MOBILE: Кнопка открытия sidebar -->
     <button
       @click="$emit('open-sidebar')"
@@ -31,8 +33,15 @@
             : currentChat?.title || "Chat"
         }}
       </h2>
-      <p class="text-xs text-app-text-secondary">
-        {{ currentChat?.type === "direct" ? "Direct Chat" : "Group Chat" }}
+
+      <!-- Typing indicator или статус -->
+      <p class="text-xs text-app-text-secondary truncate">
+        <span v-if="typingText" class="text-app-primary animate-pulse">
+          {{ typingText }}
+        </span>
+        <span v-else>
+          {{ currentChat?.type === "direct" ? "Direct Chat" : "Group Chat" }}
+        </span>
       </p>
     </div>
 
@@ -47,6 +56,10 @@
 import { computed, ref } from "vue";
 import { useChatsStore } from "../../stores/chats";
 import Badge from "../ui/Badge.vue";
+
+defineProps<{
+  typingText?: string;
+}>();
 
 defineEmits<{
   "open-sidebar": [];

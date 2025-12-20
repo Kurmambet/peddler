@@ -50,10 +50,11 @@
     <!-- MAIN CONTENT -->
     <main class="flex-1 flex flex-col min-h-0">
       <!-- HEADER -->
-      <div
-        class="sticky top-0 z-10 bg-app-surface border-b border-app-border flex-shrink-0"
-      >
-        <ChatHeader @open-sidebar="isMobileSidebarOpen = true" />
+      <div class="flex-shrink-0">
+        <ChatHeader
+          @open-sidebar="isMobileSidebarOpen = true"
+          :typing-text="typingText"
+        />
       </div>
 
       <!-- MESSAGES -->
@@ -62,9 +63,7 @@
       </div>
 
       <!-- INPUT -->
-      <div
-        class="sticky bottom-0 z-10 bg-app-surface border-t border-app-border flex-shrink-0"
-      >
+      <div class="flex-shrink-0">
         <MessageInput />
       </div>
     </main>
@@ -73,10 +72,12 @@
 
 <script setup lang="ts">
 import { ref } from "vue";
+import { useChat } from "../../composables/useChat";
 import ChatHeader from "./ChatHeader.vue";
 import ChatList from "./ChatList.vue";
 import MessageInput from "./MessageInput.vue";
 import MessageList from "./MessageList.vue";
 
 const isMobileSidebarOpen = ref(false);
+const { typingText } = useChat();
 </script>
