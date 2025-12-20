@@ -7,6 +7,7 @@ export type WSEventType =
   | "typing_stop"
   | "typing_indicator"
   | "mark_read"
+  | "user_status_changed"
   | "connected"
   | "error";
 
@@ -33,6 +34,14 @@ export interface TypingIndicatorEvent extends BaseEvent {
   is_typing: boolean;
 }
 
+export interface UserStatusChangedEvent extends BaseEvent {
+  type: "user_status_changed";
+  user_id: number;
+  username: string;
+  is_online: boolean;
+  last_seen?: string | null;
+}
+
 export interface ErrorEvent extends BaseEvent {
   type: "error";
   code: string;
@@ -49,6 +58,7 @@ export interface ConnectedEvent extends BaseEvent {
 export type WSEvent =
   | MessageCreatedEvent
   | TypingIndicatorEvent
+  | UserStatusChangedEvent
   | ErrorEvent
   | ConnectedEvent
   | BaseEvent;

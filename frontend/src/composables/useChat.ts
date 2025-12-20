@@ -7,6 +7,7 @@ import { useMessagesStore } from "../stores/messages";
 import type {
   MessageCreatedEvent,
   TypingIndicatorEvent,
+  UserStatusChangedEvent,
 } from "../types/events";
 import { splitMessage } from "../utils/messageUtils";
 import { WebSocketClient } from "../ws/client";
@@ -103,6 +104,18 @@ export function useChat() {
 
       ws.value.onMessage("message_read", (event: any) => {
         console.log("[useChat] ✓ message_read event:", event);
+      });
+
+      ws.value.onMessage("user_status_changed", (event: any) => {
+        console.log("[useChat] 👤 user_status_changed event:", event);
+        const statusEvent = event as UserStatusChangedEvent;
+
+        // Обновляем статус в chats store
+        chatsStore.updateUserStatus(
+          statusEvent.user_id,
+          statusEvent.is_online,
+          statusEvent.last_seen || null
+        );
       });
     } catch (err) {
       console.error("[useChat] ❌ WebSocket connection FAILED");

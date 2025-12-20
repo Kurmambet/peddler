@@ -4,6 +4,8 @@ export interface UserRead {
   id: number;
   username: string;
   is_active: boolean;
+  is_online: boolean;
+  last_seen: string | null;
   created_at: string;
 }
 
@@ -12,16 +14,6 @@ export interface Token {
   token_type?: string;
 }
 
-// export interface ChatRead {
-//   id: number;
-//   title: string | null;
-//   type: "direct" | "group";
-//   created_by_id: number;
-//   created_at: string;
-//   updated_at: string;
-//   // other_username?: string;
-// }
-
 export interface DirectChatRead {
   id: number;
   type: "direct";
@@ -29,6 +21,7 @@ export interface DirectChatRead {
   created_by_id: number;
   created_at: string;
   other_username: string;
+  other_user_id: number;
 }
 
 export interface GroupChatRead {

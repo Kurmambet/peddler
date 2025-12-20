@@ -10,6 +10,11 @@ export const useChatsStore = defineStore("chats", () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  // Статусы пользователей по chat_id
+  const chatParticipantStatuses = ref<
+    Map<number, Map<number, { isOnline: boolean; lastSeen: string | null }>>
+  >(new Map());
+
   const resetCurrentChat = () => {
     console.log("[ChatsStore] 🔄 Resetting current chat");
     currentChatId.value = null;
@@ -59,6 +64,31 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
+  const updateUserStatus = (
+    userId: number,
+    isOnline: boolean,
+    lastSeen: string | null
+  ) => {
+    // Обновляем статус для всех чатов где есть этот пользователь
+    chats.value.forEach((chat) => {
+      if (!chatParticipantStatuses.value.has(chat.id)) {
+        chatParticipantStatuses.value.set(chat.id, new Map());
+      }
+
+      chatParticipantStatuses.value.get(chat.id)!.set(userId, {
+        isOnline,
+        lastSeen,
+      });
+    });
+  };
+
+  const getUserStatusInChat = (
+    chatId: number,
+    userId: number
+  ): { isOnline: boolean; lastSeen: string | null } | undefined => {
+    return chatParticipantStatuses.value.get(chatId)?.get(userId);
+  };
+
   return {
     chats,
     currentChatId,
@@ -69,5 +99,7 @@ export const useChatsStore = defineStore("chats", () => {
     setCurrentChat,
     createDirectChat,
     resetCurrentChat,
+    updateUserStatus,
+    getUserStatusInChat,
   };
 });

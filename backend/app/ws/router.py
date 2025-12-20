@@ -1,6 +1,7 @@
 # app/ws/router.py
 import json
 import logging
+from datetime import datetime
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
@@ -160,7 +161,10 @@ async def websocket_endpoint(
 
             # Уведомить о disconnect
             status_event = UserStatusChangedEvent(
-                user_id=user.id, username=user.username, is_online=False
+                user_id=user.id,
+                username=user.username,
+                is_online=False,
+                last_seen=datetime.utcnow(),
             )
 
             # Получить все чаты пользователя

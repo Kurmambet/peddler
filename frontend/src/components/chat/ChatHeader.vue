@@ -39,23 +39,33 @@
         <span v-if="typingText" class="text-app-primary animate-pulse">
           {{ typingText }}
         </span>
+        <span v-else-if="otherUserStatus">
+          <span v-if="otherUserStatus.isOnline" class="text-green-500">
+            ● Online
+          </span>
+          <span v-else class="text-app-text-secondary">
+            {{ formatLastSeen(otherUserStatus.lastSeen) }}
+          </span>
+        </span>
         <span v-else>
           {{ currentChat?.type === "direct" ? "Direct Chat" : "Group Chat" }}
         </span>
       </p>
     </div>
 
-    <!-- Status indicator -->
-    <Badge v-if="isOnline" variant="online" class="flex-shrink-0">
-      Online
-    </Badge>
+    <!-- Status indicator (зелёная точка) -->
+    <div
+      v-if="otherUserStatus?.isOnline"
+      class="w-3 h-3 rounded-full bg-green-500 flex-shrink-0"
+      title="Online"
+    ></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
+import { useUserStatus } from "../../composables/useUserStatus";
 import { useChatsStore } from "../../stores/chats";
-import Badge from "../ui/Badge.vue";
 
 defineProps<{
   typingText?: string;
@@ -66,8 +76,23 @@ defineEmits<{
 }>();
 
 const chatsStore = useChatsStore();
+const { formatLastSeen } = useUserStatus();
+
 const currentChat = computed(() => chatsStore.currentChat);
 
-// Это нужно подключить из WebSocket
-const isOnline = ref(false);
+// Получить ID другого пользователя (для direct чата)
+const otherUserId = computed(() => {
+  if (currentChat.value?.type !== "direct") return null;
+  return currentChat.value.other_user_id;
+});
+
+// Статус другого пользователя
+const otherUserStatus = computed(() => {
+  if (!currentChat.value || !otherUserId.value) return null;
+
+  return chatsStore.getUserStatusInChat(
+    currentChat.value.id,
+    otherUserId.value
+  );
+});
 </script>
