@@ -1,7 +1,7 @@
 # app/ws/manager.py
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Set
 
 from fastapi import WebSocket
@@ -126,7 +126,7 @@ class ConnectionManager:
         stmt = (
             update(User)
             .where(User.id == user_id)
-            .values(is_online=False, last_seen=datetime.utcnow())
+            .values(is_online=False, last_seen=datetime.now(timezone.utc))
         )
         await db.execute(stmt)
         await db.commit()

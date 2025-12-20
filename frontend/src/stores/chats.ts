@@ -10,10 +10,11 @@ export const useChatsStore = defineStore("chats", () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
-  // Статусы пользователей по chat_id
-  const chatParticipantStatuses = ref<
-    Map<number, Map<number, { isOnline: boolean; lastSeen: string | null }>>
-  >(new Map());
+  // Статусы пользователей: userId -> { isOnline, lastSeen }
+  // ⚠️ ИЗМЕНИЛИ Map на ref<Record>
+  const userStatuses = ref<
+    Record<number, { isOnline: boolean; lastSeen: string | null }>
+  >({});
 
   const resetCurrentChat = () => {
     console.log("[ChatsStore] 🔄 Resetting current chat");
@@ -48,7 +49,6 @@ export const useChatsStore = defineStore("chats", () => {
     try {
       const { data } = await chatsAPI.createDirectChat(otherUsername);
 
-      // Добавить в список, если его там нет
       if (!chats.value.find((c) => c.id === data.id)) {
         chats.value.unshift(data);
       }
@@ -69,24 +69,23 @@ export const useChatsStore = defineStore("chats", () => {
     isOnline: boolean,
     lastSeen: string | null
   ) => {
-    // Обновляем статус для всех чатов где есть этот пользователь
-    chats.value.forEach((chat) => {
-      if (!chatParticipantStatuses.value.has(chat.id)) {
-        chatParticipantStatuses.value.set(chat.id, new Map());
-      }
+    console.log(
+      `[ChatsStore] Updating status: User ${userId} → ${
+        isOnline ? "ONLINE" : "OFFLINE"
+      } (lastSeen: ${lastSeen})`
+    );
 
-      chatParticipantStatuses.value.get(chat.id)!.set(userId, {
-        isOnline,
-        lastSeen,
-      });
-    });
+    // ⚠️ Реактивное обновление
+    userStatuses.value[userId] = {
+      isOnline,
+      lastSeen,
+    };
   };
 
-  const getUserStatusInChat = (
-    chatId: number,
+  const getUserStatus = (
     userId: number
   ): { isOnline: boolean; lastSeen: string | null } | undefined => {
-    return chatParticipantStatuses.value.get(chatId)?.get(userId);
+    return userStatuses.value[userId];
   };
 
   return {
@@ -100,6 +99,6 @@ export const useChatsStore = defineStore("chats", () => {
     createDirectChat,
     resetCurrentChat,
     updateUserStatus,
-    getUserStatusInChat,
+    getUserStatus,
   };
 });

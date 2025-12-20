@@ -30,6 +30,11 @@ export function useChat() {
   // Typing indicator
   const typing = useTyping();
 
+  // Храним последнее состояние для каждого пользователя
+  const lastUserStatuses = ref<
+    Map<number, { isOnline: boolean; timestamp: number }>
+  >(new Map());
+
   const currentMessages = computed(() => {
     if (!chatId.value) return [];
     return messagesStore.getChatMessages(chatId.value);
@@ -107,10 +112,32 @@ export function useChat() {
       });
 
       ws.value.onMessage("user_status_changed", (event: any) => {
-        console.log("[useChat] 👤 user_status_changed event:", event);
         const statusEvent = event as UserStatusChangedEvent;
 
-        // Обновляем статус в chats store
+        const now = Date.now();
+        const lastStatus = lastUserStatuses.value.get(statusEvent.user_id);
+
+        // Дедупликация: игнорируем если тот же статус в течение 3 секунд
+        if (lastStatus) {
+          const isSameStatus = lastStatus.isOnline === statusEvent.is_online;
+          const isRecent = now - lastStatus.timestamp < 3000; // 3 секунды
+
+          if (isSameStatus && isRecent) {
+            console.log(
+              `[useChat] 🔄 Duplicate status (user ${statusEvent.user_id}, online=${statusEvent.is_online}), ignoring`
+            );
+            return;
+          }
+        }
+
+        // Сохраняем новое состояние
+        lastUserStatuses.value.set(statusEvent.user_id, {
+          isOnline: statusEvent.is_online,
+          timestamp: now,
+        });
+
+        console.log("[useChat] 👤 user_status_changed event:", statusEvent);
+
         chatsStore.updateUserStatus(
           statusEvent.user_id,
           statusEvent.is_online,

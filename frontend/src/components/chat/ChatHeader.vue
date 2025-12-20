@@ -44,7 +44,7 @@
             ● Online
           </span>
           <span v-else class="text-app-text-secondary">
-            {{ formatLastSeen(otherUserStatus.lastSeen) }}
+            {{ lastSeenText }}
           </span>
         </span>
         <span v-else>
@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useUserStatus } from "../../composables/useUserStatus";
 import { useChatsStore } from "../../stores/chats";
 
@@ -80,7 +80,7 @@ const { formatLastSeen } = useUserStatus();
 
 const currentChat = computed(() => chatsStore.currentChat);
 
-// Получить ID другого пользователя (для direct чата)
+// ID другого пользователя для direct чата
 const otherUserId = computed(() => {
   if (currentChat.value?.type !== "direct") return null;
   return currentChat.value.other_user_id;
@@ -88,11 +88,39 @@ const otherUserId = computed(() => {
 
 // Статус другого пользователя
 const otherUserStatus = computed(() => {
-  if (!currentChat.value || !otherUserId.value) return null;
+  if (!otherUserId.value) return null;
+  return chatsStore.getUserStatus(otherUserId.value);
+});
 
-  return chatsStore.getUserStatusInChat(
-    currentChat.value.id,
-    otherUserId.value
-  );
+// Реактивный last seen text с автообновлением
+const lastSeenText = ref("");
+let updateInterval: number | null = null;
+
+const updateLastSeenText = () => {
+  if (otherUserStatus.value && !otherUserStatus.value.isOnline) {
+    lastSeenText.value = formatLastSeen(otherUserStatus.value.lastSeen);
+  } else {
+    lastSeenText.value = "";
+  }
+};
+
+// Обновляем при изменении статуса
+computed(() => {
+  updateLastSeenText();
+  return otherUserStatus.value;
+});
+
+// Автообновление каждые 30 секунд
+onMounted(() => {
+  updateLastSeenText();
+  updateInterval = window.setInterval(() => {
+    updateLastSeenText();
+  }, 30000); // 30 секунд
+});
+
+onUnmounted(() => {
+  if (updateInterval) {
+    clearInterval(updateInterval);
+  }
 });
 </script>

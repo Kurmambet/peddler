@@ -201,3 +201,6 @@ class UserStatusChangedEvent(WSEvent):
     username: str
     is_online: bool
     last_seen: Optional[datetime] = None
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat() + "Z" if v else None}

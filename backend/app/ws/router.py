@@ -167,16 +167,19 @@ async def websocket_endpoint(
                 last_seen=datetime.utcnow(),
             )
 
-            # Получить все чаты пользователя
-            stmt = select(ChatParticipant.chat_id).where(ChatParticipant.user_id == user.id)
-            result = await db.execute(stmt)
-            user_chat_ids = [row[0] for row in result.fetchall()]
+            # # Получить все чаты пользователя
+            # stmt = select(ChatParticipant.chat_id).where(ChatParticipant.user_id == user.id)
+            # result = await db.execute(stmt)
+            # user_chat_ids = [row[0] for row in result.fetchall()]
 
-            # Broadcast статус
-            for chat_id_to_notify in user_chat_ids:
-                await pubsub_manager.publish_to_chat(
-                    chat_id_to_notify, status_event.model_dump_json()
-                )
+            # # Broadcast статус
+            # for chat_id_to_notify in user_chat_ids:
+            #     await pubsub_manager.publish_to_chat(
+            #         chat_id_to_notify, status_event.model_dump_json()
+            #     )
+
+            # отправка только в текущий чат
+            await pubsub_manager.publish_to_chat(chat_id, status_event.model_dump_json())
 
             logger.info(f"User {user.id} set to OFFLINE, notified {len(user_chat_ids)} chats")
 

@@ -44,25 +44,47 @@ export function useUserStatus() {
   const formatLastSeen = (lastSeen: string | null): string => {
     if (!lastSeen) return "Был(а) давно";
 
-    const now = new Date();
-    const lastSeenDate = new Date(lastSeen);
-    const diffMs = now.getTime() - lastSeenDate.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+    try {
+      const now = new Date();
 
-    if (diffMins < 1) return "Только что";
-    if (diffMins < 60) return `${diffMins} мин. назад`;
+      // Добавляем Z если его нет (для UTC)
+      const lastSeenStr = lastSeen.endsWith("Z") ? lastSeen : lastSeen + "Z";
+      const lastSeenDate = new Date(lastSeenStr);
 
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours} ч. назад`;
+      // Проверка валидности даты
+      if (isNaN(lastSeenDate.getTime())) {
+        console.error("[UserStatus] Invalid date:", lastSeen);
+        return "Был(а) давно";
+      }
 
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays === 1) return "Вчера";
-    if (diffDays < 7) return `${diffDays} дн. назад`;
+      const diffMs = now.getTime() - lastSeenDate.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
 
-    return lastSeenDate.toLocaleDateString("ru-RU", {
-      day: "numeric",
-      month: "short",
-    });
+      console.log("[UserStatus] Time diff:", {
+        now: now.toISOString(),
+        lastSeen: lastSeenDate.toISOString(),
+        diffMs,
+        diffMins,
+      });
+
+      if (diffMins < 1) return "Только что";
+      if (diffMins < 60) return `${diffMins} мин. назад`;
+
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `${diffHours} ч. назад`;
+
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays === 1) return "Вчера";
+      if (diffDays < 7) return `${diffDays} дн. назад`;
+
+      return lastSeenDate.toLocaleDateString("ru-RU", {
+        day: "numeric",
+        month: "short",
+      });
+    } catch (error) {
+      console.error("[UserStatus] Error formatting date:", error, lastSeen);
+      return "Был(а) давно";
+    }
   };
 
   return {
