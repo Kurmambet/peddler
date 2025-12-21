@@ -11,8 +11,6 @@ export function useGlobalStatus() {
 
   const ws = ref<WebSocketClient | null>(null);
   const isConnected = ref(false);
-
-  // Дедупликация
   const lastUserStatuses = ref<
     Map<number, { isOnline: boolean; timestamp: number }>
   >(new Map());
@@ -31,17 +29,14 @@ export function useGlobalStatus() {
     try {
       console.log("[useGlobalStatus] 🔗 Connecting to status WebSocket...");
 
-      // Подключаемся к /ws/status вместо /ws/chats/{id}
-      //   ws.value = new WebSocketClient(0, authStore.token); // chatId=0 для статусов
-      //   ws.value.url = ws.value.url.replace("/chats/0", "/status"); // Патчим URL
+      // 1. Создаём клиент (НЕ подключаемся)
       ws.value = new WebSocketClient(0, authStore.token);
 
-      await ws.value.connect();
-      isConnected.value = true;
+      // 2. СРАЗУ регистрируем обработчики (ДО connect!)
+      ws.value.onMessage("connected", (event: any) => {
+        console.log("[useGlobalStatus] 🎉 Status WebSocket connected:", event);
+      });
 
-      console.log("[useGlobalStatus] ✅ Connected to status WebSocket");
-
-      // Слушаем только user_status_changed
       ws.value.onMessage("user_status_changed", (event: any) => {
         const statusEvent = event as UserStatusChangedEvent;
 
@@ -72,7 +67,6 @@ export function useGlobalStatus() {
           }`
         );
 
-        // Обновляем стор
         chatsStore.updateUserStatus(
           statusEvent.user_id,
           statusEvent.is_online,
@@ -80,9 +74,11 @@ export function useGlobalStatus() {
         );
       });
 
-      ws.value.onMessage("connected", (event: any) => {
-        console.log("[useGlobalStatus] 🎉 Status WebSocket connected:", event);
-      });
+      // 3. Теперь подключаемся
+      await ws.value.connect();
+      isConnected.value = true;
+
+      console.log("[useGlobalStatus] ✅ Connected to status WebSocket");
     } catch (err) {
       console.error("[useGlobalStatus] ❌ Connection failed:", err);
       isConnected.value = false;

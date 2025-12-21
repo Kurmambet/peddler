@@ -29,10 +29,7 @@ export function useChat() {
   // Typing indicator
   const typing = useTyping();
 
-  // Храним последнее состояние для каждого пользователя
-  const lastUserStatuses = ref<
-    Map<number, { isOnline: boolean; timestamp: number }>
-  >(new Map());
+  let isConnecting = false;
 
   const currentMessages = computed(() => {
     if (!chatId.value) return [];
@@ -109,40 +106,6 @@ export function useChat() {
       ws.value.onMessage("message_read", (event: any) => {
         console.log("[useChat] ✓ message_read event:", event);
       });
-
-      // ws.value.onMessage("user_status_changed", (event: any) => {
-      //   const statusEvent = event as UserStatusChangedEvent;
-
-      //   const now = Date.now();
-      //   const lastStatus = lastUserStatuses.value.get(statusEvent.user_id);
-
-      //   // Дедупликация: игнорируем если тот же статус в течение 3 секунд
-      //   if (lastStatus) {
-      //     const isSameStatus = lastStatus.isOnline === statusEvent.is_online;
-      //     const isRecent = now - lastStatus.timestamp < 3000; // 3 секунды
-
-      //     if (isSameStatus && isRecent) {
-      //       console.log(
-      //         `[useChat] 🔄 Duplicate status (user ${statusEvent.user_id}, online=${statusEvent.is_online}), ignoring`
-      //       );
-      //       return;
-      //     }
-      //   }
-
-      //   // Сохраняем новое состояние
-      //   lastUserStatuses.value.set(statusEvent.user_id, {
-      //     isOnline: statusEvent.is_online,
-      //     timestamp: now,
-      //   });
-
-      //   console.log("[useChat] 👤 user_status_changed event:", statusEvent);
-
-      //   chatsStore.updateUserStatus(
-      //     statusEvent.user_id,
-      //     statusEvent.is_online,
-      //     statusEvent.last_seen || null
-      //   );
-      // });
     } catch (err) {
       console.error("[useChat] ❌ WebSocket connection FAILED");
       console.error("[useChat] Error details:", err);
@@ -263,6 +226,11 @@ export function useChat() {
   watch(
     chatId,
     async (newChatId, oldChatId) => {
+      if (isConnecting) {
+        console.log("[useChat] ℹ️ Already connecting, skipping");
+        return;
+      }
+
       console.log(
         `[useChat] Chat changed: ${oldChatId} → ${newChatId || "null"}`
       );
@@ -282,7 +250,14 @@ export function useChat() {
         await messagesStore.loadMessages(newChatId);
 
         console.log(`[useChat] 🔗 Connecting to chat #${newChatId}`);
-        await connectWebSocket();
+
+        // ОБЕРНУТЬ В TRY/FINALLY
+        isConnecting = true;
+        try {
+          await connectWebSocket();
+        } finally {
+          isConnecting = false;
+        }
       } else {
         console.log("[useChat] ℹ️ No chat selected");
       }
