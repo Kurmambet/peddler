@@ -3,22 +3,8 @@
   <div
     ref="scrollContainer"
     class="flex flex-col h-full overflow-y-auto overflow-x-hidden"
+    @scroll="handleScroll"
   >
-    <!-- Load More Button -->
-    <div
-      v-if="hasMore && !isLoadingMore && currentMessages.length > 0"
-      class="flex justify-center py-4"
-    >
-      <Button
-        variant="secondary"
-        size="sm"
-        @click="loadOlderMessages"
-        :disabled="isLoadingMore"
-      >
-        Загрузить старые сообщения
-      </Button>
-    </div>
-
     <!-- Loading More Indicator -->
     <div v-if="isLoadingMore" class="flex justify-center py-4">
       <div class="flex items-center gap-2 text-app-text-secondary text-sm">
@@ -159,7 +145,6 @@ import {
   getDateKey,
 } from "../../utils/dateUtils";
 import Avatar from "../ui/Avatar.vue";
-import Button from "../ui/Button.vue";
 import Skeleton from "../ui/Skeleton.vue";
 
 const authStore = useAuthStore();
@@ -234,6 +219,18 @@ const loadOlderMessages = async () => {
         scrollContainer.value.scrollTop = scrollTop + diff;
       }
     });
+  }
+};
+
+const handleScroll = () => {
+  const container = scrollContainer.value;
+  if (!container || isLoadingMore.value || !hasMore.value) return;
+
+  // Порог, когда считаем, что пользователь «у самого верха»
+  const threshold = 100;
+
+  if (container.scrollTop <= threshold) {
+    loadOlderMessages();
   }
 };
 
