@@ -4,13 +4,13 @@ import type { WSEvent } from "../types/events";
 
 export class WebSocketClient {
   private ws: WebSocket | null = null;
-  private url: string;
+  public url: string;
   private reconnectAttempts: number = 0;
   private readonly maxReconnectAttempts: number = 5;
   private reconnectDelay: number = 1000;
   private messageQueue: any[] = [];
   private eventHandlers = new Map<string, Function[]>();
-  private connected: boolean = false;  // ✅ ПРОСТОЙ ПРИМИТИВ, не ref()
+  private connected: boolean = false; // ПРОСТОЙ ПРИМИТИВ, не ref()
 
   get isConnected(): boolean {
     return this.connected;
@@ -24,7 +24,10 @@ export class WebSocketClient {
       wsProtocol = wsProtocol.replace("://", "");
     }
 
-    this.url = `${wsProtocol}://${wsHost}/api/v1/ws/chats/${chatId}?token=${token}`;
+    const endpoint = chatId === 0 ? "status" : `chats/${chatId}`;
+    this.url = `${wsProtocol}://${wsHost}/api/v1/ws/${endpoint}?token=${token}`;
+
+    // this.url = `${wsProtocol}://${wsHost}/api/v1/ws/chats/${chatId}?token=${token}`;
     console.log("[WebSocketClient] ✅ Created client for chat", chatId);
     console.log("[WebSocketClient] WebSocket URL:", this.url);
   }
@@ -35,8 +38,6 @@ export class WebSocketClient {
       return;
     }
 
-    console.log(`[WebSocketClient] 🔗 Attempting to connect to: ${this.url}`);
-
     return new Promise((resolve, reject) => {
       try {
         this.ws = new WebSocket(this.url);
@@ -44,7 +45,7 @@ export class WebSocketClient {
 
         this.ws.onopen = () => {
           console.log("[WebSocketClient] 🎉 onopen fired!");
-          this.connected = true;  // ✅ ПРОСТОЕ ПРИСВОЕНИЕ
+          this.connected = true; // ✅ ПРОСТОЕ ПРИСВОЕНИЕ
           this.reconnectAttempts = 0;
           console.log(
             "[WebSocketClient] ✅ Connected, flushing message queue..."

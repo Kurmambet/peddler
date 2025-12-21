@@ -123,6 +123,9 @@ class ChatService:
                     created_at=chat.created_at,
                     other_username=other_participant.username,
                     other_user_id=other_participant.id,
+                    # статусы
+                    other_user_is_online=other_participant.is_online,
+                    other_user_last_seen=other_participant.last_seen,
                 )
 
             else:  # GROUP

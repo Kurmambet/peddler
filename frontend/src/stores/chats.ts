@@ -31,9 +31,25 @@ export const useChatsStore = defineStore("chats", () => {
     try {
       const { data } = await chatsAPI.list();
       chats.value = data;
+
+      // Заполнить статусы из REST API
+      data.forEach((chat) => {
+        if (chat.type === "direct") {
+          userStatuses.value[chat.other_user_id] = {
+            isOnline: chat.other_user_is_online,
+            lastSeen: chat.other_user_last_seen,
+          };
+
+          console.log(
+            `[ChatsStore] Initial REST status: User ${chat.other_user_id} → ${
+              chat.other_user_is_online ? "ONLINE" : "OFFLINE"
+            } (lastSeen: ${chat.other_user_last_seen})`
+          );
+        }
+      });
     } catch (err: any) {
       error.value = err.response?.data?.detail || "Failed to load chats";
-      console.error("Load chats error:", err);
+      console.error("[ChatsStore] Load chats error:", err);
     } finally {
       isLoading.value = false;
     }

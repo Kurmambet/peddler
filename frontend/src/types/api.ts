@@ -22,6 +22,8 @@ export interface DirectChatRead {
   created_at: string;
   other_username: string;
   other_user_id: number;
+  other_user_is_online: boolean;
+  other_user_last_seen: string | null;
 }
 
 export interface GroupChatRead {
