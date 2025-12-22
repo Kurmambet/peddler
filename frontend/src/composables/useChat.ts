@@ -238,6 +238,7 @@ function createChatInstance() {
         `[useChat] Chat changed: ${oldChatId} → ${newChatId || "null"}`
       );
 
+      // Отключение от старого чата
       if (oldChatId && ws.value) {
         console.log(`[useChat] 🔌 Disconnecting from chat #${oldChatId}`);
         typing.cleanup();
@@ -245,6 +246,7 @@ function createChatInstance() {
         ws.value = null;
       }
 
+      // Подключение к новому чату
       if (newChatId) {
         console.log(`[useChat] 🔄 Loading messages for chat #${newChatId}`);
         chatsStore.setCurrentChat(newChatId);
@@ -282,14 +284,14 @@ function createChatInstance() {
   }
 
   return {
-    chatId,
-    currentMessages,
-    newMessageContent,
+    chatId, //текущий чат
+    currentMessages, //список сообщений
+    newMessageContent, //текст в input
     isLoading,
-    sendMessage,
-    handleTyping,
-    typingText: typing.typingText,
-    cleanup,
+    sendMessage, //отправить сообщение
+    handleTyping, //обработать ввод
+    typingText: typing.typingText, // кто-то печатает...
+    cleanup, //для внутреннего использования
   };
 }
 

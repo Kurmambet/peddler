@@ -45,7 +45,7 @@ export class WebSocketClient {
 
         this.ws.onopen = () => {
           console.log("[WebSocketClient] 🎉 onopen fired!");
-          this.connected = true; // ✅ ПРОСТОЕ ПРИСВОЕНИЕ
+          this.connected = true; // ПРОСТОЕ ПРИСВОЕНИЕ
           this.reconnectAttempts = 0;
           console.log(
             "[WebSocketClient] ✅ Connected, flushing message queue..."
