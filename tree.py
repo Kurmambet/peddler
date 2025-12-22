@@ -37,6 +37,9 @@ SKIP_CONTENT_FILES = {
     "project_structure.md",
     "package-lock.json",
     "FKGroteskNeue.woff2",
+    "tsconfig.node.json",
+    "tsconfig.json",
+    "tsconfig.app.json",
     # "docker-compose.dev.yml",
 }
 

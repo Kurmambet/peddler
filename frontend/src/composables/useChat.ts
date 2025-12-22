@@ -12,7 +12,16 @@ import { splitMessage } from "../utils/messageUtils";
 import { WebSocketClient } from "../ws/client";
 import { useTyping } from "./useTyping";
 
-export function useChat() {
+// ============================================================
+// SINGLETON STATE (вне функции)
+// ============================================================
+let chatInstance: ReturnType<typeof createChatInstance> | null = null;
+let instanceRefCount = 0;
+
+// ============================================================
+// ВНУТРЕННЯЯ ФУНКЦИЯ (создаёт экземпляр)
+// ============================================================
+function createChatInstance() {
   const route = useRoute();
   const authStore = useAuthStore();
   const messagesStore = useMessagesStore();
@@ -25,8 +34,6 @@ export function useChat() {
 
   const ws = ref<WebSocketClient | null>(null);
   const newMessageContent = ref("");
-
-  // Typing indicator
   const typing = useTyping();
 
   let isConnecting = false;
@@ -38,10 +45,7 @@ export function useChat() {
 
   const isLoading = computed(() => messagesStore.isLoading);
 
-  // =====================================================================
   // WebSocket Connection
-  // =====================================================================
-
   async function connectWebSocket() {
     console.log("[useChat] === Starting WebSocket connection ===");
 
@@ -80,7 +84,6 @@ export function useChat() {
         console.log("[useChat] ⌨️ typing_indicator event:", event);
         const typingEvent = event as TypingIndicatorEvent;
 
-        // Игнорируем свои события
         if (typingEvent.user_id === authStore.user?.id) {
           console.log("[useChat] Ignoring own typing indicator");
           return;
@@ -106,6 +109,12 @@ export function useChat() {
       ws.value.onMessage("message_read", (event: any) => {
         console.log("[useChat] ✓ message_read event:", event);
       });
+
+      ws.value.onMessage("user_status_changed", (event: any) => {
+        console.log(
+          "[useChat] ℹ️ Ignoring user_status_changed (handled by useGlobalStatus)"
+        );
+      });
     } catch (err) {
       console.error("[useChat] ❌ WebSocket connection FAILED");
       console.error("[useChat] Error details:", err);
@@ -115,10 +124,7 @@ export function useChat() {
     }
   }
 
-  // =====================================================================
   // Message Sending
-  // =====================================================================
-
   async function sendMessage() {
     if (!newMessageContent.value.trim()) {
       console.log("[useChat] ⚠️ Message is empty");
@@ -130,7 +136,6 @@ export function useChat() {
       return;
     }
 
-    // Остановить typing перед отправкой
     typing.sendTypingStop(() => {
       if (ws.value?.isConnected) {
         ws.value.send({ type: "typing_stop" });
@@ -196,12 +201,9 @@ export function useChat() {
     }
   }
 
-  // =====================================================================
   // Typing handler для input
-  // =====================================================================
   const handleTyping = () => {
     if (!newMessageContent.value.trim()) {
-      // Пустое поле → стоп
       typing.sendTypingStop(() => {
         if (ws.value?.isConnected) {
           console.log("[useChat] Sending typing_stop");
@@ -209,7 +211,6 @@ export function useChat() {
         }
       });
     } else {
-      // Есть текст → старт
       typing.sendTypingStart(() => {
         if (ws.value?.isConnected) {
           console.log("[useChat] Sending typing_start");
@@ -219,13 +220,15 @@ export function useChat() {
     }
   };
 
-  // =====================================================================
   // Chat Changing
-  // =====================================================================
-
   watch(
     chatId,
     async (newChatId, oldChatId) => {
+      if (newChatId === oldChatId && ws.value?.isConnected) {
+        console.log("[useChat] ℹ️ Already connected to this chat, skipping");
+        return;
+      }
+
       if (isConnecting) {
         console.log("[useChat] ℹ️ Already connecting, skipping");
         return;
@@ -235,7 +238,6 @@ export function useChat() {
         `[useChat] Chat changed: ${oldChatId} → ${newChatId || "null"}`
       );
 
-      // Отключаемся от старого чата
       if (oldChatId && ws.value) {
         console.log(`[useChat] 🔌 Disconnecting from chat #${oldChatId}`);
         typing.cleanup();
@@ -243,7 +245,6 @@ export function useChat() {
         ws.value = null;
       }
 
-      // Подключаемся к новому чату
       if (newChatId) {
         console.log(`[useChat] 🔄 Loading messages for chat #${newChatId}`);
         chatsStore.setCurrentChat(newChatId);
@@ -251,7 +252,6 @@ export function useChat() {
 
         console.log(`[useChat] 🔗 Connecting to chat #${newChatId}`);
 
-        // ОБЕРНУТЬ В TRY/FINALLY
         isConnecting = true;
         try {
           await connectWebSocket();
@@ -265,24 +265,21 @@ export function useChat() {
     { immediate: true }
   );
 
-  // =====================================================================
-  // Cleanup
-  // =====================================================================
+  // Cleanup function
+  function cleanup() {
+    console.log(`[useChat] 🧹 Cleanup called, ref count: ${instanceRefCount}`);
+    instanceRefCount--;
 
-  onUnmounted(() => {
-    console.log(
-      `[useChat] 🧹 Unmounting chat composable for chat #${chatId.value}`
-    );
-    typing.cleanup();
-    if (ws.value) {
-      ws.value.disconnect();
-      ws.value = null;
+    if (instanceRefCount === 0) {
+      console.log("[useChat] 🧹 Last reference removed, destroying instance");
+      typing.cleanup();
+      if (ws.value) {
+        ws.value.disconnect();
+        ws.value = null;
+      }
+      chatInstance = null;
     }
-  });
-
-  // =====================================================================
-  // Return
-  // =====================================================================
+  }
 
   return {
     chatId,
@@ -292,5 +289,27 @@ export function useChat() {
     sendMessage,
     handleTyping,
     typingText: typing.typingText,
+    cleanup,
   };
+}
+
+// ============================================================
+// ПУБЛИЧНАЯ ФУНКЦИЯ (возвращает singleton)
+// ============================================================
+export function useChat() {
+  if (!chatInstance) {
+    console.log("[useChat] 🆕 Creating NEW singleton instance");
+    chatInstance = createChatInstance();
+  } else {
+    console.log("[useChat] ♻️ Reusing existing singleton instance");
+  }
+
+  instanceRefCount++;
+  console.log(`[useChat] 📊 Ref count: ${instanceRefCount}`);
+
+  onUnmounted(() => {
+    chatInstance?.cleanup();
+  });
+
+  return chatInstance;
 }

@@ -11,7 +11,6 @@ export const useChatsStore = defineStore("chats", () => {
   const error = ref<string | null>(null);
 
   // Статусы пользователей: userId -> { isOnline, lastSeen }
-  // ⚠️ ИЗМЕНИЛИ Map на ref<Record>
   const userStatuses = ref<
     Record<number, { isOnline: boolean; lastSeen: string | null }>
   >({});
