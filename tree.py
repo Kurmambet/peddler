@@ -1,3 +1,4 @@
+# C:\projects\peddler\peddler\tree.py - скрипт для генерации этого project_structure.md
 import os
 
 # Директории для исключения из обхода
@@ -30,10 +31,10 @@ SKIP_CONTENT_FILES = {
     ".gitignore",
     "alembic.ini",  # Конфиг alembic
     ".md",
-    "notes.txtREADME.md",
+    "README.md",
     "notes.txt",
     "README.md",
-    "tree.py",
+    # "tree.py",
     "project_structure.md",
     "package-lock.json",
     "FKGroteskNeue.woff2",
