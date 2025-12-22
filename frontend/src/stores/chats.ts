@@ -10,6 +10,11 @@ export const useChatsStore = defineStore("chats", () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  // Статусы пользователей: userId -> { isOnline, lastSeen }
+  const userStatuses = ref<
+    Record<number, { isOnline: boolean; lastSeen: string | null }>
+  >({});
+
   const resetCurrentChat = () => {
     console.log("[ChatsStore] 🔄 Resetting current chat");
     currentChatId.value = null;
@@ -25,9 +30,25 @@ export const useChatsStore = defineStore("chats", () => {
     try {
       const { data } = await chatsAPI.list();
       chats.value = data;
+
+      // Заполнить статусы из REST API
+      data.forEach((chat) => {
+        if (chat.type === "direct") {
+          userStatuses.value[chat.other_user_id] = {
+            isOnline: chat.other_user_is_online,
+            lastSeen: chat.other_user_last_seen,
+          };
+
+          console.log(
+            `[ChatsStore] Initial REST status: User ${chat.other_user_id} → ${
+              chat.other_user_is_online ? "ONLINE" : "OFFLINE"
+            } (lastSeen: ${chat.other_user_last_seen})`
+          );
+        }
+      });
     } catch (err: any) {
       error.value = err.response?.data?.detail || "Failed to load chats";
-      console.error("Load chats error:", err);
+      console.error("[ChatsStore] Load chats error:", err);
     } finally {
       isLoading.value = false;
     }
@@ -43,7 +64,6 @@ export const useChatsStore = defineStore("chats", () => {
     try {
       const { data } = await chatsAPI.createDirectChat(otherUsername);
 
-      // Добавить в список, если его там нет
       if (!chats.value.find((c) => c.id === data.id)) {
         chats.value.unshift(data);
       }
@@ -59,6 +79,30 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
+  const updateUserStatus = (
+    userId: number,
+    isOnline: boolean,
+    lastSeen: string | null
+  ) => {
+    console.log(
+      `[ChatsStore] Updating status: User ${userId} → ${
+        isOnline ? "ONLINE" : "OFFLINE"
+      } (lastSeen: ${lastSeen})`
+    );
+
+    // ⚠️ Реактивное обновление
+    userStatuses.value[userId] = {
+      isOnline,
+      lastSeen,
+    };
+  };
+
+  const getUserStatus = (
+    userId: number
+  ): { isOnline: boolean; lastSeen: string | null } | undefined => {
+    return userStatuses.value[userId];
+  };
+
   return {
     chats,
     currentChatId,
@@ -69,5 +113,7 @@ export const useChatsStore = defineStore("chats", () => {
     setCurrentChat,
     createDirectChat,
     resetCurrentChat,
+    updateUserStatus,
+    getUserStatus,
   };
 });

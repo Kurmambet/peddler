@@ -1,10 +1,17 @@
 // src/main.ts
+// Styles
+import "./styles/fonts.css";
+import "./styles/main.css";
+import "./styles/variables.css";
+
+// System
 import { createPinia } from "pinia";
 import { createApp } from "vue";
+
+// Internal
 import App from "./App.vue";
 import router from "./router";
 import { useAuthStore } from "./stores/auth";
-import "./styles/main.css";
 
 const app = createApp(App);
 const pinia = createPinia();

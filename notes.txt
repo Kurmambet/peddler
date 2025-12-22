@@ -1,3 +1,7 @@
+docker-compose -f docker-compose.dev.yml up -d
+docker-compose -f docker-compose.dev.yml up --build -d
+docker-compose -f docker-compose.dev.yml down
+
 # 1. Подключись к контейнеру PostgreSQL
 docker exec -it peddler-db-dev psql -U peddler -d peddler
 
@@ -6,6 +10,7 @@ docker exec -it peddler-db-dev psql -U peddler -d peddler
 
 # 3. Посмотри пользователей
 SELECT id, username FROM users;
+SELECT * FROM users;
 
 # 4. Посмотри чаты
 SELECT * FROM chats;
@@ -45,3 +50,14 @@ docker exec peddler-redis-dev redis-cli -a psw123 ping
 
 # Или:
 docker exec peddler-redis-dev redis-cli -a psw123 INFO server
+
+
+рименение миграция в docker:
+# 1. Зайди в контейнер backend
+docker exec -it peddler-backend-dev sh
+
+# 2. Внутри контейнера примени миграции
+alembic upgrade head
+
+# 3. Выйди
+exit

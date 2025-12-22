@@ -100,17 +100,20 @@ class ChatService:
 
     async def get_user_chats(self, user_id: int, limit: int = 50, offset: int = 0) -> List[Chat]:
         """Получить список чатов пользователя"""
-        # return await self.repo.get_user_chats(user_id, limit, offset)
         chats = await self.repo.get_user_chats(user_id, limit, offset)
 
         results: List[ChatRead] = []
         for chat in chats:
             if chat.type == ChatType.DIRECT:
-                # Теперь это работает без lazy loading
-                other_username = next(
-                    (p.user.username for p in chat.participants if p.user_id != user_id),
+                # Найти другого участника
+                other_participant = next(
+                    (p.user for p in chat.participants if p.user_id != user_id),
                     None,
                 )
+
+                if not other_participant:
+                    # Если не нашли другого участника - пропускаем
+                    continue
 
                 result = DirectChatRead(
                     id=chat.id,
@@ -118,8 +121,13 @@ class ChatService:
                     title=None,
                     created_by_id=chat.created_by_id,
                     created_at=chat.created_at,
-                    other_username=other_username or "",
+                    other_username=other_participant.username,
+                    other_user_id=other_participant.id,
+                    # статусы
+                    other_user_is_online=other_participant.is_online,
+                    other_user_last_seen=other_participant.last_seen,
                 )
+
             else:  # GROUP
                 result = GroupChatRead(
                     id=chat.id,

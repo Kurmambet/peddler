@@ -1,12 +1,15 @@
 # app/ws/router.py
 import json
 import logging
+from datetime import datetime
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.models.chat import ChatParticipant
 from app.models.user import User
 from app.schemas.message import MessageCreate
 from app.services.message_service import MessageService
@@ -22,6 +25,7 @@ from app.ws.events import (
     MessageReadEvent,
     SendMessageEvent,
     TypingIndicatorEvent,
+    UserStatusChangedEvent,
 )
 from app.ws.manager import ConnectionManager
 from app.ws.pubsub import RedisPubSubManager
@@ -45,6 +49,7 @@ async def websocket_endpoint(
 ):
     """
     WebSocket endpoint для реалтайм-обмена сообщениями в чате.
+    НЕ УПРАВЛЯЕТ СТАТУСАМИ — это делает /ws/status
 
     URL: ws://localhost:8000/api/v1/ws/chats/{chat_id}?token=<JWT>
 
@@ -56,9 +61,7 @@ async def websocket_endpoint(
     5. При disconnect — очистка соединения
     """
 
-    # ========================================================================
     # Шаг 1: Аутентификация
-    # ========================================================================
     user = await authenticate_websocket(websocket, db)
     if not user:
         await reject_websocket(
@@ -66,9 +69,7 @@ async def websocket_endpoint(
         )
         return
 
-    # ========================================================================
     # Шаг 2: Проверка доступа к чату
-    # ========================================================================
     has_access = await verify_chat_access(user.id, chat_id, db)
     if not has_access:
         await reject_websocket(
@@ -80,9 +81,7 @@ async def websocket_endpoint(
 
     connected = False
 
-    # ========================================================================
     # Шаг 3: Регистрация соединения
-    # ========================================================================
     await manager.connect(websocket, chat_id, user.id)
     connected = True
 
@@ -91,18 +90,14 @@ async def websocket_endpoint(
 
     logger.info(f"User {user.id} ({user.username}) connected to chat {chat_id}")
 
-    # ========================================================================
     # Шаг 4: Отправка подтверждения подключения
-    # ========================================================================
     connected_event = ConnectedEvent(
         user_id=user.id, chat_id=chat_id, message=f"Connected to chat {chat_id}"
     )
     await manager.send_personal_message(connected_event.model_dump_json(), websocket)
 
     try:
-        # ====================================================================
         # Шаг 5: Основной цикл приема событий
-        # ====================================================================
         while True:
             # Ждем сообщение от клиента (блокирующий вызов)
             raw_data = await websocket.receive_text()
@@ -132,9 +127,7 @@ async def websocket_endpoint(
                 )
 
     finally:
-        # ====================================================================
         # Шаг 6: Очистка при любом выходе из цикла
-        # ====================================================================
         if connected:
             await manager.disconnect(websocket, chat_id, user.id)
 
@@ -310,3 +303,113 @@ async def handle_mark_read(
     await pubsub_manager.publish_to_chat(chat_id, read_event.model_dump_json())
 
     logger.info(f"Message {message.id} marked as read by user {user.id}")
+
+
+@router.websocket("/status")
+async def status_websocket_endpoint(websocket: WebSocket, db: AsyncSession = Depends(get_db)):
+    """
+    Глобальный WebSocket для синхронизации онлайн-статусов.
+
+    Подключается один раз при входе на главную страницу.
+    Устанавливает пользователя online и подписывается на статусы
+    всех пользователей из его чатов.
+    """
+    # Шаг 1: Аутентификация
+    user = await authenticate_websocket(websocket, db)
+    if not user:
+        await reject_websocket(
+            websocket, status.WS_1008_POLICY_VIOLATION, "Invalid or missing authentication token"
+        )
+        return
+
+    connected = False
+
+    try:
+        # Шаг 2: Accept соединения
+        await websocket.accept()
+        connected = True
+        # Шаг 3: Пометить пользователя как online
+        await manager.connect_status(user.id, websocket)
+
+        await manager.set_user_online(user.id, db)
+
+        # Шаг 4: Получить все чаты пользователя
+        stmt = select(ChatParticipant.chat_id).where(ChatParticipant.user_id == user.id)
+        result = await db.execute(stmt)
+        user_chat_ids = [row[0] for row in result.fetchall()]
+
+        # Шаг 5: Broadcast статус online во все чаты
+        status_event = UserStatusChangedEvent(
+            user_id=user.id, username=user.username, is_online=True
+        )
+
+        for chat_id in user_chat_ids:
+            await pubsub_manager.publish_to_chat(chat_id, status_event.model_dump_json())
+
+        logger.info(f"[StatusWS] User {user.id} set to ONLINE, notified {len(user_chat_ids)} chats")
+
+        # Шаг 6: Подписаться на все чаты (для получения статусов других)
+        for chat_id in user_chat_ids:
+            await pubsub_manager.subscribe_to_chat(chat_id)
+
+        # Шаг 7: Отправить подтверждение подключения
+        connected_event = ConnectedEvent(
+            user_id=user.id,
+            chat_id=0,  # Глобальный канал, не привязан к конкретному чату
+            message=f"Status WebSocket connected for user {user.username}",
+        )
+        await websocket.send_text(connected_event.model_dump_json())
+
+        # Шаг 8: Держать соединение открытым
+        while True:
+            try:
+                data = await websocket.receive_text()
+                if data == "ping":
+                    await websocket.send_text("pong")
+            except WebSocketDisconnect:
+                break
+
+    except WebSocketDisconnect:
+        logger.info(f"[StatusWS] User {user.id} disconnected from status WebSocket")
+
+    except Exception as e:
+        logger.error(f"[StatusWS] Error for user {user.id}: {e}")
+
+    finally:
+        # Шаг 9: Cleanup при disconnect
+        if connected:
+            # Пометить как offline
+            await manager.disconnect_status(user.id, websocket)
+            await manager.set_user_offline(user.id, db)
+
+            # Получить чаты (могли измениться за время сессии)
+            stmt = select(ChatParticipant.chat_id).where(ChatParticipant.user_id == user.id)
+            result = await db.execute(stmt)
+            user_chat_ids = [row[0] for row in result.fetchall()]
+
+            # Broadcast offline статус
+            async with manager._lock:
+                has_devices = user.id in manager.status_connections
+
+            if not has_devices:
+                status_event = UserStatusChangedEvent(
+                    user_id=user.id,
+                    username=user.username,
+                    is_online=False,
+                    last_seen=datetime.utcnow(),
+                )
+
+                for chat_id in user_chat_ids:
+                    await pubsub_manager.publish_to_chat(chat_id, status_event.model_dump_json())
+
+                logger.info(
+                    f"[StatusWS] User {user.id} set to OFFLINE, notified {len(user_chat_ids)} chats"
+                )
+            else:
+                logger.info(f"[StatusWS] User {user.id} still has other devices online")
+
+            for chat_id in user_chat_ids:
+                if manager.get_chat_participant_count(chat_id) == 0:
+                    await pubsub_manager.unsubscribe_from_chat(chat_id)
+
+            logger.info(f"[StatusWS] Cleaned up status connection for user {user.id}")

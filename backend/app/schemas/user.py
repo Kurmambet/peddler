@@ -1,5 +1,6 @@
 # app/schemas/user.py
 from datetime import datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,10 +16,12 @@ class UserCreate(UserBase):
 class UserRead(UserBase):
     id: int
     is_active: bool
+    is_online: bool
+    last_seen: Optional[datetime] = None
     created_at: datetime
 
     class Config:
-        from_attributes = True  # Pydantic v2: позволяет создавать из ORM-объектов
+        from_attributes = True
 
 
 class Token(BaseModel):

@@ -27,6 +27,7 @@ class EventType(str, Enum):
     TYPING_INDICATOR = "typing_indicator"
     ERROR = "error"
     CONNECTED = "connected"  # Подтверждение успешного подключения
+    USER_STATUS_CHANGED = "user_status_changed"
 
 
 class WSEvent(BaseModel):
@@ -186,3 +187,20 @@ class ConnectedEvent(WSEvent):
     user_id: int
     chat_id: int
     message: str = "Successfully connected"
+
+
+class UserStatusChangedEvent(WSEvent):
+    """
+    Сервер уведомляет о смене онлайн-статуса пользователя.
+
+    Пример: {"type": "user_status_changed", "user_id": 42, "username": "alice", "is_online": true}
+    """
+
+    type: EventType = EventType.USER_STATUS_CHANGED
+    user_id: int
+    username: str
+    is_online: bool
+    last_seen: Optional[datetime] = None
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat() + "Z" if v else None}

@@ -1,43 +1,56 @@
 <!-- src/components/chat/CreateDirectChat.vue -->
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-    <div class="max-w-md w-full bg-white rounded-lg shadow p-6">
-      <h2 class="text-2xl font-bold mb-4">Создать чат</h2>
+  <div class="min-h-screen flex items-center justify-center bg-app-bg p-4">
+    <Card padding="lg" class="max-w-md w-full">
+      <div class="space-y-6">
+        <!-- Header -->
+        <div class="text-center">
+          <h2 class="text-2xl font-bold text-app-text">Create New Chat</h2>
+          <p class="text-app-text-secondary text-sm mt-1">
+            Enter the username to start chatting
+          </p>
+        </div>
 
-      <div v-if="error" class="mb-4 p-3 bg-red-50 text-red-700 rounded">
-        {{ error }}
-      </div>
+        <!-- Error Message -->
+        <div
+          v-if="error"
+          class="rounded-md p-4 bg-app-error/10 border border-app-error/30 text-app-error text-sm"
+        >
+          {{ error }}
+        </div>
 
-      <div class="mb-4">
-        <label class="block text-sm font-medium mb-2">Username</label>
-        <input
-          v-model.number="otherUsername"
+        <!-- Username Input -->
+        <Input
+          v-model="otherUsername"
           type="text"
-          placeholder="Введите username"
+          label="Username"
+          placeholder="Enter username"
+          :error="error ? '' : ''"
+          hint="Start typing to search for users"
           @keyup.enter="createChat"
-          class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-600"
         />
-        <p class="text-xs text-gray-500 mt-1">
-          Введите username пользователя, с которым хотите начать чат
-        </p>
+
+        <!-- Create Button -->
+        <Button
+          variant="primary"
+          :disabled="!otherUsername || isLoading"
+          :is-loading="isLoading"
+          full-width
+          @click="createChat"
+        >
+          Create Chat
+        </Button>
+
+        <!-- Back Link -->
+        <router-link
+          to="/"
+          @click="resetChat"
+          class="block text-center text-sm text-app-text-secondary hover:text-app-text transition-colors"
+        >
+          ← Back to chats
+        </router-link>
       </div>
-
-      <button
-        @click="createChat"
-        :disabled="!otherUsername || isLoading"
-        class="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-      >
-        {{ isLoading ? "Создаём..." : "Создать чат" }}
-      </button>
-
-      <router-link
-        to="/"
-        @click="resetChat"
-        class="block mt-4 text-center text-sm text-gray-600 hover:text-gray-900"
-      >
-        ← Назад к чатам
-      </router-link>
-    </div>
+    </Card>
   </div>
 </template>
 
@@ -45,13 +58,14 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useChatsStore } from "../../stores/chats";
+import Button from "../ui/Button.vue";
+import Card from "../ui/Card.vue";
+import Input from "../ui/Input.vue";
 
 const router = useRouter();
 const chatsStore = useChatsStore();
 
-// const otherUserId = ref<number | null>(null);
 const otherUsername = ref<string>("");
-
 const isLoading = ref(false);
 const error = ref<string | null>(null);
 
@@ -67,12 +81,12 @@ const createChat = async () => {
     await router.push(`/chat/${chat.id}`);
   } catch (err: any) {
     console.error("❌ Create chat error:", err);
-    error.value = err.response?.data?.detail || "Не удалось создать чат";
+    error.value = err.response?.data?.detail || "Failed to create chat";
   } finally {
     isLoading.value = false;
   }
 };
-// TODO когда нормальный фронт буду делать это заменить на редирект на главную страницу
+
 const resetChat = () => {
   console.log("[Component] 🔄 Resetting current chat before navigation");
   chatsStore.resetCurrentChat();

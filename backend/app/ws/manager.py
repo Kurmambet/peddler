@@ -1,9 +1,13 @@
 # app/ws/manager.py
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Dict, Set
 
 from fastapi import WebSocket
+from sqlalchemy import update
+
+from app.models.user import User
 
 logger = logging.getLogger(__name__)
 
@@ -19,18 +23,23 @@ class ConnectionManager:
 
     def __init__(self):
         # Ключ = chat_id (int), значение = множество WebSocket объектов
+        # Для /ws/chats/{id}
         self.active_connections: Dict[int, Set[WebSocket]] = {}
 
         # Ключ = user_id (int), значение = WebSocket объект
         # Один пользователь = одно активное соединение (для упрощения)
-        self.user_connections: Dict[int, WebSocket] = {}
+        # Для /ws/chats/{id} (персональные соединения)
+        self.chat_user_connections: Dict[int, WebSocket] = {}
+
+        # Для /ws/status (статусные соединения)
+        self.status_connections: Dict[int, Set[WebSocket]] = {}
 
         # Блокировка для потокобезопасности при изменении словарей
         self._lock = asyncio.Lock()
 
     async def connect(self, websocket: WebSocket, chat_id: int, user_id: int):
         """
-        Принимает новое WebSocket-соединение и регистрирует его.
+        Принимает новое WebSocket-соединение и регистрирует его в /ws/chats/{id}
 
         1. Отправляет WebSocket handshake (accept)
         2. Добавляет в active_connections для чата
@@ -45,13 +54,14 @@ class ConnectionManager:
             self.active_connections[chat_id].add(websocket)
 
             # Регистрируем персональное соединение
-            self.user_connections[user_id] = websocket
+            self.chat_user_connections[user_id] = websocket
 
         logger.info(f"User {user_id} connected to chat {chat_id}")
 
     async def disconnect(self, websocket: WebSocket, chat_id: int, user_id: int):
         """
         Удаляет соединение из всех маппингов при отключении клиента.
+        Отключение от /ws/chats/{id}.
         Вызывается либо явно (клиент закрыл вкладку), либо при ошибке.
         """
         async with self._lock:
@@ -63,10 +73,42 @@ class ConnectionManager:
                     del self.active_connections[chat_id]
 
             # Удаляем персональную связку
-            if user_id in self.user_connections:
-                del self.user_connections[user_id]
+            if user_id in self.chat_user_connections:
+                del self.chat_user_connections[user_id]
 
         logger.info(f"User {user_id} disconnected from chat {chat_id}")
+
+    # Метод для /ws/status
+    async def connect_status(self, user_id: int, websocket: WebSocket):
+        """Регистрация /ws/status соединения (поддержка нескольких устройств)"""
+        async with self._lock:
+            # Добавляем в Set
+            if user_id not in self.status_connections:
+                self.status_connections[user_id] = set()
+
+            self.status_connections[user_id].add(websocket)
+
+            # Логируем количество устройств
+            device_count = len(self.status_connections[user_id])
+        logger.info(f"[Manager] User {user_id} registered /ws/status (devices: {device_count})")
+
+    # Метод для /ws/status
+    async def disconnect_status(self, user_id: int, websocket: WebSocket):
+        """Отключение /ws/status соединения (удаляет конкретное устройство)"""
+        async with self._lock:
+            if user_id in self.status_connections:
+                # Удаляем конкретный websocket
+                self.status_connections[user_id].discard(websocket)
+
+                # Если это было последнее устройство, удаляем ключ
+                if not self.status_connections[user_id]:
+                    del self.status_connections[user_id]
+                    logger.info(f"[Manager] User {user_id} unregistered /ws/status (last device)")
+                else:
+                    device_count = len(self.status_connections[user_id])
+                    logger.info(
+                        f"[Manager] User {user_id} unregistered /ws/status (remaining devices: {device_count})"
+                    )
 
     async def send_personal_message(self, message: str, websocket: WebSocket):
         """
@@ -80,31 +122,86 @@ class ConnectionManager:
 
     async def broadcast_to_chat(self, chat_id: int, message: str):
         """
-        Отправляет сообщение всем подключенным к чату клиентам.
-        Это основной метод для доставки новых сообщений, typing indicators и т.д.
+        Отправляет сообщение:
+        1. Всем в /ws/chats/{chat_id}
+        2. ВСЕМ в /ws/status (независимо от chat_id)
         """
+
+        # ========================================
+        # 1. Отправить в /ws/chats/{id}
+        # ========================================
         async with self._lock:
-            # Копируем множество, чтобы не блокировать lock на время отправки
             connections = self.active_connections.get(chat_id, set()).copy()
 
-        # Отправляем вне блокировки, чтобы не задерживать другие операции
         dead_connections = []
         for websocket in connections:
             try:
                 await websocket.send_text(message)
             except Exception as e:
-                logger.debug(f"Failed to send to websocket in chat {chat_id}: {e}")
-                # Помечаем сокет как мертвый для очистки
+                logger.debug(f"Failed to send to chat websocket: {e}")
                 dead_connections.append(websocket)
 
-        # Удаляем разорванные соединения
+        # Удаляем мёртвые соединения
         if dead_connections:
             async with self._lock:
                 for ws in dead_connections:
                     self.active_connections.get(chat_id, set()).discard(ws)
+            logger.debug(f"Cleaned up {len(dead_connections)} dead chat connections")
 
-            logger.debug(f"Cleaned up {len(dead_connections)} dead connections from chat {chat_id}")
+        # ========================================
+        # 2.  Отправить в /ws/status
+        # ========================================
+        async with self._lock:
+            status_conns = self.status_connections.copy()
+
+        for user_id, websockets in status_conns.items():
+            dead_status = []
+
+            for websocket in websockets:
+                try:
+                    await websocket.send_text(message)
+                    logger.debug(f"[Manager] Sent to /ws/status for user {user_id}")
+                except Exception as e:
+                    logger.debug(f"Failed to send to /ws/status for user {user_id}: {e}")
+                    dead_status.append(websocket)
+
+            # Удаляем мёртвые соединения
+            if dead_status:
+                async with self._lock:
+                    for ws in dead_status:
+                        self.status_connections.get(user_id, set()).discard(ws)
+
+                    # Если это был последний websocket, удаляем user_id
+                    if not self.status_connections.get(user_id):
+                        del self.status_connections[user_id]
+
+                logger.debug(
+                    f"Cleaned up {len(dead_status)} dead status connections for user {user_id}"
+                )
 
     def get_chat_participant_count(self, chat_id: int) -> int:
-        """Get number of active connections in a chat."""
         return len(self.active_connections.get(chat_id, set()))
+
+    async def set_user_online(self, user_id: int, db):
+        stmt = update(User).where(User.id == user_id).values(is_online=True)
+        await db.execute(stmt)
+        await db.commit()
+
+    async def set_user_offline(self, user_id: int, db):
+        async with self._lock:
+            has_connections = (
+                user_id in self.status_connections and len(self.status_connections[user_id]) > 0
+            )
+            device_count = len(self.status_connections.get(user_id, set()))
+
+        if not has_connections:
+            stmt = (
+                update(User)
+                .where(User.id == user_id)
+                .values(is_online=False, last_seen=datetime.now(timezone.utc))
+            )
+            await db.execute(stmt)
+            await db.commit()
+            logger.info(f"[Manager] User {user_id} set to OFFLINE (no devices)")
+        else:
+            logger.info(f"[Manager] User {user_id} still has {device_count} device(s) online")

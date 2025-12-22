@@ -5,18 +5,21 @@
 
 <script setup lang="ts">
 import { onMounted } from "vue";
+import { useGlobalStatus } from "./composables/useGlobalStatus";
 import { useAuthStore } from "./stores/auth";
 
 const authStore = useAuthStore();
 
+useGlobalStatus();
+
 onMounted(async () => {
   if (authStore.token) {
-    console.log("[App] Mounting, restoring session...");
+    console.log("[App] Restoring session...");
     try {
       await authStore.restoreSession();
       console.log("[App] Session restored, user:", authStore.user?.username);
     } catch (err) {
-      console.error("Session restore failed:", err);
+      console.error("[App] Session restore failed:", err);
     }
   }
 });
