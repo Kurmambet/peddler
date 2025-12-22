@@ -379,7 +379,7 @@ async def status_websocket_endpoint(websocket: WebSocket, db: AsyncSession = Dep
         # Шаг 9: Cleanup при disconnect
         if connected:
             # Пометить как offline
-            await manager.disconnect_status(user.id)
+            await manager.disconnect_status(user.id, websocket)
             await manager.set_user_offline(user.id, db)
 
             # Получить чаты (могли измениться за время сессии)
@@ -388,21 +388,26 @@ async def status_websocket_endpoint(websocket: WebSocket, db: AsyncSession = Dep
             user_chat_ids = [row[0] for row in result.fetchall()]
 
             # Broadcast offline статус
-            status_event = UserStatusChangedEvent(
-                user_id=user.id,
-                username=user.username,
-                is_online=False,
-                last_seen=datetime.utcnow(),
-            )
+            async with manager._lock:
+                has_devices = user.id in manager.status_connections
 
-            for chat_id in user_chat_ids:
-                await pubsub_manager.publish_to_chat(chat_id, status_event.model_dump_json())
+            if not has_devices:
+                status_event = UserStatusChangedEvent(
+                    user_id=user.id,
+                    username=user.username,
+                    is_online=False,
+                    last_seen=datetime.utcnow(),
+                )
 
-            logger.info(
-                f"[StatusWS] User {user.id} set to OFFLINE, notified {len(user_chat_ids)} chats"
-            )
+                for chat_id in user_chat_ids:
+                    await pubsub_manager.publish_to_chat(chat_id, status_event.model_dump_json())
 
-            # Отписаться от всех чатов
+                logger.info(
+                    f"[StatusWS] User {user.id} set to OFFLINE, notified {len(user_chat_ids)} chats"
+                )
+            else:
+                logger.info(f"[StatusWS] User {user.id} still has other devices online")
+
             for chat_id in user_chat_ids:
                 if manager.get_chat_participant_count(chat_id) == 0:
                     await pubsub_manager.unsubscribe_from_chat(chat_id)
