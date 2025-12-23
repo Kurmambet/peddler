@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from app.models.chat import Chat, ChatParticipant, ChatParticipantRole, ChatType
 from app.models.user import User
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -112,3 +112,71 @@ class ChatRepository:
         """Проверить, какие пользователи существуют"""
         result = await self.db.execute(select(User.id).where(User.id.in_(user_ids)))
         return result.scalars().all()
+
+    async def get_chat_by_id_with_participants(self, chat_id: int) -> Optional[Chat]:
+        """
+        Получить чат по ID с загруженными участниками и их данными.
+        Использует selectinload для избежания N+1 проблемы.
+        """
+        result = await self.db.execute(
+            select(Chat)
+            .options(selectinload(Chat.participants).selectinload(ChatParticipant.user))
+            .where(Chat.id == chat_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_participant_role(
+        self, chat_id: int, user_id: int
+    ) -> Optional[ChatParticipantRole]:
+        """Получить роль участника в чате"""
+        result = await self.db.execute(
+            select(ChatParticipant.role).where(
+                and_(
+                    ChatParticipant.chat_id == chat_id,
+                    ChatParticipant.user_id == user_id,
+                )
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def remove_participant(self, chat_id: int, user_id: int):
+        """Удалить участника из чата"""
+        result = await self.db.execute(
+            select(ChatParticipant).where(
+                and_(
+                    ChatParticipant.chat_id == chat_id,
+                    ChatParticipant.user_id == user_id,
+                )
+            )
+        )
+        participant = result.scalar_one_or_none()
+        if participant:
+            await self.db.delete(participant)
+
+    async def update_participant_role(
+        self, chat_id: int, user_id: int, new_role: ChatParticipantRole
+    ):
+        """Обновить роль участника"""
+        stmt = (
+            update(ChatParticipant)
+            .where(
+                and_(
+                    ChatParticipant.chat_id == chat_id,
+                    ChatParticipant.user_id == user_id,
+                )
+            )
+            .values(role=new_role)
+        )
+        await self.db.execute(stmt)
+
+    async def update_chat(self, chat_id: int, **kwargs):
+        """Обновить поля чата"""
+        stmt = update(Chat).where(Chat.id == chat_id).values(**kwargs)
+        await self.db.execute(stmt)
+
+    async def get_participant_count(self, chat_id: int) -> int:
+        """Получить количество участников в чате"""
+        result = await self.db.execute(
+            select(func.count(ChatParticipant.id)).where(ChatParticipant.chat_id == chat_id)
+        )
+        return result.scalar_one()

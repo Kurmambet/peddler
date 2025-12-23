@@ -20,6 +20,8 @@ class Chat(BaseModel):
     __tablename__ = "chats"
 
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+
     type: Mapped[ChatType] = mapped_column(
         Enum(ChatType, name="chat_type_enum"),
         nullable=False,

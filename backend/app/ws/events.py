@@ -28,6 +28,10 @@ class EventType(str, Enum):
     ERROR = "error"
     CONNECTED = "connected"  # Подтверждение успешного подключения
     USER_STATUS_CHANGED = "user_status_changed"
+    USER_JOINED = "user_joined"
+    USER_LEFT = "user_left"
+    GROUP_UPDATED = "group_updated"
+    ROLE_CHANGED = "role_changed"
 
 
 class WSEvent(BaseModel):
@@ -204,3 +208,50 @@ class UserStatusChangedEvent(WSEvent):
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat() + "Z" if v else None}
+
+
+# события для групповых чатов
+class UserJoinedEvent(WSEvent):
+    """Пользователь присоединился к группе"""
+
+    type: EventType = EventType.USER_JOINED
+    chat_id: int
+    user_id: int
+    username: str
+    added_by_id: int
+    added_by_username: str
+
+
+class UserLeftEvent(WSEvent):
+    """Пользователь покинул группу"""
+
+    type: EventType = EventType.USER_LEFT
+    chat_id: int
+    user_id: int
+    username: str
+    reason: str  # "left" | "removed"
+    removed_by_id: Optional[int] = None
+    removed_by_username: Optional[str] = None
+
+
+class GroupUpdatedEvent(WSEvent):
+    """Настройки группы обновлены"""
+
+    type: EventType = EventType.GROUP_UPDATED
+    chat_id: int
+    updated_by_id: int
+    updated_by_username: str
+    changes: dict  # {"title": "New Title", "description": "..."}
+
+
+class RoleChangedEvent(WSEvent):
+    """Роль участника изменена"""
+
+    type: EventType = EventType.ROLE_CHANGED
+    chat_id: int
+    user_id: int
+    username: str
+    old_role: str
+    new_role: str
+    changed_by_id: int
+    changed_by_username: str

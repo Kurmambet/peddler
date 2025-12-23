@@ -1,0 +1,363 @@
+/* ============================================================================
+   src/styles/variables.css
+   
+   CSS Custom Properties для темизации приложения.
+   ТОЛЬКО ПЕРЕМЕННЫЕ - без классов .hidden, .flex и т.д.
+   ============================================================================ */
+
+/* ============================================================================
+   СВЕТЛЫЙ РЕЖИМ (Light Mode) — по умолчанию
+   ============================================================================ */
+
+:root {
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* Цвета фона */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --color-bg: 252 252 249;
+  --color-surface: 255 255 253;
+  --color-card: 255 255 253;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* Цвета текста */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --color-text: 19 52 59;
+  --color-text-secondary: 98 108 113;
+  --color-text-inverse: 252 252 249;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* Границы и разделители */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --color-border: 94 82 64;
+  --color-border-strong: 94 82 64;
+  --color-border-subtle: 94 82 64;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* Основные цвета (Primary/Brand) */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --color-primary: 33 128 141;
+  --color-primary-hover: 29 116 128;
+  --color-primary-active: 26 104 115;
+  --color-primary-subtle: 33 128 141;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* Статусные цвета */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --color-success: 33 128 141;
+  --color-success-hover: 29 116 128;
+  --color-success-subtle: 33 128 141;
+
+  --color-error: 192 21 47;
+  --color-error-hover: 192 21 47;
+  --color-error-subtle: 192 21 47;
+
+  --color-warning: 168 75 47;
+  --color-warning-hover: 168 75 47;
+  --color-warning-subtle: 168 75 47;
+
+  --color-info: 98 108 113;
+  --color-info-hover: 98 108 113;
+  --color-info-subtle: 98 108 113;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* Специальные цвета для чата */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --color-message-incoming: 94 82 64;
+  --color-message-outgoing: 33 128 141;
+  --color-message-text-incoming: 19 52 59;
+  --color-message-text-outgoing: 252 252 249;
+  --color-typing: 94 82 64;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* Интерактивные элементы */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --color-focus-ring: 33 128 141;
+  --color-disabled: 94 82 64;
+  --color-disabled-text: 98 108 113;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* Аватары (цвета для инициалов) */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --color-avatar-1: 33 128 141;
+  --color-avatar-2: 45 166 178;
+  --color-avatar-3: 50 184 198;
+  --color-avatar-4: 29 116 128;
+  --color-avatar-5: 168 75 47;
+  --color-avatar-6: 192 21 47;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* SPACING (Стандартные отступы) */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --spacing-xs: 0.25rem; /* 4px */
+  --spacing-sm: 0.5rem; /* 8px */
+  --spacing-md: 1rem; /* 16px */
+  --spacing-lg: 1.5rem; /* 24px */
+  --spacing-xl: 2rem; /* 32px */
+  --spacing-2xl: 3rem; /* 48px */
+  --spacing-3xl: 4rem; /* 64px */
+
+  --gutter-mobile: 1rem;
+  --gutter-desktop: 1.5rem;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* ТИПОГРАФИЯ (Font Sizes) */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --font-size-xs: 0.6875rem; /* 11px */
+  --font-size-sm: 0.75rem; /* 12px */
+  --font-size-base: 0.875rem; /* 14px */
+  --font-size-md: 0.875rem; /* 14px */
+  --font-size-lg: 1rem; /* 16px */
+  --font-size-xl: 1.125rem; /* 18px */
+  --font-size-2xl: 1.25rem; /* 20px */
+  --font-size-3xl: 1.5rem; /* 24px */
+  --font-size-4xl: 1.875rem; /* 30px */
+
+  --line-height-tight: 1.2;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 550;
+  --font-weight-bold: 600;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* Z-INDEX (Слои) */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --z-hide: -1;
+  --z-auto: 0;
+  --z-base: 1;
+  --z-elevated: 10;
+  --z-sticky: 20;
+  --z-fixed: 30;
+  --z-dropdown: 1000;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+  --z-notification: 1080;
+  --z-debugger: 9999;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* BORDER RADIUS */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --radius-none: 0;
+  --radius-sm: 0.375rem; /* 6px */
+  --radius-base: 0.5rem; /* 8px */
+  --radius-md: 0.75rem; /* 12px */
+  --radius-lg: 1rem; /* 16px */
+  --radius-xl: 1.5rem; /* 24px */
+  --radius-full: 9999px;
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* TRANSITIONS & ANIMATIONS */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 300ms;
+  --duration-slower: 500ms;
+
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ─────────────────────────────────────────────────────────────────────── */
+  /* SHADOWS (Тени для глубины) */
+  /* ─────────────────────────────────────────────────────────────────────── */
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.04),
+    0 2px 4px -1px rgba(0, 0, 0, 0.02);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.04),
+    0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.04),
+    0 8px 10px -6px rgba(0, 0, 0, 0.02);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.03);
+}
+
+/* ============================================================================
+   ТЁМНЫЙ РЕЖИМ (Dark Mode) — через prefers-color-scheme
+   ============================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: 31 33 33;
+    --color-surface: 38 40 40;
+    --color-card: 38 40 40;
+    --color-text: 245 245 245;
+    --color-text-secondary: 167 169 169;
+    --color-text-inverse: 19 52 59;
+    --color-border: 119 124 124;
+    --color-border-strong: 119 124 124;
+    --color-border-subtle: 119 124 124;
+    --color-primary: 50 184 198;
+    --color-primary-hover: 45 166 178;
+    --color-primary-active: 41 150 161;
+    --color-primary-subtle: 50 184 198;
+    --color-success: 50 184 198;
+    --color-success-hover: 45 166 178;
+    --color-success-subtle: 50 184 198;
+    --color-error: 255 84 89;
+    --color-error-hover: 255 84 89;
+    --color-error-subtle: 255 84 89;
+    --color-warning: 230 129 97;
+    --color-warning-hover: 230 129 97;
+    --color-warning-subtle: 230 129 97;
+    --color-info: 167 169 169;
+    --color-info-hover: 167 169 169;
+    --color-info-subtle: 167 169 169;
+    --color-message-incoming: 119 124 124;
+    --color-message-outgoing: 50 184 198;
+    --color-message-text-incoming: 245 245 245;
+    --color-message-text-outgoing: 19 52 59;
+    --color-typing: 119 124 124;
+    --color-focus-ring: 50 184 198;
+    --color-disabled: 119 124 124;
+    --color-disabled-text: 167 169 169;
+    --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* ============================================================================
+   РУЧНОЕ ПЕРЕКЛЮЧЕНИЕ ТЕМЫ (для кнопки "Light/Dark")
+   ============================================================================ */
+
+[data-theme="dark"] {
+  --color-bg: 31 33 33;
+  --color-surface: 38 40 40;
+  --color-card: 38 40 40;
+  --color-text: 245 245 245;
+  --color-text-secondary: 167 169 169;
+  --color-text-inverse: 19 52 59;
+  --color-border: 119 124 124;
+  --color-border-strong: 119 124 124;
+  --color-border-subtle: 119 124 124;
+  --color-primary: 50 184 198;
+  --color-primary-hover: 45 166 178;
+  --color-primary-active: 41 150 161;
+  --color-primary-subtle: 50 184 198;
+  --color-success: 50 184 198;
+  --color-success-hover: 45 166 178;
+  --color-success-subtle: 50 184 198;
+  --color-error: 255 84 89;
+  --color-error-hover: 255 84 89;
+  --color-error-subtle: 255 84 89;
+  --color-warning: 230 129 97;
+  --color-warning-hover: 230 129 97;
+  --color-warning-subtle: 230 129 97;
+  --color-info: 167 169 169;
+  --color-info-hover: 167 169 169;
+  --color-info-subtle: 167 169 169;
+  --color-message-incoming: 119 124 124;
+  --color-message-outgoing: 50 184 198;
+  --color-message-text-incoming: 245 245 245;
+  --color-message-text-outgoing: 19 52 59;
+  --color-typing: 119 124 124;
+  --color-focus-ring: 50 184 198;
+  --color-disabled: 119 124 124;
+  --color-disabled-text: 167 169 169;
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] {
+  --color-bg: 252 252 249;
+  --color-surface: 255 255 253;
+  --color-card: 255 255 253;
+  --color-text: 19 52 59;
+  --color-text-secondary: 98 108 113;
+  --color-text-inverse: 252 252 249;
+  --color-border: 94 82 64;
+  --color-border-strong: 94 82 64;
+  --color-border-subtle: 94 82 64;
+  --color-primary: 33 128 141;
+  --color-primary-hover: 29 116 128;
+  --color-primary-active: 26 104 115;
+  --color-primary-subtle: 33 128 141;
+  --color-success: 33 128 141;
+  --color-success-hover: 29 116 128;
+  --color-success-subtle: 33 128 141;
+  --color-error: 192 21 47;
+  --color-error-hover: 192 21 47;
+  --color-error-subtle: 192 21 47;
+  --color-warning: 168 75 47;
+  --color-warning-hover: 168 75 47;
+  --color-warning-subtle: 168 75 47;
+  --color-info: 98 108 113;
+  --color-info-hover: 98 108 113;
+  --color-info-subtle: 98 108 113;
+  --color-message-incoming: 94 82 64;
+  --color-message-outgoing: 33 128 141;
+  --color-message-text-incoming: 19 52 59;
+  --color-message-text-outgoing: 252 252 249;
+  --color-typing: 94 82 64;
+  --color-focus-ring: 33 128 141;
+  --color-disabled: 94 82 64;
+  --color-disabled-text: 98 108 113;
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.15),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.03);
+}
+
+/* ============================================================================
+   MOBILE RESPONSIVE (480px and below)
+   ============================================================================ */
+
+@media (max-width: 480px) {
+  :root {
+    --font-size-xs: 0.625rem; /* 10px */
+    --font-size-sm: 0.6875rem; /* 11px */
+    --font-size-base: 0.8125rem; /* 13px */
+    --font-size-md: 0.8125rem; /* 13px */
+    --font-size-lg: 0.9375rem; /* 15px */
+    --font-size-xl: 1.0625rem; /* 17px */
+    --font-size-2xl: 1.1875rem; /* 19px */
+    --font-size-3xl: 1.375rem; /* 22px */
+    --font-size-4xl: 1.625rem; /* 26px */
+
+    --spacing-md: 0.75rem; /* 12px */
+    --spacing-lg: 1rem; /* 16px */
+    --spacing-xl: 1.5rem; /* 24px */
+    --spacing-2xl: 2rem; /* 32px */
+    --spacing-3xl: 3rem; /* 48px */
+
+    --gutter-mobile: 0.75rem;
+  }
+}
+
+/* ============================================================================
+   УТИЛИТЫ ДЛЯ ACCESSIBILITY
+   ============================================================================ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--color-primary));
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(var(--color-primary), 0.4);
+}
