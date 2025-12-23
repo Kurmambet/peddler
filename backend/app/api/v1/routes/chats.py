@@ -7,7 +7,9 @@ from app.models.chat import Chat
 from app.models.user import User
 from app.schemas.chat import (
     AddParticipantsRequest,
+    AddParticipantsResponse,
     ChangeRoleRequest,
+    ChangeRoleResponse,
     ChatRead,
     DirectChatCreate,
     DirectChatRead,
@@ -18,7 +20,7 @@ from app.schemas.chat import (
     RemoveParticipantResponse,
     TransferOwnershipRequest,
     TransferOwnershipResponse,
-    UpdateGroupRequest,
+    UpdateGroup,
 )
 from app.services.chat_service import ChatService
 from fastapi import APIRouter, Depends, status
@@ -77,7 +79,11 @@ async def get_chat_details(
     return await service.get_chat_details(chat_id, current_user.id)
 
 
-@router.post("/{chat_id}/participants", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{chat_id}/participants",
+    status_code=status.HTTP_201_CREATED,
+    response_model=AddParticipantsResponse,
+)
 async def add_participants(
     chat_id: int,
     request: AddParticipantsRequest,
@@ -105,7 +111,7 @@ async def remove_participant(
     return await service.remove_participant(chat_id, user_id, current_user.id)
 
 
-@router.patch("/{chat_id}/participants/{user_id}/role")
+@router.patch("/{chat_id}/participants/{user_id}/role", response_model=ChangeRoleResponse)
 async def change_participant_role(
     chat_id: int,
     user_id: int,
@@ -120,10 +126,10 @@ async def change_participant_role(
     return await service.change_participant_role(chat_id, user_id, request.role, current_user.id)
 
 
-@router.patch("/{chat_id}")
+@router.patch("/{chat_id}", response_model=UpdateGroup)
 async def update_group(
     chat_id: int,
-    request: UpdateGroupRequest,
+    request: UpdateGroup,
     current_user: User = Depends(get_current_user),
     service: ChatService = Depends(get_chat_service),
 ):

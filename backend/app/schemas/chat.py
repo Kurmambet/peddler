@@ -84,12 +84,18 @@ class AddParticipantsRequest(BaseModel):
     )
 
 
+class AddParticipantsResponse(BaseModel):
+    """Ответ на добавление участников в группу"""
+
+    added_count: int = Field(..., ge=1)
+    added_users: List[str] = Field(..., min_items=1)
+
+
 class RemoveParticipantResponse(BaseModel):
     """Ответ при удалении участника"""
 
-    success: bool
-    message: str
-    removed_user_id: int
+    removed_username: str
+    removed_id: int
 
 
 class ChangeRoleRequest(BaseModel):
@@ -98,7 +104,15 @@ class ChangeRoleRequest(BaseModel):
     role: ChatParticipantRole = Field(..., description="New role: member or admin")
 
 
-class UpdateGroupRequest(BaseModel):
+class ChangeRoleResponse(BaseModel):
+    """Ответ на изменение роли участника"""
+
+    user_id: int
+    username: str
+    new_role: ChatParticipantRole = Field(..., description="New role: member or admin")
+
+
+class UpdateGroup(BaseModel):
     """Запрос на обновление настроек группы"""
 
     title: Optional[str] = Field(None, min_length=1, max_length=255)

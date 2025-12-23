@@ -1,7 +1,9 @@
 # app/schemas/__init__.py
 from app.schemas.chat import (
     AddParticipantsRequest,
+    AddParticipantsResponse,
     ChangeRoleRequest,
+    ChangeRoleResponse,
     ChatParticipantBase,
     ChatParticipantRead,
     ChatRead,
@@ -13,7 +15,7 @@ from app.schemas.chat import (
     RemoveParticipantResponse,
     TransferOwnershipRequest,
     TransferOwnershipResponse,
-    UpdateGroupRequest,
+    UpdateGroup,
 )
 from app.schemas.message import MessageBase, MessageCreate, MessageListResponse, MessageRead
 from app.schemas.user import UserBase, UserCreate, UserRead
@@ -33,9 +35,11 @@ __all__ = [
     "ChatParticipantBase",
     "ChatParticipantRead",
     "AddParticipantsRequest",
+    "AddParticipantsResponse",
     "RemoveParticipantResponse",
     "ChangeRoleRequest",
-    "UpdateGroupRequest",
+    "ChangeRoleResponse",
+    "UpdateGroup",
     "GroupChatDetailRead",
     "LeaveGroupResponse",
     "TransferOwnershipRequest",

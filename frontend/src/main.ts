@@ -10,10 +10,12 @@ import { createApp } from "vue";
 
 // Internal
 import App from "./App.vue";
+import { vClickOutside } from "./directives/clickOutside";
 import router from "./router";
 import { useAuthStore } from "./stores/auth";
 
 const app = createApp(App);
+app.directive("click-outside", vClickOutside);
 const pinia = createPinia();
 
 app.use(pinia);

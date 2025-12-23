@@ -5,6 +5,8 @@ from app.models.chat import Chat, ChatParticipantRole, ChatType
 from app.models.user import User
 from app.repositories.chat_repository import ChatRepository
 from app.schemas.chat import (
+    AddParticipantsResponse,
+    ChangeRoleResponse,
     ChatRead,
     DirectChatRead,
     GroupChatCreate,
@@ -13,7 +15,7 @@ from app.schemas.chat import (
     LeaveGroupResponse,
     RemoveParticipantResponse,
     TransferOwnershipResponse,
-    UpdateGroupRequest,
+    UpdateGroup,
 )
 from app.ws import pubsub_manager
 from app.ws.events import (
@@ -228,7 +230,9 @@ class ChatService:
             participant_count=len(participants_data),
         )
 
-    async def add_participants(self, chat_id: int, usernames: List[str], requester_id: int):
+    async def add_participants(
+        self, chat_id: int, usernames: List[str], requester_id: int
+    ) -> AddParticipantsResponse:
         """Добавить участников в группу"""
         # 1. Проверяем права
         requester_role = await self.repo.get_participant_role(chat_id, requester_id)
@@ -272,11 +276,10 @@ class ChatService:
             )
             await pubsub_manager.publish_to_chat(chat_id, event.model_dump_json())
 
-        return {
-            "success": True,
-            "message": f"Added {len(added_users)} participant(s)",
-            "added_users": [u.username for u in added_users],
-        }
+        return AddParticipantsResponse(
+            added_count=len(added_users),
+            added_users=[u.username for u in added_users],
+        )
 
     async def remove_participant(
         self, chat_id: int, target_user_id: int, requester_id: int
@@ -326,14 +329,13 @@ class ChatService:
         await pubsub_manager.publish_to_chat(chat_id, event.model_dump_json())
 
         return RemoveParticipantResponse(
-            success=True,
-            message=f"User {target_user.username} removed from group",
-            removed_user_id=target_user_id,
+            removed_username=target_user.username,
+            removed_id=target_user_id,
         )
 
     async def change_participant_role(
         self, chat_id: int, target_user_id: int, new_role: ChatParticipantRole, requester_id: int
-    ):
+    ) -> ChangeRoleResponse:
         """Изменить роль участника"""
         # 1. Только OWNER может менять роли
         requester_role = await self.repo.get_participant_role(chat_id, requester_id)
@@ -377,14 +379,13 @@ class ChatService:
         )
         await pubsub_manager.publish_to_chat(chat_id, event.model_dump_json())
 
-        return {
-            "success": True,
-            "message": f"Role changed to {new_role.value}",
-            "user_id": target_user_id,
-            "new_role": new_role.value,
-        }
+        return ChangeRoleResponse(
+            user_id=target_user_id, username=target_user.username, new_role=new_role.value
+        )
 
-    async def update_group(self, chat_id: int, request: UpdateGroupRequest, requester_id: int):
+    async def update_group(
+        self, chat_id: int, request: UpdateGroup, requester_id: int
+    ) -> UpdateGroup:
         """Обновить настройки группы"""
         # 1. Проверяем права
         requester_role = await self.repo.get_participant_role(chat_id, requester_id)
@@ -421,11 +422,7 @@ class ChatService:
         )
         await pubsub_manager.publish_to_chat(chat_id, event.model_dump_json())
 
-        return {
-            "success": True,
-            "message": "Group updated",
-            "changes": changes,
-        }
+        return UpdateGroup(title=changes["title"], description=changes["description"])
 
     async def transfer_ownership(
         self, chat_id: int, new_owner_id: int, current_owner_id: int

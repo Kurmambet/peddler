@@ -1,5 +1,9 @@
 // src/types/api.ts
 
+// ============================================================
+// USER TYPES
+// ============================================================
+
 export interface UserRead {
   id: number;
   username: string;
@@ -14,6 +18,35 @@ export interface Token {
   token_type?: string;
 }
 
+// ============================================================
+// CHAT ENUMS & BASIC TYPES
+// ============================================================
+
+export enum ChatParticipantRole {
+  MEMBER = "member",
+  ADMIN = "admin",
+  OWNER = "owner",
+}
+
+export interface ChatParticipant {
+  user_id: number;
+  username: string;
+  role: ChatParticipantRole | string;
+  is_online: boolean;
+  last_seen?: string | null;
+}
+
+export interface ChatParticipantRead {
+  id: number;
+  chat_id: number;
+  user_id: number;
+  role: ChatParticipantRole | string;
+}
+
+// ============================================================
+// DIRECT CHAT TYPES
+// ============================================================
+
 export interface DirectChatRead {
   id: number;
   type: "direct";
@@ -26,6 +59,15 @@ export interface DirectChatRead {
   other_user_last_seen: string | null;
 }
 
+export interface DirectChatCreate {
+  type?: "direct";
+  other_username: string;
+}
+
+// ============================================================
+// GROUP CHAT TYPES
+// ============================================================
+
 export interface GroupChatRead {
   id: number;
   type: "group";
@@ -34,7 +76,91 @@ export interface GroupChatRead {
   created_at: string;
 }
 
+export interface GroupChatDetailRead {
+  id: number;
+  type: "group";
+  title: string;
+  description: string | null;
+  created_by_id: number;
+  created_at: string;
+  participants: ChatParticipant[];
+  my_role: ChatParticipantRole | string;
+  participant_count: number;
+}
+
+export interface GroupChatCreate {
+  title: string;
+  type?: "group";
+  participant_usernames: string[];
+}
+
+// ============================================================
+// CHAT UNION TYPE
+// ============================================================
+
 export type ChatRead = DirectChatRead | GroupChatRead;
+
+// ============================================================
+// GROUP MANAGEMENT REQUEST TYPES
+// ============================================================
+
+export interface AddParticipantsRequest {
+  usernames: string[];
+}
+
+export interface ChangeRoleRequest {
+  role: ChatParticipantRole | string;
+}
+
+export interface UpdateGroupRequest {
+  title?: string;
+  description?: string;
+}
+
+export interface TransferOwnershipRequest {
+  new_owner_id: number;
+}
+
+// ============================================================
+// GROUP MANAGEMENT RESPONSE TYPES
+// ============================================================
+
+export interface AddParticipantsResponse {
+  added_count: number;
+  added_users: string[];
+}
+
+export interface RemoveParticipantResponse {
+  removed_username: string;
+  removed_id: number;
+}
+
+export interface ChangeRoleResponse {
+  user_id: number;
+  username: string;
+  new_role: ChatParticipantRole | string;
+}
+
+export interface UpdateGroupResponse {
+  title: string;
+  description: string | null;
+}
+
+export interface LeaveGroupResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface TransferOwnershipResponse {
+  success: boolean;
+  message: string;
+  old_owner_id: number;
+  new_owner_id: number;
+}
+
+// ============================================================
+// MESSAGE TYPES
+// ============================================================
 
 export interface MessageRead {
   id: number;
@@ -45,6 +171,10 @@ export interface MessageRead {
   is_read: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface MessageCreate {
+  content: string;
 }
 
 export interface MessageListResponse {
