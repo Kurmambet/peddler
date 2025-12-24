@@ -33,41 +33,62 @@ class ChatService:
         self.repo = ChatRepository(db)
         self.db = db
 
-    async def create_or_get_direct_chat(self, current_user: User, other_username: str) -> Chat:
-        """
-        Создать или получить существующий direct-чат.
-        Бизнес-правила:
-        - Нельзя создать чат с самим собой
-        - Один direct-чат на пару пользователей
-        """
-        # Проверка: другой пользователь существует
+    async def create_or_get_direct_chat(
+        self, current_user: User, other_username: str
+    ) -> DirectChatRead:
+        """Создаёт или возвращает существующий direct-чат"""
+
+        # 1. Найти другого пользователя
         other_user = await self.repo.get_user_by_username(other_username)
         if not other_user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-        # Бизнес-правило: нельзя с самим собой
         if other_user.id == current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot create chat with yourself"
             )
 
-        # Поиск существующего чата
+        # 2. Проверить существующий чат
         existing_chat = await self.repo.find_direct_chat(current_user.id, other_user.id)
-        if existing_chat:
-            return existing_chat
 
-        # Создание нового чата
+        if existing_chat:
+            # Вернуть существующий чат с заполненными полями
+            return DirectChatRead(
+                id=existing_chat.id,
+                type="direct",
+                title=existing_chat.title,
+                created_by_id=existing_chat.created_by_id,
+                created_at=existing_chat.created_at,
+                other_username=other_user.username,
+                other_user_id=other_user.id,
+                other_user_is_online=other_user.is_online,
+                other_user_last_seen=other_user.last_seen,
+            )
+
+        # 3. Создать новый чат
         new_chat = await self.repo.create_chat(
             chat_type=ChatType.DIRECT,
             created_by_id=current_user.id,
         )
 
-        # Добавляем участников
+        # 4. Добавить участников
         await self.repo.add_participant(new_chat.id, current_user.id, ChatParticipantRole.MEMBER)
         await self.repo.add_participant(new_chat.id, other_user.id, ChatParticipantRole.MEMBER)
 
         await self.db.commit()
-        return new_chat
+
+        # 5. Вернуть DirectChatRead с заполненными полями
+        return DirectChatRead(
+            id=new_chat.id,
+            type="direct",
+            title=new_chat.title,
+            created_by_id=new_chat.created_by_id,
+            created_at=new_chat.created_at,
+            other_username=other_user.username,
+            other_user_id=other_user.id,
+            other_user_is_online=other_user.is_online,
+            other_user_last_seen=other_user.last_seen,
+        )
 
     async def create_group_chat(
         self,
