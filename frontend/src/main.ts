@@ -1,8 +1,4 @@
 // src/main.ts
-// Styles
-import "./styles/fonts.css";
-import "./styles/main.css";
-import "./styles/variables.css";
 
 // System
 import { createPinia } from "pinia";
@@ -13,6 +9,14 @@ import App from "./App.vue";
 import { vClickOutside } from "./directives/clickOutside";
 import router from "./router";
 import { useAuthStore } from "./stores/auth";
+
+// Styles
+// 1
+import "./styles/variables.css";
+
+// 2
+import "./styles/fonts.css";
+import "./styles/main.css";
 
 const app = createApp(App);
 app.directive("click-outside", vClickOutside);
