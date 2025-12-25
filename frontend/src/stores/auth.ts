@@ -3,10 +3,11 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { authAPI } from "../api/auth";
-import type { UserRead } from "../types/api";
+import type { CurrentUser } from "../types/api";
 
 export const useAuthStore = defineStore("auth", () => {
-  const user = ref<UserRead | null>(null);
+  // const user = ref<UserRead | null>(null);
+  const user = ref<CurrentUser | null>(null);
   const token = ref<string | null>(localStorage.getItem("access_token"));
   const isLoading = ref(false);
   const error = ref<string | null>(null);
@@ -102,6 +103,42 @@ export const useAuthStore = defineStore("auth", () => {
     await loadUser();
   };
 
+  async function fetchMe() {
+    try {
+      // Здесь мы вызываем authAPI.getMe(), который дергает /users/me (MyUserProfile)
+      // Или /auth/me (UserRead) - смотря что у тебя сейчас
+
+      // Лучше всего, чтобы fetchMe вызывал именно /users/me,
+      // чтобы получить полные данные (bio, display_name)
+      const data = await authAPI.getMe(); // Пусть возвращает MyUserProfile
+
+      // Мержим данные, если у нас уже что-то было
+      user.value = { ...user.value, ...data } as CurrentUser;
+
+      return user.value;
+    } catch (err) {
+      // ...
+    }
+  }
+
+  async function updateProfile(updates: {
+    display_name?: string;
+    bio?: string;
+  }) {
+    try {
+      const updatedProfile = await authAPI.updateProfile(updates);
+
+      // Обновляем стейт
+      if (user.value) {
+        user.value = { ...user.value, ...updatedProfile };
+      }
+
+      return updatedProfile;
+    } catch (err) {
+      throw err;
+    }
+  }
+
   // ============================================================
   // RETURN
   // ============================================================
@@ -123,5 +160,7 @@ export const useAuthStore = defineStore("auth", () => {
     logout,
     loadUser,
     restoreSession,
+    updateProfile,
+    fetchMe,
   };
 });

@@ -1,6 +1,11 @@
 // src/api/auth.ts
 
-import type { OtherUserProfile, Token, UserRead } from "../types/api";
+import type {
+  MyUserProfile,
+  OtherUserProfile,
+  Token,
+  UserRead,
+} from "../types/api";
 import apiClient from "./client";
 
 export const authAPI = {
@@ -34,6 +39,19 @@ export const authAPI = {
 
   async getUserProfile(userId: number): Promise<OtherUserProfile> {
     const { data } = await apiClient.get(`/users/${userId}`);
+    return data;
+  },
+
+  async getMe(): Promise<MyUserProfile> {
+    const { data } = await apiClient.get("/users/me");
+    return data;
+  },
+
+  async updateProfile(updates: {
+    display_name?: string;
+    bio?: string;
+  }): Promise<MyUserProfile> {
+    const { data } = await apiClient.patch("/users/me", updates);
     return data;
   },
 };

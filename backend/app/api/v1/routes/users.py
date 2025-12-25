@@ -5,7 +5,7 @@ from typing import List
 from app.api.dependencies import get_current_user
 from app.database import get_db
 from app.models.user import User
-from app.schemas.user import MyUserProfile, OtherUserProfile, UserRead
+from app.schemas.user import MyUserProfile, OtherUserProfile, UserRead, UserUpdate
 from app.services.user_service import UserService
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, select
@@ -56,6 +56,15 @@ async def get_my_user_profile(
 ):
     """Получить свой профиль"""
     return await service.get_my_user_profile(current_user)
+
+
+@router.patch("/me", response_model=MyUserProfile)
+async def update_my_profile(
+    updates: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    service: UserService = Depends(get_user_service),
+):
+    return await service.update_my_profile(current_user, updates)
 
 
 @router.get("/{user_id}", response_model=OtherUserProfile)

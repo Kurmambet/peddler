@@ -3,7 +3,7 @@ from typing import Optional
 
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
-from app.schemas.user import MyUserProfile, OtherUserProfile
+from app.schemas.user import MyUserProfile, OtherUserProfile, UserUpdate
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,3 +51,15 @@ class UserService:
             is_online=user.is_online,
             last_seen=user.last_seen,
         )
+
+    async def update_my_profile(self, user: User, updates: UserUpdate) -> MyUserProfile:
+        # Обновляем поля
+        if updates.display_name is not None:
+            user.display_name = updates.display_name
+        if updates.bio is not None:
+            user.bio = updates.bio
+
+        await self.db.commit()
+        await self.db.refresh(user)
+
+        return await self.get_my_user_profile(user)

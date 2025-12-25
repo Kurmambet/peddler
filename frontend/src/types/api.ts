@@ -38,6 +38,7 @@ export interface MyUserProfile {
   two_factor_enabled: boolean;
 }
 
+export type CurrentUser = UserRead & Partial<MyUserProfile>;
 // ============================================================
 // CHAT ENUMS & BASIC TYPES
 // ============================================================

@@ -1,3 +1,4 @@
+<!-- frontend\src\components\user\UserProfileModal.vue -->
 <template>
   <Modal :model-value="true" @close="$emit('close')">
     <div class="p-6 max-w-sm w-full mx-auto text-center relative">

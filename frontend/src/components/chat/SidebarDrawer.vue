@@ -38,6 +38,7 @@
         @click="openProfileSettings"
         class="w-full p-4 flex items-center gap-3 hover:bg-app-hover transition-colors text-left"
       >
+        <SettingsModal v-if="showSettings" @close="showSettings = false" />
         <Avatar
           v-if="authStore.user"
           :username="authStore.user.username"
@@ -189,10 +190,11 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../../stores/auth";
+import SettingsModal from "../settings/SettingsModal.vue";
 import Avatar from "../ui/Avatar.vue";
-
 interface Props {
   isOpen: boolean;
 }
@@ -205,11 +207,12 @@ const emit = defineEmits<{
   "create-group": [];
 }>();
 
+const showSettings = ref(false);
 const authStore = useAuthStore();
 const router = useRouter();
 
 const openProfileSettings = () => {
-  // TODO: Implement profile settings
+  showSettings.value = true;
   console.log("Opening profile settings...");
   emit("close");
 };

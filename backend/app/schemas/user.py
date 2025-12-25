@@ -51,3 +51,8 @@ class MyUserProfile(UserBase):
 
     class Config:
         from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
