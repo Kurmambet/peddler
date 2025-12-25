@@ -148,10 +148,11 @@
 import Button from "@/components/ui/Button.vue";
 import Input from "@/components/ui/Input.vue";
 import Modal from "@/components/ui/Modal.vue";
+import router from "@/router";
 import { useAuthStore } from "@/stores/auth";
 import { useChatsStore } from "@/stores/chats";
 import { computed, onMounted, ref } from "vue";
-import AddParticipantsModal from "./AddParticipantsModal.vue"; // Нужно создать
+import AddParticipantsModal from "./AddParticipantsModal.vue";
 import GroupMembersList from "./GroupMembersList.vue";
 
 const props = defineProps<{ chatId: number }>();
@@ -248,11 +249,29 @@ const handleTransfer = async (member: any) => {
 };
 
 const handleDeleteGroup = async () => {
-  const confirmText = prompt('Type "DELETE" to confirm group deletion.');
+  const confirmText = prompt(
+    'Type "DELETE" to confirm group deletion. This action cannot be undone.'
+  );
   if (confirmText !== "DELETE") return;
 
-  // TODO: chatsStore.deleteGroup(props.chatId)
-  emit("close");
+  try {
+    isLoading.value = true; // Покажем лоадер или заблокируем интерфейс
+    await chatsStore.deleteChat(props.chatId);
+
+    // Закрываем модалку
+    emit("close");
+
+    // Редирект на главную (если мы были в этом чате)
+    router.push("/");
+  } catch (error: any) {
+    console.error("Failed to delete group:", error);
+    alert(
+      "Failed to delete group: " +
+        (error.response?.data?.detail || "Unknown error")
+    );
+  } finally {
+    isLoading.value = false;
+  }
 };
 
 const reloadMembers = () => {

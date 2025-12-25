@@ -1,6 +1,6 @@
 // src/api/auth.ts
 
-import type { Token, UserRead } from "../types/api";
+import type { OtherUserProfile, Token, UserRead } from "../types/api";
 import apiClient from "./client";
 
 export const authAPI = {
@@ -29,6 +29,11 @@ export const authAPI = {
     const { data } = await apiClient.get<UserRead[]>("/users/search", {
       params: { q: query, limit },
     });
+    return data;
+  },
+
+  async getUserProfile(userId: number): Promise<OtherUserProfile> {
+    const { data } = await apiClient.get(`/users/${userId}`);
     return data;
   },
 };

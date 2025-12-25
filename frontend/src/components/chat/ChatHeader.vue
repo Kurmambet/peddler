@@ -51,13 +51,12 @@
       @toggle-mute="handleToggleMute"
       @leave-group="handleLeaveGroup"
     />
-    <!-- Modals (будут подключены позже) -->
 
-    <!-- <UserProfileModal
-      v-if="showProfileModal"
+    <UserProfileModal
+      v-if="showProfileModal && profileUserId"
       :user-id="profileUserId"
       @close="showProfileModal = false"
-    /> -->
+    />
 
     <GroupSettingsModal
       v-if="showGroupSettingsModal && groupSettingsChatId"
@@ -73,6 +72,7 @@ import { useRouter } from "vue-router";
 import { useChat } from "../../composables/useChat";
 import { useChatsStore } from "../../stores/chats";
 import Avatar from "../ui/Avatar.vue";
+import UserProfileModal from "../user/UserProfileModal.vue";
 import ChatHeaderDropdown from "./ChatHeaderDropdown.vue";
 import GroupSettingsModal from "./GroupSettingsModal.vue";
 

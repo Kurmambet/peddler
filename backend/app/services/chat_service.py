@@ -587,6 +587,11 @@ class ChatService:
             await self.repo.delete_chat(chat_id)
 
         elif chat.type == ChatType.GROUP:
+            # Сначала отправляем событие ВСЕМ участникам, что группа удалена
+            # Но так как мы сейчас удалим чат, participants могут удалиться каскадно
+            # Лучше сначала получить список участников, потом удалить
+            # await pubsub_manager.publish_to_chat(chat_id, GroupDeletedEvent(...))
+
             # Только Owner может удалить группу
             role = await self.repo.get_participant_role(chat_id, user_id)
             if role != ChatParticipantRole.OWNER:
