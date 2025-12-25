@@ -43,7 +43,7 @@ const props = withDefaults(defineProps<Props>(), {
 const variantClasses = computed(() => {
   switch (props.variant) {
     case "primary":
-      return "bg-app-primary-subtle text-app-primary";
+      return "bg-app-primary-subtle text-app-text-inverse";
     case "secondary":
       return "bg-app-surface text-app-text-secondary border border-app-border";
     case "success":

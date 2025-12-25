@@ -51,16 +51,37 @@
       @toggle-mute="handleToggleMute"
       @leave-group="handleLeaveGroup"
     />
+    <!-- Modals (будут подключены позже) -->
+
+    <!-- <UserProfileModal
+      v-if="showProfileModal"
+      :user-id="profileUserId"
+      @close="showProfileModal = false"
+    /> -->
+
+    <GroupSettingsModal
+      v-if="showGroupSettingsModal && groupSettingsChatId"
+      :chat-id="groupSettingsChatId"
+      @close="showGroupSettingsModal = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useChat } from "../../composables/useChat";
 import { useChatsStore } from "../../stores/chats";
 import Avatar from "../ui/Avatar.vue";
 import ChatHeaderDropdown from "./ChatHeaderDropdown.vue";
+import GroupSettingsModal from "./GroupSettingsModal.vue";
+
+// State for Modals
+const showProfileModal = ref(false);
+const profileUserId = ref<number | null>(null);
+
+const showGroupSettingsModal = ref(false);
+const groupSettingsChatId = ref<number | null>(null);
 
 interface Props {
   typingText?: string;
@@ -117,24 +138,19 @@ const handleTitleClick = () => {
 const handleViewProfile = () => {
   if (!currentChat.value) return;
 
-  // Проверяем тип чата
   if (currentChat.value.type === "direct") {
-    // Теперь TS знает, что это DirectChatRead, и other_user_id доступен
-    console.log("Open profile for", currentChat.value.other_user_id);
-
-    // Здесь будем открывать модалку
-    // profileUserId.value = currentChat.value.other_user_id
-    // showProfileModal.value = true
+    // Устанавливаем ID и открываем
+    profileUserId.value = currentChat.value.other_user_id;
+    showProfileModal.value = true;
   } else {
-    console.warn(
-      "Cannot view profile in group chat context without user selection"
-    );
+    // В будущем: можно открыть список участников и выбрать оттуда
   }
 };
 
 const handleViewInfo = () => {
-  // TODO: Открыть GroupSettingsModal
-  console.log("Open group info for", currentChat.value?.id);
+  if (!currentChat.value) return;
+  groupSettingsChatId.value = currentChat.value.id;
+  showGroupSettingsModal.value = true;
 };
 
 const handleToggleMute = () => {
