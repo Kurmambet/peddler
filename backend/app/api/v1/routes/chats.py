@@ -111,6 +111,15 @@ async def remove_participant(
     return await service.remove_participant(chat_id, user_id, current_user.id)
 
 
+@router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chat(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+):
+    await service.delete_chat(chat_id, current_user.id)
+
+
 @router.patch("/{chat_id}/participants/{user_id}/role", response_model=ChangeRoleResponse)
 async def change_participant_role(
     chat_id: int,

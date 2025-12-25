@@ -51,6 +51,7 @@ class GroupChatRead(BaseModel):
     title: str
     created_by_id: int
     created_at: datetime
+    participant_count: Optional[int] = 0
 
 
 ChatRead = Union[DirectChatRead, GroupChatRead]

@@ -1,5 +1,5 @@
 # app/repositories/chat_repository.py
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from app.models.chat import Chat, ChatParticipant, ChatParticipantRole, ChatType
 from sqlalchemy import and_, func, select, update
@@ -10,16 +10,6 @@ from sqlalchemy.orm import selectinload
 class ChatRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
-
-    # async def get_user_by_id(self, user_id: int) -> Optional[User]:
-    #     """Получить пользователя по ID"""
-    #     result = await self.db.execute(select(User).where(User.id == user_id))
-    #     return result.scalar_one_or_none()
-
-    # async def get_user_by_username(self, username: str) -> Optional[User]:
-    #     """Получить пользователя по username"""
-    #     result = await self.db.execute(select(User).where(User.username == username))
-    #     return result.scalar_one_or_none()
 
     async def find_direct_chat(self, user1_id: int, user2_id: int) -> Optional[Chat]:
         """Найти существующий direct-чат между двумя пользователями"""
@@ -107,11 +97,6 @@ class ChatRepository:
         )
         return result.scalar_one_or_none() is not None
 
-    # async def check_users_exist(self, user_ids: List[int]) -> List[int]:
-    #     """Проверить, какие пользователи существуют"""
-    #     result = await self.db.execute(select(User.id).where(User.id.in_(user_ids)))
-    #     return result.scalars().all()
-
     async def get_chat_by_id_with_participants(self, chat_id: int) -> Optional[Chat]:
         """
         Получить чат по ID с загруженными участниками и их данными.
@@ -179,3 +164,20 @@ class ChatRepository:
             select(func.count(ChatParticipant.id)).where(ChatParticipant.chat_id == chat_id)
         )
         return result.scalar_one()
+
+    async def get_participants_counts_batch(self, chat_ids: List[int]) -> Dict[int, int]:
+        stmt = (
+            select(ChatParticipant.chat_id, func.count(ChatParticipant.id))
+            .where(ChatParticipant.chat_id.in_(chat_ids))
+            .group_by(ChatParticipant.chat_id)
+        )
+        result = await self.db.execute(stmt)
+        # Возвращает словарь {chat_id: count}
+        return dict(result.all())
+
+    async def delete_chat(self, chat_id: int):
+        # Удаляем чат (CASCADE должно удалить участников и сообщения)
+        # Если каскад не настроен в БД, нужно удалять вручную
+        chat = await self.get_chat_by_id(chat_id)
+        if chat:
+            await self.db.delete(chat)

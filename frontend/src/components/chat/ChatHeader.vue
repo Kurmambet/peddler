@@ -3,14 +3,14 @@
   <div
     class="h-14 px-4 flex items-center gap-3 border-b border-app-border bg-app-surface"
   >
-    <!-- Back button (только на mobile) -->
+    <!-- Back button (mobile) -->
     <button
       @click="$emit('back')"
-      class="md:hidden p-2 -ml-2 rounded-lg hover:bg-app-hover transition-colors"
+      class="md:hidden p-2 -ml-2 rounded-lg hover:bg-app-hover transition-colors text-app-text"
       aria-label="Back to chats"
     >
       <svg
-        class="w-5 h-5 text-app-text"
+        class="w-5 h-5"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -25,23 +25,14 @@
     </button>
 
     <!-- Avatar & Info -->
-    <div class="flex items-center gap-3 flex-1 min-w-0">
-      <Avatar
-        v-if="currentChat"
-        :username="
-          currentChat.type === 'direct'
-            ? currentChat.other_username
-            : currentChat.title
-        "
-        size="md"
-      />
+    <div
+      class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+      @click="handleTitleClick"
+    >
+      <Avatar v-if="currentChat" :username="chatTitle" size="md" />
       <div class="flex-1 min-w-0">
         <h2 class="font-semibold text-app-text truncate">
-          {{
-            currentChat?.type === "direct"
-              ? currentChat.other_username
-              : currentChat?.title || "Chat"
-          }}
+          {{ chatTitle }}
         </h2>
         <p class="text-xs text-app-text-secondary truncate">
           {{ typingText || statusText }}
@@ -49,35 +40,27 @@
       </div>
     </div>
 
-    <!-- Actions -->
-    <div class="flex items-center gap-1">
-      <button
-        class="p-2 rounded-lg hover:bg-app-hover transition-colors"
-        aria-label="More options"
-      >
-        <svg
-          class="w-5 h-5 text-app-text-secondary"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-          />
-        </svg>
-      </button>
-    </div>
+    <!-- Actions Dropdown -->
+    <ChatHeaderDropdown
+      v-if="currentChat"
+      :is-direct="currentChat.type === 'direct'"
+      :is-muted="false"
+      @view-profile="handleViewProfile"
+      @delete-chat="handleDeleteChat"
+      @view-info="handleViewInfo"
+      @toggle-mute="handleToggleMute"
+      @leave-group="handleLeaveGroup"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import { useRouter } from "vue-router";
 import { useChat } from "../../composables/useChat";
 import { useChatsStore } from "../../stores/chats";
 import Avatar from "../ui/Avatar.vue";
+import ChatHeaderDropdown from "./ChatHeaderDropdown.vue";
 
 interface Props {
   typingText?: string;
@@ -89,6 +72,7 @@ defineEmits<{
   back: [];
 }>();
 
+const router = useRouter();
 const { chatId } = useChat();
 const chatsStore = useChatsStore();
 
@@ -97,13 +81,93 @@ const currentChat = computed(() => {
   return chatsStore.chats.find((c) => c.id === chatId.value);
 });
 
+const chatTitle = computed(() => {
+  if (!currentChat.value) return "Chat";
+  if (currentChat.value.type === "direct") {
+    // TODO: Здесь позже можно добавить проверку на display_name из профиля собеседника,
+    // если мы будем хранить его в объекте чата или подгружать отдельно
+    return currentChat.value.other_username;
+  }
+  return currentChat.value.title;
+});
+
 const statusText = computed(() => {
   if (!currentChat.value) return "";
 
   if (currentChat.value.type === "direct") {
-    return currentChat.value.other_user_is_online ? "Online" : "Offline";
+    if (currentChat.value.other_user_is_online) return "Online";
+    // Можно добавить форматирование last seen
+    return "Offline";
   } else {
-    return "Group chat";
+    const count = currentChat.value.participant_count || 0;
+    return `${count} member${count !== 1 ? "s" : ""}`;
   }
 });
+
+// --- Handlers ---
+
+const handleTitleClick = () => {
+  if (currentChat.value?.type === "direct") {
+    handleViewProfile();
+  } else {
+    handleViewInfo();
+  }
+};
+
+const handleViewProfile = () => {
+  if (!currentChat.value) return;
+
+  // Проверяем тип чата
+  if (currentChat.value.type === "direct") {
+    // Теперь TS знает, что это DirectChatRead, и other_user_id доступен
+    console.log("Open profile for", currentChat.value.other_user_id);
+
+    // Здесь будем открывать модалку
+    // profileUserId.value = currentChat.value.other_user_id
+    // showProfileModal.value = true
+  } else {
+    console.warn(
+      "Cannot view profile in group chat context without user selection"
+    );
+  }
+};
+
+const handleViewInfo = () => {
+  // TODO: Открыть GroupSettingsModal
+  console.log("Open group info for", currentChat.value?.id);
+};
+
+const handleToggleMute = () => {
+  // TODO: Реализовать логику Mute в сторе
+  console.log("Toggle mute");
+};
+
+const handleDeleteChat = async () => {
+  if (!currentChat.value) return;
+  if (
+    !confirm("Are you sure you want to delete this chat? History will be lost.")
+  )
+    return;
+
+  try {
+    await chatsStore.deleteChat(currentChat.value.id);
+    router.push("/");
+  } catch (e) {
+    console.error("Failed to delete chat", e);
+  }
+};
+
+const handleLeaveGroup = async () => {
+  if (!currentChat.value) return;
+  if (!confirm("Are you sure you want to leave this group?")) return;
+
+  try {
+    await chatsStore.leaveGroup(currentChat.value.id);
+    router.push("/");
+  } catch (e) {
+    console.error("Failed to leave group", e);
+    // Здесь можно добавить тост с ошибкой, если, например, владелец пытается выйти без передачи прав
+    alert("Failed to leave group: " + (e as any).response?.data?.detail);
+  }
+};
 </script>

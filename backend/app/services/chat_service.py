@@ -140,9 +140,17 @@ class ChatService:
         await self.db.commit()
         return new_chat
 
-    async def get_user_chats(self, user_id: int, limit: int = 50, offset: int = 0) -> List[Chat]:
+    async def get_user_chats(
+        self, user_id: int, limit: int = 50, offset: int = 0
+    ) -> List[ChatRead]:
         """Получить список чатов пользователя"""
         chats = await self.repo.get_user_chats(user_id, limit, offset)
+
+        group_ids = [c.id for c in chats if c.type == ChatType.GROUP]
+        counts_map = {}
+
+        if group_ids:
+            counts_map = await self.repo.get_participants_counts_batch(group_ids)
 
         results: List[ChatRead] = []
         for chat in chats:
@@ -171,12 +179,14 @@ class ChatService:
                 )
 
             else:  # GROUP
+                p_count = counts_map.get(chat.id, 0)
                 result = GroupChatRead(
                     id=chat.id,
                     type="group",
                     title=chat.title,
                     created_by_id=chat.created_by_id,
                     created_at=chat.created_at,
+                    participant_count=p_count,
                 )
 
             results.append(result)
@@ -553,3 +563,38 @@ class ChatService:
             success=True,
             message="You have left the group",
         )
+
+    async def delete_chat(self, chat_id: int, user_id: int):
+        """
+        Удалить чат.
+        Для Direct: удаляет чат полностью.
+        Для Group: удаляет только если ты Owner (полное удаление).
+        """
+        chat = await self.repo.get_chat_by_id(chat_id)
+        if not chat:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+
+        # Проверяем права
+        if chat.type == ChatType.DIRECT:
+            # Проверяем, что пользователь участник
+            is_participant = await self.repo.is_chat_participant(chat_id, user_id)
+            if not is_participant:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN, detail="Not a participant"
+                )
+
+            # В Direct удаляем чат полностью
+            await self.repo.delete_chat(chat_id)
+
+        elif chat.type == ChatType.GROUP:
+            # Только Owner может удалить группу
+            role = await self.repo.get_participant_role(chat_id, user_id)
+            if role != ChatParticipantRole.OWNER:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Only owner can delete the group. Use /leave to exit.",
+                )
+
+            await self.repo.delete_chat(chat_id)
+
+        await self.db.commit()

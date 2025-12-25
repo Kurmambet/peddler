@@ -43,7 +43,7 @@ export const chatsAPI = {
   },
 
   // ============================================================
-  // CREATE CHATS
+  // CHATS
   // ============================================================
 
   /**
@@ -167,12 +167,19 @@ export const chatsAPI = {
    * Покинуть группу
    * ВАЖНО: Если вы OWNER и есть другие участники,
    * сначала вызовите transferOwnership
-   * Возвращает: success, message
    */
   async leaveGroup(chatId: number): Promise<LeaveGroupResponse> {
     const { data } = await apiClient.post<LeaveGroupResponse>(
       `/chats/${chatId}/leave`
     );
+    return data;
+  },
+
+  /**
+   * Удалить чат (для Direct - удаляет историю и чат)
+   */
+  async deleteChat(chatId: number) {
+    const { data } = await apiClient.delete(`/chats/${chatId}`);
     return data;
   },
 };

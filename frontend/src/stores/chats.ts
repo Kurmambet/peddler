@@ -137,6 +137,33 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
+  /**
+   * Удалить чат (только для Direct пока что)
+   */
+  const deleteChat = async (chatId: number) => {
+    isLoading.value = true;
+    error.value = null;
+    try {
+      await chatsAPI.deleteChat(chatId);
+
+      // Удалить из списка
+      chats.value = chats.value.filter((c) => c.id !== chatId);
+
+      // Сбросить текущий чат если удалили его
+      if (currentChatId.value === chatId) {
+        resetCurrentChat();
+      }
+
+      console.log(`[ChatsStore] ✅ Chat ${chatId} deleted`);
+    } catch (err: any) {
+      error.value = err.response?.data?.detail || "Failed to delete chat";
+      console.error("[ChatsStore] ❌ Delete chat error:", err);
+      throw err;
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   // ============================================================
   // GROUP CHAT MANAGEMENT
   // ============================================================
@@ -417,6 +444,7 @@ export const useChatsStore = defineStore("chats", () => {
 
     // Methods - Direct Chat
     createDirectChat,
+    deleteChat,
 
     // Methods - Group Chat
     createGroupChat,

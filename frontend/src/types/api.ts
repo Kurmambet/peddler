@@ -18,6 +18,26 @@ export interface Token {
   token_type?: string;
 }
 
+export interface OtherUserProfile {
+  id: number;
+  username: string;
+  display_name: string | null;
+  bio: string | null;
+  is_online: boolean;
+  last_seen: string | null;
+}
+
+export interface MyUserProfile {
+  id: number;
+  username: string;
+  display_name: string | null;
+  bio: string | null;
+  created_at: string;
+  avatar_url: string | null;
+  email: string | null;
+  two_factor_enabled: boolean;
+}
+
 // ============================================================
 // CHAT ENUMS & BASIC TYPES
 // ============================================================
@@ -74,6 +94,7 @@ export interface GroupChatRead {
   title: string;
   created_by_id: number;
   created_at: string;
+  participant_count?: number;
 }
 
 export interface GroupChatDetailRead {
