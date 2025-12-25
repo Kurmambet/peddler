@@ -4,6 +4,7 @@ from typing import List
 from app.models.chat import Chat, ChatParticipantRole, ChatType
 from app.models.user import User
 from app.repositories.chat_repository import ChatRepository
+from app.repositories.user_repository import UserRepository
 from app.schemas.chat import (
     AddParticipantsResponse,
     ChangeRoleResponse,
@@ -31,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 class ChatService:
     def __init__(self, db: AsyncSession):
         self.repo = ChatRepository(db)
+        self.user_repo = UserRepository(db)
         self.db = db
 
     async def create_or_get_direct_chat(
@@ -39,7 +41,7 @@ class ChatService:
         """Создаёт или возвращает существующий direct-чат"""
 
         # 1. Найти другого пользователя
-        other_user = await self.repo.get_user_by_username(other_username)
+        other_user = await self.user_repo.get_user_by_username(other_username)
         if not other_user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
@@ -106,7 +108,7 @@ class ChatService:
         # Получаем объекты пользователей по username
         participants_data = []
         for username in chat_in.participant_usernames:
-            user = await self.repo.get_user_by_username(username)
+            user = await self.user_repo.get_user_by_username(username)
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND, detail=f"User '{username}' not found"
@@ -264,12 +266,12 @@ class ChatService:
             )
 
         # 2. Получаем данные запрашивающего
-        requester = await self.repo.get_user_by_id(requester_id)
+        requester = await self.user_repo.get_user_by_id(requester_id)
 
         # 3. Проверяем пользователей и добавляем
         added_users = []
         for username in usernames:
-            user = await self.repo.get_user_by_username(username)
+            user = await self.user_repo.get_user_by_username(username)
             if not user:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND, detail=f"User '{username}' not found"
@@ -335,8 +337,8 @@ class ChatService:
         await self.db.commit()
 
         # 5. Получаем данные для события
-        requester = await self.repo.get_user_by_id(requester_id)
-        target_user = await self.repo.get_user_by_id(target_user_id)
+        requester = await self.user_repo.get_user_by_id(requester_id)
+        target_user = await self.user_repo.get_user_by_id(target_user_id)
 
         # 6. Broadcast событие
         event = UserLeftEvent(
@@ -385,8 +387,8 @@ class ChatService:
         await self.db.commit()
 
         # 5. Получаем данные для события
-        requester = await self.repo.get_user_by_id(requester_id)
-        target_user = await self.repo.get_user_by_id(target_user_id)
+        requester = await self.user_repo.get_user_by_id(requester_id)
+        target_user = await self.user_repo.get_user_by_id(target_user_id)
 
         # 6. Broadcast событие
         event = RoleChangedEvent(
@@ -432,7 +434,7 @@ class ChatService:
         await self.db.commit()
 
         # 3. Получаем данные для события
-        requester = await self.repo.get_user_by_id(requester_id)
+        requester = await self.user_repo.get_user_by_id(requester_id)
 
         # 4. Broadcast событие
         event = GroupUpdatedEvent(
@@ -482,8 +484,8 @@ class ChatService:
         await self.db.commit()
 
         # 5. Получаем данные для события
-        old_owner = await self.repo.get_user_by_id(current_owner_id)
-        new_owner = await self.repo.get_user_by_id(new_owner_id)
+        old_owner = await self.user_repo.get_user_by_id(current_owner_id)
+        new_owner = await self.user_repo.get_user_by_id(new_owner_id)
 
         # 6. Broadcast события о смене ролей
         # Событие 1: Старый владелец стал админом
@@ -536,7 +538,7 @@ class ChatService:
         await self.db.commit()
 
         # 4. Получаем данные для события
-        user = await self.repo.get_user_by_id(user_id)
+        user = await self.user_repo.get_user_by_id(user_id)
 
         # 5. Broadcast событие
         event = UserLeftEvent(

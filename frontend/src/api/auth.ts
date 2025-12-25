@@ -26,7 +26,7 @@ export const authAPI = {
   },
 
   async searchUsers(query: string, limit = 10): Promise<UserRead[]> {
-    const { data } = await apiClient.get<UserRead[]>("/auth/users/search", {
+    const { data } = await apiClient.get<UserRead[]>("/users/search", {
       params: { q: query, limit },
     });
     return data;

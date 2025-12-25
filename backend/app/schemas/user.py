@@ -27,3 +27,27 @@ class UserRead(UserBase):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+
+
+class OtherUserProfile(UserBase):
+    id: int
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+    is_online: bool
+    last_seen: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class MyUserProfile(UserBase):
+    id: int
+    display_name: Optional[str] = None
+    bio: Optional[str] = None
+    created_at: datetime
+    avatar_url: Optional[str] = None
+    email: Optional[str] = None
+    two_factor_enabled: Optional[bool] = False
+
+    class Config:
+        from_attributes = True
