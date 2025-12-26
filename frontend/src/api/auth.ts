@@ -54,4 +54,20 @@ export const authAPI = {
     const { data } = await apiClient.patch("/users/me", updates);
     return data;
   },
+
+  async uploadAvatar(file: File): Promise<UserRead> {
+    const formData = new FormData();
+    formData.append("file", file); // Имя поля "file" должно совпадать с бэкендом (file: UploadFile = File(...))
+
+    const { data } = await apiClient.post<UserRead>(
+      "/users/me/avatar",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    return data;
+  },
 };

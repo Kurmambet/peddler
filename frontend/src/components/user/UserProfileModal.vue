@@ -14,6 +14,7 @@
         <div class="mb-4 flex justify-center">
           <Avatar
             :username="user.username"
+            :src="user.avatar_url"
             size="xl"
             class="w-24 h-24 text-2xl"
           />

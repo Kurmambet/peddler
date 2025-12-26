@@ -95,7 +95,7 @@ class ChatService:
     async def create_group_chat(
         self,
         current_user: User,
-        chat_in: GroupChatCreate,  # Используем схему вместо параметров
+        chat_in: GroupChatCreate,
     ) -> Chat:
         """
         Создать групповой чат.
@@ -173,6 +173,7 @@ class ChatService:
                     created_at=chat.created_at,
                     other_username=other_participant.username,
                     other_display_name=other_participant.display_name,
+                    avatar_url=other_participant.avatar_url,
                     other_user_id=other_participant.id,
                     # статусы
                     other_user_is_online=other_participant.is_online,
@@ -246,6 +247,7 @@ class ChatService:
                     "role": participant.role.value,
                     "is_online": user.is_online,
                     "last_seen": user.last_seen,
+                    "avatar_url": user.avatar_url,
                 }
             )
 

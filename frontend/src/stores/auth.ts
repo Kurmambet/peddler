@@ -139,6 +139,20 @@ export const useAuthStore = defineStore("auth", () => {
     }
   }
 
+  async function uploadAvatar(file: File) {
+    try {
+      const updatedUser = await authAPI.uploadAvatar(file);
+
+      // Обновляем стейт сразу, чтобы интерфейс перерисовался
+      if (user.value) {
+        // Создаем новый объект для реактивности
+        user.value = { ...user.value, avatar_url: updatedUser.avatar_url };
+      }
+      return updatedUser;
+    } catch (err) {
+      throw err;
+    }
+  }
   // ============================================================
   // RETURN
   // ============================================================
@@ -160,6 +174,7 @@ export const useAuthStore = defineStore("auth", () => {
     logout,
     loadUser,
     restoreSession,
+    uploadAvatar,
     updateProfile,
     fetchMe,
   };

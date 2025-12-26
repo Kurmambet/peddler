@@ -29,7 +29,12 @@
       class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
       @click="handleTitleClick"
     >
-      <Avatar v-if="currentChat" :username="chatTitle" size="md" />
+      <Avatar
+        v-if="currentChat"
+        :username="chatTitle"
+        :src="currentChat.type === 'direct' ? currentChat.avatar_url : null"
+        size="md"
+      />
       <div class="flex-1 min-w-0">
         <h2 class="font-semibold text-app-text truncate">
           {{ chatTitle }}

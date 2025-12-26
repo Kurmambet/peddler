@@ -1,8 +1,10 @@
 # backend/app/main.py
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import close_db, init_db
@@ -14,18 +16,9 @@ from .api.v1 import api_router
 
 settings = get_settings()
 
-
-# @asynccontextmanager
-# async def lifespan(app: FastAPI):
-#     """Startup and shutdown events."""
-#     # startup
-#     await init_db()
-#     await pubsub_manager.connect()
-#     yield
-
-#     # shutdown
-#     await pubsub_manager.disconnect()
-#     await close_db()
+UPLOAD_DIR = "uploads"
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
 
 
 @asynccontextmanager
@@ -69,6 +62,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.mount("/static", StaticFiles(directory="uploads"), name="static")
 
 
 @app.get("/health")

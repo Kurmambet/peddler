@@ -81,6 +81,7 @@
                   ? chat.other_display_name
                   : chat.other_username
               "
+              :src="chat.avatar_url"
               size="md"
             />
 

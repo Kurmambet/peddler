@@ -23,6 +23,7 @@ export interface MessageCreatedEvent extends BaseEvent {
   sender_id: number;
   sender_username: string;
   sender_display_name: string | null;
+  avatar_url: string | null;
   content: string;
   created_at: string;
   is_read: boolean;

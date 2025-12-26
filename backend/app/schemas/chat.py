@@ -38,6 +38,7 @@ class DirectChatRead(BaseModel):
     created_at: datetime
     other_username: str
     other_display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
     other_user_id: int
     other_user_is_online: bool
     other_user_last_seen: Optional[datetime] = None

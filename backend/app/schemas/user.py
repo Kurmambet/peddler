@@ -16,6 +16,7 @@ class UserCreate(UserBase):
 class UserRead(UserBase):
     id: int
     display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
     is_active: bool
     is_online: bool
     last_seen: Optional[datetime] = None
@@ -33,6 +34,7 @@ class Token(BaseModel):
 class OtherUserProfile(UserBase):
     id: int
     display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
     bio: Optional[str] = None
     is_online: bool
     last_seen: Optional[datetime]
@@ -44,6 +46,7 @@ class OtherUserProfile(UserBase):
 class MyUserProfile(UserBase):
     id: int
     display_name: Optional[str] = None
+    avatar_url: Optional[str] = None
     bio: Optional[str] = None
     created_at: datetime
     avatar_url: Optional[str] = None
@@ -55,5 +58,6 @@ class MyUserProfile(UserBase):
 
 
 class UserUpdate(BaseModel):
+    avatar_url: Optional[str] = None
     display_name: Optional[str] = None
     bio: Optional[str] = None

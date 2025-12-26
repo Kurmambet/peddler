@@ -81,7 +81,11 @@
           ]"
         >
           <!-- Avatar -->
-          <Avatar :username="user.username" size="sm" />
+          <Avatar
+            :username="user.username"
+            :src="user.avatar_url ? user.avatar_url : null"
+            size="sm"
+          />
 
           <!-- User Info -->
           <div class="flex-1 text-left">

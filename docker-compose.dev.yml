@@ -65,6 +65,7 @@ services:
     ports:
       - "${BACKEND_PORT}:8000"
     volumes:
+      - ./uploads:/app/uploads
       - ./backend/app:/app/app:ro
       - ./backend/alembic:/app/alembic:ro
     command: >

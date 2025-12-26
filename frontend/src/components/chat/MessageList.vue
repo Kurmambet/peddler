@@ -86,6 +86,7 @@
             <Avatar
               v-if="!isOwn(msg)"
               :username="msg.sender_username"
+              :src="msg.avatar_url ? msg.avatar_url : null"
               size="sm"
               class="mr-2 mt-1 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
               @click="openProfile(msg.sender_id)"

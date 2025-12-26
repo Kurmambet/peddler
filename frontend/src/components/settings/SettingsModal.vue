@@ -75,6 +75,7 @@
               >
                 <Avatar
                   :username="form.username"
+                  :src="user.avatar_url ? user.avatar_url : ''"
                   size="xl"
                   class="w-20 h-20 md:w-24 md:h-24 text-2xl md:text-3xl shrink-0"
                 />
@@ -82,13 +83,25 @@
                   <Button
                     variant="secondary"
                     size="sm"
-                    disabled
                     class="w-full md:w-auto"
+                    :disabled="isUploading"
+                    @click="triggerFileInput"
                   >
-                    Upload Photo
+                    <span v-if="isUploading">Uploading...</span>
+                    <span v-else>Upload Photo</span>
                   </Button>
+                  <input
+                    ref="fileInput"
+                    type="file"
+                    class="hidden"
+                    accept="image/png, image/jpeg, image/gif, image/webp"
+                    @change="handleFileSelect"
+                  />
                   <p class="text-xs text-app-text-secondary mt-2 max-w-[200px]">
                     JPG, GIF or PNG. Max size 800K
+                  </p>
+                  <p v-if="uploadError" class="text-xs text-red-500 mt-1">
+                    {{ uploadError }}
                   </p>
                 </div>
               </div>
@@ -209,7 +222,6 @@ import { useAuthStore } from "@/stores/auth";
 import type { CurrentUser } from "@/types/api";
 import { computed, onMounted, ref } from "vue";
 
-// const emit = defineEmits(["close"]);
 const authStore = useAuthStore();
 
 const tabs = [
@@ -223,6 +235,10 @@ const isLoading = ref(false);
 const isSaving = ref(false);
 
 const user = computed(() => (authStore.user as CurrentUser) || {});
+
+const fileInput = ref<HTMLInputElement | null>(null);
+const isUploading = ref(false);
+const uploadError = ref<string | null>(null);
 
 // Form state
 const form = ref({
@@ -272,5 +288,45 @@ const setup2FA = () => {
 
 const changePassword = () => {
   alert("Password change coming next!");
+};
+
+// 1. Клик по кнопке -> клик по инпуту
+const triggerFileInput = () => {
+  uploadError.value = null;
+  fileInput.value?.click();
+};
+
+// 2. Обработка выбора файла
+const handleFileSelect = async (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) return;
+
+  if (file.size > 5 * 1024 * 1024) {
+    uploadError.value = "File is too large (max 5MB)";
+    target.value = "";
+    return;
+  }
+
+  if (!file.type.startsWith("image/")) {
+    uploadError.value = "File must be an image";
+    target.value = "";
+    return;
+  }
+
+  isUploading.value = true;
+  try {
+    await authStore.uploadAvatar(file);
+
+    // Больше ничего делать не надо, user в сторе обновился реактивно
+    // и аватарка сама перерисуется благодаря watch в Avatar.vue
+  } catch (err) {
+    console.error("Upload failed", err);
+    uploadError.value = "Failed to upload avatar. Try again.";
+  } finally {
+    isUploading.value = false;
+    if (target) target.value = "";
+  }
 };
 </script>

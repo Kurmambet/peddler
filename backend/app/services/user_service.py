@@ -47,6 +47,7 @@ class UserService:
             id=user.id,
             username=user.username,
             display_name=user.display_name,
+            avatar_url=user.avatar_url,
             bio=user.bio,
             is_online=user.is_online,
             last_seen=user.last_seen,

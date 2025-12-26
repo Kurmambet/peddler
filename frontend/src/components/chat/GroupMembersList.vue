@@ -14,7 +14,11 @@
           class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
           @click="$emit('view-profile', member)"
         >
-          <Avatar :username="member.username" size="sm" />
+          <Avatar
+            :username="member.username"
+            size="sm"
+            :src="member.avatar_url"
+          />
           <div>
             <div class="flex items-center gap-2">
               <span class="font-medium text-app-text">{{

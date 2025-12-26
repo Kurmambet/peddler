@@ -89,3 +89,5 @@ celerybeat-schedule-wal
 notes.md
 notes.py
 project_structure.md
+.uploads
+avatars/
