@@ -12,6 +12,8 @@ EXCLUDE_DIRS = {
     ".vscode",
     "postgres_dev_data",
     "redis_dev_data",
+    "avatars",
+    "versions",
 }
 
 SKIP_CONTENT_DIRS = {
@@ -19,6 +21,8 @@ SKIP_CONTENT_DIRS = {
     "backend/alembic",
     "node_modules",
     ".vscode",
+    "uploads",
+    "avatars",
     # "backend",
     # "api",
     # "stores",
@@ -31,6 +35,7 @@ SKIP_CONTENT_FILES = {
     "alembic.ini",
     ".md",
     "README.md",
+    "README",
     "notes.txt",
     "project_structure.md",
     "package-lock.json",
