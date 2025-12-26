@@ -26,13 +26,13 @@ services:
     image: redis:7-alpine
     container_name: peddler-redis-dev
     restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass psw123
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_dev_data:/data
     ports:
       - "${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5m
       timeout: 3s
       start_period: 10s
@@ -53,13 +53,19 @@ services:
         condition: service_healthy
     env_file:
       - .env
+      - backend/.env
     environment:
+      # ===== Переопределяет для Docker =====
       DB_HOST: db
-      REDIS_URL: redis://:psw123@redis:6379
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
+      ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000,http://host.docker.internal:5173
+      USE_REDIS_PUBSUB: "true"
       APP_NAME: Peddler Dev
+      DEBUG: "true"
     ports:
       - "${BACKEND_PORT}:8000"
     volumes:
+      - ./uploads:/app/uploads
       - ./backend/app:/app/app:ro
       - ./backend/alembic:/app/alembic:ro
     command: >
@@ -73,6 +79,24 @@ services:
       retries: 3
     networks:
       - peddler-dev-network
+
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #     dockerfile: Dockerfile
+  #   container_name: peddler-frontend-dev
+  #   restart: unless-stopped
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     VITE_API_URL: http://localhost:8000/api/v1
+  #   ports:
+  #     - "${FRONTEND_PORT}:5173"
+  #   volumes:
+  #     - ./frontend/src:/app/src:ro
+  #     - ./frontend/public:/app/public:ro
+  #   networks:
+  #     - peddler-dev-network
 
 volumes:
   postgres_dev_data:

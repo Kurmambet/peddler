@@ -1,6 +1,6 @@
 # app/schemas/message.py
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -20,6 +20,8 @@ class MessageRead(MessageBase):
     is_read: bool
     created_at: datetime
     sender_username: str | None = None
+    sender_display_name: str | None = None
+    avatar_url: Optional[str] = None
 
     class Config:
         from_attributes = True

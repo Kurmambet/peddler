@@ -35,7 +35,6 @@ const router = createRouter({
   routes,
 });
 
-// src/router/index.ts
 router.beforeEach(async (to) => {
   const authStore = useAuthStore();
 

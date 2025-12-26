@@ -1,4 +1,5 @@
 # app/api/v1/routes/auth.py
+
 from app.api.dependencies import get_current_user
 from app.database import get_db
 from app.models.user import User
@@ -73,3 +74,35 @@ async def debug_token(token: str):
 @router.get("/me", response_model=UserRead)
 async def read_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+# @router.get("/users/search", response_model=List[UserRead])
+# async def search_users(
+#     q: str = Query(..., min_length=1, max_length=50, description="Search query"),
+#     limit: int = Query(10, ge=1, le=50),
+#     current_user: User = Depends(get_current_user),
+#     db: AsyncSession = Depends(get_db),
+# ) -> List[User]:
+#     """
+#     Поиск пользователей по username.
+#     Возвращает только активных пользователей (is_active=True).
+#     Не возвращает текущего пользователя.
+#     """
+#     # Поиск по LIKE (регистронезависимый)
+#     stmt = (
+#         select(User)
+#         .where(
+#             and_(
+#                 or_(User.username.ilike(f"%{q}%"), User.display_name.ilike(f"%{q}%")),
+#                 User.is_active,
+#                 User.id != current_user.id,
+#             )
+#         )
+#         .limit(limit)
+#         .order_by(User.username)
+#     )
+
+#     result = await db.execute(stmt)
+#     users = result.scalars().all()
+
+#     return users

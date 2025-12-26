@@ -69,6 +69,15 @@ SELECT * FROM chat_participants;
 \q
 
 
+# участники чата testGroup с ролями
+SELECT u.username, cp.role
+FROM chat_participants cp
+JOIN users u ON u.id = cp.user_id
+JOIN chats c ON c.id = cp.chat_id
+WHERE c.title = 'testGroup';
+```
+
+```bash
 # Подключиться к Redis
 docker exec -it peddler-redis-dev redis-cli -a psw123
 

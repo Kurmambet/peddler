@@ -7,25 +7,26 @@
       'bg-gradient-to-br',
       sizeClasses,
       backgroundColor,
-      'flex-shrink-0',
+      'flex-shrink-0 overflow-hidden',
     ]"
     :title="`${username}`"
   >
     <img
-      v-if="src"
-      :src="src"
+      v-if="fullSrc"
+      :src="fullSrc"
       :alt="alt || username"
-      class="w-full h-full rounded-full object-cover"
+      class="w-full h-full object-cover"
+      @error="handleError"
     />
     <span v-else class="select-none">{{ initials }}</span>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 
 interface Props {
-  src?: string;
+  src?: string | null;
   alt?: string;
   username: string;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
@@ -33,6 +34,40 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   size: "md",
+});
+
+const hasError = ref(false);
+
+// Сбрасываем ошибку, если url поменялся (например, загрузили новую аватарку)
+watch(
+  () => props.src,
+  () => {
+    hasError.value = false;
+  }
+);
+
+const handleError = () => {
+  hasError.value = true;
+};
+
+const fullSrc = computed(() => {
+  if (!props.src || hasError.value) return null;
+
+  // Если это уже полная ссылка (http...) - возвращаем как есть
+  if (props.src.startsWith("http")) return props.src;
+
+  // Если относительная - добавляем домен API
+  // VITE_API_URL должен быть определен в .env (например http://localhost:8000/api/v1)
+  // Но картинки лежат в корне, а не в /api/v1, поэтому нам нужен BASE URL сервера
+
+  // Простой хак: если VITE_API_URL="http://localhost:8000/api/v1", то origin="http://localhost:8000"
+  const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+  const baseUrl = apiUrl.replace(/\/api\/v1\/?$/, ""); // Убираем хвост API если он есть
+
+  // Убираем двойные слеши
+  const cleanPath = props.src.startsWith("/") ? props.src : `/${props.src}`;
+
+  return `${baseUrl}${cleanPath}`;
 });
 
 const sizeClasses = computed(() => {

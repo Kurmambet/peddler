@@ -75,6 +75,8 @@ class MessageService:
                 chat_id=msg.chat_id,
                 sender_id=msg.sender_id,
                 sender_username=msg.sender.username,
+                sender_display_name=msg.sender.display_name,
+                avatar_url=msg.sender.avatar_url,
                 content=msg.content,
                 is_read=msg.is_read,
                 created_at=msg.created_at,

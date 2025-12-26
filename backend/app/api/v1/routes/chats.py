@@ -6,14 +6,24 @@ from app.database import get_db
 from app.models.chat import Chat
 from app.models.user import User
 from app.schemas.chat import (
+    AddParticipantsRequest,
+    AddParticipantsResponse,
+    ChangeRoleRequest,
+    ChangeRoleResponse,
     ChatRead,
     DirectChatCreate,
     DirectChatRead,
     GroupChatCreate,
+    GroupChatDetailRead,
     GroupChatRead,
+    LeaveGroupResponse,
+    RemoveParticipantResponse,
+    TransferOwnershipRequest,
+    TransferOwnershipResponse,
+    UpdateGroup,
 )
 from app.services.chat_service import ChatService
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["chats"])
@@ -36,7 +46,7 @@ async def create_or_get_direct_chat(
 
 @router.post("/group", response_model=GroupChatRead)
 async def create_group_chat(
-    request: GroupChatCreate,  # Используем схему
+    request: GroupChatCreate,
     current_user: User = Depends(get_current_user),
     service: ChatService = Depends(get_chat_service),
 ) -> Chat:
@@ -53,3 +63,115 @@ async def get_user_chats(
 ) -> List[Chat]:
     """Возвращает список чатов текущего пользователя"""
     return await service.get_user_chats(current_user.id, limit, offset)
+
+
+# для управления группами
+@router.get("/{chat_id}", response_model=GroupChatDetailRead)
+async def get_chat_details(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+) -> GroupChatDetailRead:
+    """
+    Получить детальную информацию о чате.
+    Для группы: список участников с ролями и статусами.
+    """
+    return await service.get_chat_details(chat_id, current_user.id)
+
+
+@router.post(
+    "/{chat_id}/participants",
+    status_code=status.HTTP_201_CREATED,
+    response_model=AddParticipantsResponse,
+)
+async def add_participants(
+    chat_id: int,
+    request: AddParticipantsRequest,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+):
+    """
+    Добавить участников в группу.
+    Требуется роль ADMIN или OWNER.
+    """
+    return await service.add_participants(chat_id, request.usernames, current_user.id)
+
+
+@router.delete("/{chat_id}/participants/{user_id}", response_model=RemoveParticipantResponse)
+async def remove_participant(
+    chat_id: int,
+    user_id: int,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+) -> RemoveParticipantResponse:
+    """
+    Удалить участника из группы.
+    Требуется роль ADMIN или OWNER.
+    """
+    return await service.remove_participant(chat_id, user_id, current_user.id)
+
+
+@router.delete("/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chat(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+):
+    await service.delete_chat(chat_id, current_user.id)
+
+
+@router.patch("/{chat_id}/participants/{user_id}/role", response_model=ChangeRoleResponse)
+async def change_participant_role(
+    chat_id: int,
+    user_id: int,
+    request: ChangeRoleRequest,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+):
+    """
+    Изменить роль участника (member <-> admin).
+    Требуется роль OWNER.
+    """
+    return await service.change_participant_role(chat_id, user_id, request.role, current_user.id)
+
+
+@router.patch("/{chat_id}", response_model=UpdateGroup)
+async def update_group(
+    chat_id: int,
+    request: UpdateGroup,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+):
+    """
+    Обновить настройки группы (название, описание).
+    Требуется роль ADMIN или OWNER.
+    """
+    return await service.update_group(chat_id, request, current_user.id)
+
+
+@router.post("/{chat_id}/transfer-ownership", response_model=TransferOwnershipResponse)
+async def transfer_ownership(
+    chat_id: int,
+    request: TransferOwnershipRequest,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+) -> TransferOwnershipResponse:
+    """
+    Передать владение группой другому участнику.
+    Требуется роль OWNER.
+    Текущий владелец станет ADMIN.
+    """
+    return await service.transfer_ownership(chat_id, request.new_owner_id, current_user.id)
+
+
+@router.post("/{chat_id}/leave", response_model=LeaveGroupResponse)
+async def leave_group(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+) -> LeaveGroupResponse:
+    """
+    Покинуть группу.
+    Если вы OWNER и остались другие участники, сначала передайте права.
+    """
+    return await service.leave_group(chat_id, current_user.id)

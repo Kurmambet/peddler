@@ -1,5 +1,5 @@
-# C:\projects\peddler\peddler\tree.py - скрипт для генерации этого project_structure.md
 import os
+import re
 
 # Директории для исключения из обхода
 EXCLUDE_DIRS = {
@@ -12,14 +12,17 @@ EXCLUDE_DIRS = {
     ".vscode",
     "postgres_dev_data",
     "redis_dev_data",
+    "avatars",
+    "versions",
 }
 
-# Файлы/директории, которые НЕ нужно копировать содержимое
 SKIP_CONTENT_DIRS = {
     "alembic/versions",
     "backend/alembic",
     "node_modules",
     ".vscode",
+    "uploads",
+    "avatars",
     # "backend",
     # "api",
     # "stores",
@@ -27,14 +30,13 @@ SKIP_CONTENT_DIRS = {
 
 SKIP_CONTENT_FILES = {
     ".dockerignore",
-    "uv.lock",  # Большой файл зависимостей
+    "uv.lock",
     ".gitignore",
-    "alembic.ini",  # Конфиг alembic
+    "alembic.ini",
     ".md",
     "README.md",
+    "README",
     "notes.txt",
-    "README.md",
-    # "tree.py",
     "project_structure.md",
     "package-lock.json",
     "FKGroteskNeue.woff2",
@@ -42,9 +44,9 @@ SKIP_CONTENT_FILES = {
     "tsconfig.json",
     "tsconfig.app.json",
     # "docker-compose.dev.yml",
+    ".env.example",
 }
 
-# Расширения файлов для копирования
 INCLUDE_EXTENSIONS = {
     ".py",
     # ".txt",
@@ -58,7 +60,7 @@ INCLUDE_EXTENSIONS = {
     ".vue",
     ".html",
     ".css",
-    ".env.example",
+    # ".env.example",
     ".dockerignore",
     "Dockerfile",
 }
@@ -66,8 +68,61 @@ INCLUDE_EXTENSIONS = {
 OUTPUT_FILE = "project_structure.md"
 
 
+def clean_code(content, filename):
+    """Универсальная очистка кода от комментариев и лишних строк."""
+    ext = os.path.splitext(filename)[1]
+
+    # 1. Сначала удаляем многострочные комментарии (/* */ для JS/CSS и docstrings для Python)
+    if ext in [".js", ".ts", ".css", ".vue"]:
+        content = re.sub(r"/\*[\s\S]*?\*/", "", content)
+    elif ext == ".py":
+        # Удаляем многострочные кавычки '''...''' и """..."""
+        content = re.sub(r'""".*?"""', "", content, flags=re.DOTALL)
+        content = re.sub(r"'''.*?'''", "", content, flags=re.DOTALL)
+
+    lines = content.split("\n")
+    cleaned_lines = []
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        # Правило: Всегда сохраняем самую первую строку файла (путь)
+        if i == 0 and (
+            stripped.startswith("#")
+            or stripped.startswith("//")
+            or stripped.startswith("/*")
+        ):
+            cleaned_lines.append(line)
+            continue
+
+        # Пропускаем пустые строки
+        if not stripped:
+            continue
+
+        if ext in [".js", ".ts", ".css", ".vue"]:
+            # Удаляем строки, состоящие только из //
+            if stripped.startswith("//"):
+                continue
+            # Удаляем инлайновые //, если перед ними НЕ стоит двоеточие (защита http://)
+            # Ищем //, перед которыми есть пробел или начало кода, но не ':'
+            line = re.sub(r"(?<!:)\/\/.*", "", line)
+
+        elif ext in [".py", ".yml", ".yaml", ".toml"]:
+            # Удаляем строки, состоящие только из #
+            if stripped.startswith("#"):
+                continue
+            # Удаляем инлайновые #, если перед ними есть пробел (стандарт PEP8 и YAML)
+            if " #" in line:
+                line = line.split(" #")[0]
+
+        # Если после очистки инлайна строка стала пустой — пропускаем
+        if line.strip():
+            cleaned_lines.append(line.rstrip())
+
+    return "\n".join(cleaned_lines)
+
+
 def get_file_extension(filename):
-    """Получить расширение файла для подсветки синтаксиса."""
     ext_map = {
         ".py": "python",
         ".yml": "yaml",
@@ -80,145 +135,80 @@ def get_file_extension(filename):
         ".html": "html",
         ".css": "css",
         ".md": "markdown",
-        ".sh": "bash",
         "Dockerfile": "dockerfile",
-        ".dockerignore": "text",
     }
-
     if filename == "Dockerfile":
         return "dockerfile"
-
     for ext, lang in ext_map.items():
         if filename.endswith(ext):
             return lang
-
     return "text"
 
 
-def should_include_file(filepath):
-    """Проверить, нужно ли включать файл."""
-    filename = os.path.basename(filepath)
-
-    # Пропускаем файлы из черного списка
-    if filename in SKIP_CONTENT_FILES:
-        return False
-
-    # Пропускаем файлы без расширения (кроме Dockerfile)
-    if filename == "Dockerfile":
-        return True
-
-    # Проверяем расширение
-    return any(filename.endswith(ext) for ext in INCLUDE_EXTENSIONS)
-
-
-def is_in_skip_dir(filepath, root_path):
-    """Проверить, находится ли файл в директории, которую нужно пропустить."""
-    rel_path = os.path.relpath(filepath, root_path)
-
-    for skip_dir in SKIP_CONTENT_DIRS:
-        if rel_path.startswith(skip_dir.replace("/", os.sep)):
-            return True
-
-    return False
-
-
 def generate_tree(root_path="."):
-    """Генерировать древовидную структуру проекта."""
     tree_lines = []
-
     for root, dirs, files in os.walk(root_path):
-        # Фильтруем директории
         dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
         dirs.sort()
-
         level = root.replace(root_path, "").count(os.sep)
         indent = "    " * level
         dirname = os.path.basename(root) or os.path.basename(os.getcwd())
         tree_lines.append(f"{indent}{dirname}/")
-
-        subindent = "    " * (level + 1)
         for f in sorted(files):
-            tree_lines.append(f"{subindent}{f}")
-
+            tree_lines.append(f"{'    ' * (level + 1)}{f}")
     return "\n".join(tree_lines)
 
 
 def generate_file_contents(root_path="."):
-    """Генерировать содержимое файлов."""
     content_lines = []
-
     for root, dirs, files in os.walk(root_path):
-        # Фильтруем директории
         dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
         dirs.sort()
-
         for filename in sorted(files):
             filepath = os.path.join(root, filename)
             rel_path = os.path.relpath(filepath, root_path)
 
-            # Проверяем, нужно ли включать файл
-            if not should_include_file(filepath):
+            if filename in SKIP_CONTENT_FILES:
                 continue
 
-            # Проверяем, не в исключенной ли директории
-            if is_in_skip_dir(filepath, root_path):
+            # Проверка расширения
+            is_valid_ext = (
+                any(filename.endswith(ext) for ext in INCLUDE_EXTENSIONS)
+                or filename == "Dockerfile"
+            )
+            if not is_valid_ext:
                 continue
 
-            # Читаем содержимое файла
+            # Проверка исключенных директорий (alembic и т.д.)
+            if any(
+                rel_path.startswith(d.replace("/", os.sep)) for d in SKIP_CONTENT_DIRS
+            ):
+                continue
+
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
                     content = f.read()
 
-                # Определяем язык для подсветки
+                cleaned = clean_code(content, filename)
                 lang = get_file_extension(filename)
 
-                # Добавляем разделитель и содержимое
                 content_lines.append(f"\n## {rel_path}\n")
-                content_lines.append(f"```{lang}")
-                content_lines.append(content)
-                content_lines.append("```\n")
-
+                content_lines.append(f"```{lang}\n{cleaned}\n```\n")
             except Exception as e:
-                content_lines.append(f"\n## {rel_path}\n")
-                content_lines.append(f"```{lang}")
-                content_lines.append(f"Error reading file: {e}")
-                content_lines.append("```\n")
-
+                content_lines.append(f"\n## {rel_path}\n```{e}```\n")
     return "\n".join(content_lines)
 
 
 def main():
-    """Главная функция."""
-    print("=" * 50)
-    print("Generating project structure...")
-    print("=" * 50)
-
+    print("Generating structure...")
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        # Заголовок
-        f.write("# Project Structure\n\n")
-        f.write("## Directory Tree\n\n")
-        f.write("```")
+        f.write("# Project Structure\n\n## Directory Tree\n\n```")
+        f.write(generate_tree("."))
+        f.write("\n```\n\n---\n\n# File Contents\n")
+        f.write(generate_file_contents("."))
 
-        print("📁 Building directory tree...")
-        tree = generate_tree(".")
-        f.write(tree)
-        f.write("\n```\n\n")
-
-        f.write("---\n\n")
-        f.write("# File Contents\n")
-
-        print("Copying file contents...")
-        contents = generate_file_contents(".")
-        f.write(contents)
-
-    print("=" * 50)
-    print("✅ SUCCESS!")
-    print(f"File: {OUTPUT_FILE}")
-
-    # Статистика
-    file_size = os.path.getsize(OUTPUT_FILE)
-    print(f"Size: {file_size / 1024:.2f} KB ({file_size:,} bytes)")
-    print("=" * 50)
+    size = os.path.getsize(OUTPUT_FILE)
+    print(f"SUCCESS! Size: {size / 1024:.2f} KB")
 
 
 if __name__ == "__main__":

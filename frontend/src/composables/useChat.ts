@@ -91,7 +91,12 @@ function createChatInstance() {
 
         if (typingEvent.is_typing) {
           console.log(`[useChat] ${typingEvent.username} started typing`);
-          typing.addTypingUser(typingEvent.user_id, typingEvent.username);
+          typing.addTypingUser(
+            typingEvent.user_id,
+            typingEvent.display_name
+              ? typingEvent.display_name
+              : typingEvent.username
+          );
         } else {
           console.log(`[useChat] ${typingEvent.username} stopped typing`);
           typing.removeTypingUser(typingEvent.username);

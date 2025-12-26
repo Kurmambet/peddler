@@ -1,22 +1,37 @@
 // src/stores/auth.ts
+
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { authAPI } from "../api/auth";
-import type { UserRead } from "../types/api";
+import type { CurrentUser } from "../types/api";
 
 export const useAuthStore = defineStore("auth", () => {
-  const user = ref<UserRead | null>(null);
+  // const user = ref<UserRead | null>(null);
+  const user = ref<CurrentUser | null>(null);
   const token = ref<string | null>(localStorage.getItem("access_token"));
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  // ============================================================
+  // COMPUTED
+  // ============================================================
+
   const isAuthenticated = computed(() => !!token.value && !!user.value);
+
+  /**
+   * Текущий пользователь (alias для user)
+   */
+  const currentUser = computed(() => user.value);
+
+  // ============================================================
+  // LOGIN & REGISTER
+  // ============================================================
 
   const login = async (username: string, password: string) => {
     isLoading.value = true;
     error.value = null;
     try {
-      const { data } = await authAPI.login(username, password);
+      const data = await authAPI.login(username, password);
       token.value = data.access_token;
       localStorage.setItem("access_token", data.access_token);
 
@@ -46,6 +61,10 @@ export const useAuthStore = defineStore("auth", () => {
     }
   };
 
+  // ============================================================
+  // LOGOUT & LOAD USER
+  // ============================================================
+
   const logout = () => {
     console.log(`[AuthStore] 🚪 Logging out user: ${user.value?.username}`);
     token.value = null;
@@ -54,10 +73,13 @@ export const useAuthStore = defineStore("auth", () => {
   };
 
   const loadUser = async () => {
-    if (!token.value) return;
+    if (!token.value) {
+      console.log("[AuthStore] No token available, skipping loadUser");
+      return;
+    }
 
     try {
-      const { data } = await authAPI.me();
+      const data = await authAPI.me();
       user.value = data;
       console.log(
         `[AuthStore] 👤 User loaded: ${data.username} (ID: ${data.id})`
@@ -81,16 +103,79 @@ export const useAuthStore = defineStore("auth", () => {
     await loadUser();
   };
 
+  async function fetchMe() {
+    try {
+      // Здесь мы вызываем authAPI.getMe(), который дергает /users/me (MyUserProfile)
+      // Или /auth/me (UserRead) - смотря что у тебя сейчас
+
+      // Лучше всего, чтобы fetchMe вызывал именно /users/me,
+      // чтобы получить полные данные (bio, display_name)
+      const data = await authAPI.getMe(); // Пусть возвращает MyUserProfile
+
+      // Мержим данные, если у нас уже что-то было
+      user.value = { ...user.value, ...data } as CurrentUser;
+
+      return user.value;
+    } catch (err) {
+      // ...
+    }
+  }
+
+  async function updateProfile(updates: {
+    display_name?: string;
+    bio?: string;
+  }) {
+    try {
+      const updatedProfile = await authAPI.updateProfile(updates);
+
+      // Обновляем стейт
+      if (user.value) {
+        user.value = { ...user.value, ...updatedProfile };
+      }
+
+      return updatedProfile;
+    } catch (err) {
+      throw err;
+    }
+  }
+
+  async function uploadAvatar(file: File) {
+    try {
+      const updatedUser = await authAPI.uploadAvatar(file);
+
+      // Обновляем стейт сразу, чтобы интерфейс перерисовался
+      if (user.value) {
+        // Создаем новый объект для реактивности
+        user.value = { ...user.value, avatar_url: updatedUser.avatar_url };
+      }
+      return updatedUser;
+    } catch (err) {
+      throw err;
+    }
+  }
+  // ============================================================
+  // RETURN
+  // ============================================================
+
   return {
+    // State
     user,
     token,
     isLoading,
     error,
+
+    // Computed
     isAuthenticated,
+    currentUser,
+
+    // Methods
     login,
     register,
     logout,
     loadUser,
     restoreSession,
+    uploadAvatar,
+    updateProfile,
+    fetchMe,
   };
 });

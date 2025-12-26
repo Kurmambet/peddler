@@ -1,16 +1,16 @@
 <!-- src/components/chat/ChatHeader.vue -->
 <template>
   <div
-    class="px-4 md:px-6 py-3 bg-app-surface flex items-center gap-4 border-b border-app-border"
+    class="h-14 px-4 flex items-center gap-3 border-b border-app-border bg-app-surface"
   >
-    <!-- MOBILE: Кнопка открытия sidebar -->
+    <!-- Back button (mobile) -->
     <button
-      @click="$emit('open-sidebar')"
-      class="md:hidden p-2 -ml-2 rounded-lg hover:bg-app-primary/10 transition-colors"
-      aria-label="Open chats"
+      @click="$emit('back')"
+      class="md:hidden p-2 -ml-2 rounded-lg hover:bg-app-hover transition-colors text-app-text"
+      aria-label="Back to chats"
     >
       <svg
-        class="w-6 h-6 text-app-text"
+        class="w-5 h-5"
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
@@ -19,108 +19,178 @@
           stroke-linecap="round"
           stroke-linejoin="round"
           stroke-width="2"
-          d="M4 6h16M4 12h16M4 18h16"
+          d="M15 19l-7-7 7-7"
         />
       </svg>
     </button>
 
-    <!-- Chat info -->
-    <div class="flex-1 min-w-0">
-      <h2 class="text-base md:text-lg font-semibold text-app-text truncate">
-        {{
-          currentChat?.type === "direct"
-            ? currentChat?.other_username
-            : currentChat?.title || "Chat"
-        }}
-      </h2>
-
-      <!-- Typing indicator или статус -->
-      <p class="text-xs text-app-text-secondary truncate">
-        <span v-if="typingText" class="text-app-primary animate-pulse">
-          {{ typingText }}
-        </span>
-        <span v-else-if="otherUserStatus">
-          <span v-if="otherUserStatus.isOnline" class="text-green-500">
-            ● Online
-          </span>
-          <span v-else class="text-app-text-secondary">
-            {{ lastSeenText }}
-          </span>
-        </span>
-        <span v-else>
-          {{ currentChat?.type === "direct" ? "Direct Chat" : "Group Chat" }}
-        </span>
-      </p>
+    <!-- Avatar & Info -->
+    <div
+      class="flex items-center gap-3 flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+      @click="handleTitleClick"
+    >
+      <Avatar
+        v-if="currentChat"
+        :username="chatTitle"
+        :src="currentChat.type === 'direct' ? currentChat.avatar_url : null"
+        size="md"
+      />
+      <div class="flex-1 min-w-0">
+        <h2 class="font-semibold text-app-text truncate">
+          {{ chatTitle }}
+        </h2>
+        <p class="text-xs text-app-text-secondary truncate">
+          {{ typingText || statusText }}
+        </p>
+      </div>
     </div>
 
-    <!-- Status indicator (зелёная точка) -->
-    <div
-      v-if="otherUserStatus?.isOnline"
-      class="w-3 h-3 rounded-full bg-green-500 flex-shrink-0"
-      title="Online"
-    ></div>
+    <!-- Actions Dropdown -->
+    <ChatHeaderDropdown
+      v-if="currentChat"
+      :is-direct="currentChat.type === 'direct'"
+      :is-muted="false"
+      @view-profile="handleViewProfile"
+      @delete-chat="handleDeleteChat"
+      @view-info="handleViewInfo"
+      @toggle-mute="handleToggleMute"
+      @leave-group="handleLeaveGroup"
+    />
+
+    <UserProfileModal
+      v-if="showProfileModal && profileUserId"
+      :user-id="profileUserId"
+      @close="showProfileModal = false"
+    />
+
+    <GroupSettingsModal
+      v-if="showGroupSettingsModal && groupSettingsChatId"
+      :chat-id="groupSettingsChatId"
+      @close="showGroupSettingsModal = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
-import { useUserStatus } from "../../composables/useUserStatus";
+import { computed, ref } from "vue";
+import { useRouter } from "vue-router";
+import { useChat } from "../../composables/useChat";
 import { useChatsStore } from "../../stores/chats";
+import Avatar from "../ui/Avatar.vue";
+import UserProfileModal from "../user/UserProfileModal.vue";
+import ChatHeaderDropdown from "./ChatHeaderDropdown.vue";
+import GroupSettingsModal from "./GroupSettingsModal.vue";
 
-defineProps<{
+// State for Modals
+const showProfileModal = ref(false);
+const profileUserId = ref<number | null>(null);
+
+const showGroupSettingsModal = ref(false);
+const groupSettingsChatId = ref<number | null>(null);
+
+interface Props {
   typingText?: string;
-}>();
+}
 
+defineProps<Props>();
 defineEmits<{
   "open-sidebar": [];
+  back: [];
 }>();
 
+const router = useRouter();
+const { chatId } = useChat();
 const chatsStore = useChatsStore();
-const { formatLastSeen } = useUserStatus();
 
-const currentChat = computed(() => chatsStore.currentChat);
-
-// ID другого пользователя для direct чата
-const otherUserId = computed(() => {
-  if (currentChat.value?.type !== "direct") return null;
-  return currentChat.value.other_user_id;
+const currentChat = computed(() => {
+  if (!chatId.value) return null;
+  return chatsStore.chats.find((c) => c.id === chatId.value);
 });
 
-// Статус другого пользователя
-const otherUserStatus = computed(() => {
-  if (!otherUserId.value) return null;
-  return chatsStore.getUserStatus(otherUserId.value);
+const chatTitle = computed(() => {
+  if (!currentChat.value) return "Chat";
+  if (currentChat.value.type === "direct") {
+    if (currentChat.value.other_display_name) {
+      return currentChat.value.other_display_name;
+    } else {
+      return currentChat.value.other_username;
+    }
+  }
+  return currentChat.value.title;
 });
 
-// Реактивный last seen text с автообновлением
-const lastSeenText = ref("");
-let updateInterval: number | null = null;
+const statusText = computed(() => {
+  if (!currentChat.value) return "";
 
-const updateLastSeenText = () => {
-  if (otherUserStatus.value && !otherUserStatus.value.isOnline) {
-    lastSeenText.value = formatLastSeen(otherUserStatus.value.lastSeen);
+  if (currentChat.value.type === "direct") {
+    if (currentChat.value.other_user_is_online) return "Online";
+    // Можно добавить форматирование last seen
+    return "Offline";
   } else {
-    lastSeenText.value = "";
+    const count = currentChat.value.participant_count || 0;
+    return `${count} member${count !== 1 ? "s" : ""}`;
+  }
+});
+
+// --- Handlers ---
+
+const handleTitleClick = () => {
+  if (currentChat.value?.type === "direct") {
+    handleViewProfile();
+  } else {
+    handleViewInfo();
   }
 };
 
-// Обновляем при изменении статуса
-computed(() => {
-  updateLastSeenText();
-  return otherUserStatus.value;
-});
+const handleViewProfile = () => {
+  if (!currentChat.value) return;
 
-// Автообновление каждые 30 секунд
-onMounted(() => {
-  updateLastSeenText();
-  updateInterval = window.setInterval(() => {
-    updateLastSeenText();
-  }, 30000); // 30 секунд
-});
-
-onUnmounted(() => {
-  if (updateInterval) {
-    clearInterval(updateInterval);
+  if (currentChat.value.type === "direct") {
+    // Устанавливаем ID и открываем
+    profileUserId.value = currentChat.value.other_user_id;
+    showProfileModal.value = true;
+  } else {
+    // В будущем: можно открыть список участников и выбрать оттуда
   }
-});
+};
+
+const handleViewInfo = () => {
+  if (!currentChat.value) return;
+  groupSettingsChatId.value = currentChat.value.id;
+  showGroupSettingsModal.value = true;
+};
+
+const handleToggleMute = () => {
+  // TODO: Реализовать логику Mute в сторе
+  console.log("Toggle mute");
+};
+
+const handleDeleteChat = async () => {
+  if (!currentChat.value) return;
+  if (
+    !confirm("Are you sure you want to delete this chat? History will be lost.")
+  )
+    return;
+
+  try {
+    await chatsStore.deleteChat(currentChat.value.id);
+    router.push("/");
+  } catch (e) {
+    console.error("Failed to delete chat", e);
+  }
+};
+
+const handleLeaveGroup = async () => {
+  if (!currentChat.value) return;
+  if (!confirm("Are you sure you want to leave this group?")) return;
+
+  try {
+    await chatsStore.leaveGroup(currentChat.value.id);
+    router.push("/");
+  } catch (e) {
+    console.error("Failed to leave group", e);
+    // Здесь можно добавить тост с ошибкой, если, например, владелец пытается выйти без передачи прав
+    alert("Failed to leave group: " + (e as any).response?.data?.detail);
+  }
+};
 </script>

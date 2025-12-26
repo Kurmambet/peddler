@@ -86,8 +86,10 @@
             <Avatar
               v-if="!isOwn(msg)"
               :username="msg.sender_username"
+              :src="msg.avatar_url ? msg.avatar_url : null"
               size="sm"
-              class="mr-2 mt-1 flex-shrink-0"
+              class="mr-2 mt-1 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+              @click="openProfile(msg.sender_id)"
             />
 
             <!-- Message bubble -->
@@ -103,9 +105,14 @@
               <!-- Sender name for group chats -->
               <p
                 v-if="!isOwn(msg)"
-                class="text-xs font-semibold mb-1 opacity-75 break-words"
+                class="text-xs font-semibold mb-1 opacity-75 break-words cursor-pointer hover:underline"
+                @click="openProfile(msg.sender_id)"
               >
-                {{ msg.sender_username }}
+                {{
+                  msg.sender_display_name
+                    ? msg.sender_display_name
+                    : msg.sender_username
+                }}
               </p>
 
               <!-- Message content -->
@@ -130,6 +137,12 @@
       <!-- Scroll anchor -->
       <div ref="scrollAnchor" class="h-1"></div>
     </div>
+
+    <UserProfileModal
+      v-if="showUserProfile && selectedUserId"
+      :user-id="selectedUserId"
+      @close="showUserProfile = false"
+    />
   </div>
 </template>
 
@@ -147,6 +160,8 @@ import {
 import Avatar from "../ui/Avatar.vue";
 import Skeleton from "../ui/Skeleton.vue";
 
+import UserProfileModal from "../user/UserProfileModal.vue";
+
 const authStore = useAuthStore();
 const messagesStore = useMessagesStore();
 const { currentMessages, isLoading, chatId } = useChat();
@@ -158,6 +173,14 @@ const hasMore = computed(() =>
   chatId.value ? messagesStore.getHasMore(chatId.value) : false
 );
 const previousMessageCount = ref(0);
+
+const showUserProfile = ref(false);
+const selectedUserId = ref<number | null>(null);
+
+const openProfile = (userId: number) => {
+  selectedUserId.value = userId;
+  showUserProfile.value = true;
+};
 
 // Group messages by date
 const groupedMessages = computed(() => {
@@ -245,22 +268,11 @@ watch(
 
       // Если это НАШЕ сообщение - скроллим ВСЕГДА
       if (hasOwnMessage) {
-        console.log("[MessageList] Own message sent, scrolling to bottom");
         scrollToBottom("smooth");
-      }
-      // Если это чужое сообщение - скроллим только если были внизу
-      else if (isNearBottom()) {
-        console.log(
-          "[MessageList] New message received, user near bottom, scrolling"
-        );
+      } else if (isNearBottom()) {
         scrollToBottom("smooth");
-      } else {
-        console.log(
-          "[MessageList] New message received, but user scrolled up, NOT scrolling"
-        );
       }
     }
-
     previousMessageCount.value = newLength;
   }
 );
