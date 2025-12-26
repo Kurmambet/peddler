@@ -74,7 +74,15 @@
                 />
               </svg>
             </div>
-            <Avatar v-else :username="chat.other_username" size="md" />
+            <Avatar
+              v-else
+              :username="
+                chat.other_display_name
+                  ? chat.other_display_name
+                  : chat.other_username
+              "
+              size="md"
+            />
 
             <!-- Online indicator -->
             <span
@@ -87,7 +95,13 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-baseline justify-between mb-0.5">
               <h3 class="font-semibold text-app-text truncate">
-                {{ chat.type === "direct" ? chat.other_username : chat.title }}
+                {{
+                  chat.type === "direct"
+                    ? chat.other_display_name
+                      ? chat.other_display_name
+                      : chat.other_username
+                    : chat.title
+                }}
               </h3>
             </div>
 

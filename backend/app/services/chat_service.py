@@ -172,6 +172,7 @@ class ChatService:
                     created_by_id=chat.created_by_id,
                     created_at=chat.created_at,
                     other_username=other_participant.username,
+                    other_display_name=other_participant.display_name,
                     other_user_id=other_participant.id,
                     # статусы
                     other_user_is_online=other_participant.is_online,

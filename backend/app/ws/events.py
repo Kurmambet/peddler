@@ -134,6 +134,7 @@ class MessageCreatedEvent(WSEvent):
     chat_id: int
     sender_id: int
     sender_username: str
+    sender_display_name: Optional[str]
     content: str
     created_at: datetime
     is_read: bool = False
@@ -164,6 +165,7 @@ class TypingIndicatorEvent(WSEvent):
     type: EventType = EventType.TYPING_INDICATOR
     user_id: int
     username: str
+    display_name: Optional[str] = None
     is_typing: bool  # True = начал печатать, False = перестал
 
 

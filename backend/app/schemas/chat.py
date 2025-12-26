@@ -37,6 +37,7 @@ class DirectChatRead(BaseModel):
     created_by_id: int
     created_at: datetime
     other_username: str
+    other_display_name: Optional[str] = None
     other_user_id: int
     other_user_is_online: bool
     other_user_last_seen: Optional[datetime] = None

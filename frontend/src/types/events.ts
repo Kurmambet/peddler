@@ -22,6 +22,7 @@ export interface MessageCreatedEvent extends BaseEvent {
   chat_id: number;
   sender_id: number;
   sender_username: string;
+  sender_display_name: string | null;
   content: string;
   created_at: string;
   is_read: boolean;
@@ -31,6 +32,7 @@ export interface TypingIndicatorEvent extends BaseEvent {
   type: "typing_indicator";
   user_id: number;
   username: string;
+  display_name: string | null;
   is_typing: boolean;
 }
 

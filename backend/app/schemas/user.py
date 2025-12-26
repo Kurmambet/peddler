@@ -15,6 +15,7 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: int
+    display_name: Optional[str] = None
     is_active: bool
     is_online: bool
     last_seen: Optional[datetime] = None

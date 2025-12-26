@@ -105,7 +105,11 @@
                 v-if="!isOwn(msg)"
                 class="text-xs font-semibold mb-1 opacity-75 break-words"
               >
-                {{ msg.sender_username }}
+                {{
+                  msg.sender_display_name
+                    ? msg.sender_display_name
+                    : msg.sender_username
+                }}
               </p>
 
               <!-- Message content -->

@@ -8,7 +8,7 @@ from app.models.user import User
 from app.schemas.user import MyUserProfile, OtherUserProfile, UserRead, UserUpdate
 from app.services.user_service import UserService
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["users"])
@@ -36,7 +36,8 @@ async def search_users(
         select(User)
         .where(
             and_(
-                User.username.ilike(f"%{q}%"),  # ILIKE = case-insensitive
+                # User.username.ilike(f"%{q}%"),
+                or_(User.username.ilike(f"%{q}%"), User.display_name.ilike(f"%{q}%")),
                 User.is_active,
                 User.id != current_user.id,  # Исключаем себя
             )

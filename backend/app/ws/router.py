@@ -223,6 +223,7 @@ async def handle_send_message(
         chat_id=message.chat_id,
         sender_id=message.sender_id,
         sender_username=user.username,
+        sender_display_name=user.display_name,
         content=message.content,
         created_at=message.created_at,
         is_read=message.is_read,
@@ -245,8 +246,12 @@ async def handle_typing_start(user: User, chat_id: int, websocket: WebSocket):
     # event = TypingStartEvent(**data)  # можно опустить, если не нужны доп. поля
 
     # Формируем событие для других участников
-    typing_event = TypingIndicatorEvent(user_id=user.id, username=user.username, is_typing=True)
-
+    if user.display_name:
+        typing_event = TypingIndicatorEvent(
+            user_id=user.id, username=user.username, display_name=user.display_name, is_typing=True
+        )
+    else:
+        typing_event = TypingIndicatorEvent(user_id=user.id, username=user.username, is_typing=True)
     # публикуем в Redis вместо manager.broadcast_to_chat
     await pubsub_manager.publish_to_chat(chat_id, typing_event.model_dump_json())
 

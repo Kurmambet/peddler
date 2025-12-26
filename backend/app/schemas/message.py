@@ -20,6 +20,7 @@ class MessageRead(MessageBase):
     is_read: bool
     created_at: datetime
     sender_username: str | None = None
+    sender_display_name: str | None = None
 
     class Config:
         from_attributes = True

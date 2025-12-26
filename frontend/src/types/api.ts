@@ -7,6 +7,7 @@
 export interface UserRead {
   id: number;
   username: string;
+  display_name: string | null;
   is_active: boolean;
   is_online: boolean;
   last_seen: string | null;
@@ -52,6 +53,7 @@ export enum ChatParticipantRole {
 export interface ChatParticipant {
   user_id: number;
   username: string;
+  display_name: string | null;
   role: ChatParticipantRole | string;
   is_online: boolean;
   last_seen?: string | null;
@@ -75,6 +77,7 @@ export interface DirectChatRead {
   created_by_id: number;
   created_at: string;
   other_username: string;
+  other_display_name: string | null;
   other_user_id: number;
   other_user_is_online: boolean;
   other_user_last_seen: string | null;
@@ -189,6 +192,7 @@ export interface MessageRead {
   chat_id: number;
   sender_id: number;
   sender_username: string;
+  sender_display_name: string | null;
   content: string;
   is_read: boolean;
   created_at: string;

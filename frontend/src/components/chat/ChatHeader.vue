@@ -105,9 +105,11 @@ const currentChat = computed(() => {
 const chatTitle = computed(() => {
   if (!currentChat.value) return "Chat";
   if (currentChat.value.type === "direct") {
-    // TODO: Здесь позже можно добавить проверку на display_name из профиля собеседника,
-    // если мы будем хранить его в объекте чата или подгружать отдельно
-    return currentChat.value.other_username;
+    if (currentChat.value.other_display_name) {
+      return currentChat.value.other_display_name;
+    } else {
+      return currentChat.value.other_username;
+    }
   }
   return currentChat.value.title;
 });
