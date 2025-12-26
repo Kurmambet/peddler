@@ -116,7 +116,13 @@
               </p>
 
               <!-- Message content -->
-              <p class="text-sm break-all whitespace-pre-wrap leading-relaxed">
+              <div v-if="msg.message_type === 'voice'" class="my-1">
+                <VoicePlayer :url="msg.file_url!" :duration="msg.duration!" />
+              </div>
+              <p
+                v-else
+                class="text-sm break-all whitespace-pre-wrap leading-relaxed"
+              >
                 {{ msg.content }}
               </p>
 
@@ -161,6 +167,7 @@ import Avatar from "../ui/Avatar.vue";
 import Skeleton from "../ui/Skeleton.vue";
 
 import UserProfileModal from "../user/UserProfileModal.vue";
+import VoicePlayer from "./VoicePlayer.vue";
 
 const authStore = useAuthStore();
 const messagesStore = useMessagesStore();
@@ -186,7 +193,12 @@ const openProfile = (userId: number) => {
 const groupedMessages = computed(() => {
   const groups: Record<string, { label: string; messages: MessageRead[] }> = {};
 
-  currentMessages.value.forEach((msg) => {
+  const sortedMessages = [...currentMessages.value].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
+
+  sortedMessages.forEach((msg) => {
     const dateKey = getDateKey(msg.created_at);
     if (!groups[dateKey]) {
       groups[dateKey] = {

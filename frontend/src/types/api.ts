@@ -1,5 +1,12 @@
 // src/types/api.ts
 
+export enum MessageType {
+  TEXT = "text",
+  VOICE = "voice",
+  VIDEO = "video",
+  IMAGE = "image",
+}
+
 // ============================================================
 // USER TYPES
 // ============================================================
@@ -202,6 +209,11 @@ export interface MessageRead {
   is_read: boolean;
   created_at: string;
   updated_at: string;
+
+  message_type: MessageType;
+  file_url?: string | null;
+  file_size?: number | null;
+  duration?: number | null;
 }
 
 export interface MessageCreate {

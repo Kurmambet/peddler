@@ -8,17 +8,29 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import get_settings
 from app.database import close_db, init_db
-from app.ws import manager, pubsub_manager
+
+# from app.ws import manager, pubsub_manager
 from app.ws import router as ws_router
 from app.ws.events import ErrorEvent
+from app.ws.globals import manager, pubsub_manager
 
 from .api.v1 import api_router
 
 settings = get_settings()
 
 UPLOAD_DIR = "uploads"
+VOICE_DIR = f"{UPLOAD_DIR}/voice"
+AVATARS_DIR = f"{UPLOAD_DIR}/avatars"
+
+# Создаём родительскую папку
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
+
+# Создаём подпапки (exist_ok=True на случай, если уже есть)
+if not os.path.exists(VOICE_DIR):
+    os.makedirs(VOICE_DIR, exist_ok=True)
+if not os.path.exists(AVATARS_DIR):
+    os.makedirs(AVATARS_DIR, exist_ok=True)
 
 
 @asynccontextmanager
@@ -63,7 +75,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory="uploads"), name="static")
+# app.mount("/static", StaticFiles(directory="uploads"), name="static") - у меня уже была тут дирректория uploads/avatars, так же в докере она есть
+app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
 
 
 @app.get("/health")

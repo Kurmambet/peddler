@@ -6,6 +6,8 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from app.models.message import MessageType
+
 
 class EventType(str, Enum):
     """
@@ -115,29 +117,23 @@ class MessageCreatedEvent(WSEvent):
 
     После создания Message в БД через MessageService.send_message()
     мы конструируем этот event и делаем broadcast всем в чате
-
-    Пример JSON к клиенту:
-    {
-        "type": "message_created",
-        "id": 123,
-        "chat_id": 5,
-        "sender_id": 42,
-        "sender_username": "alice", - Можно загрузить из Message.sender.username
-        "content": "Привет!",
-        "created_at": "2025-12-07T06:39:00Z",
-        "timestamp": "2025-12-07T06:39:00.123Z"
-    }
     """
 
     type: EventType = EventType.MESSAGE_CREATED
-    id: int  # ID сообщения в БД
+    id: int
     chat_id: int
     sender_id: int
     sender_username: str
     sender_display_name: Optional[str]
+    avatar_url: Optional[str] = None
     content: str
     created_at: datetime
     is_read: bool = False
+
+    message_type: MessageType = MessageType.TEXT
+    file_url: str | None = None
+    file_size: int | None = None
+    duration: int | None = None
 
 
 class MessageReadEvent(WSEvent):

@@ -95,7 +95,7 @@ export const useMessagesStore = defineStore("messages", () => {
       return;
     }
 
-    messages.push({
+    const newMessage: MessageRead = {
       id: event.id,
       chat_id: event.chat_id,
       sender_id: event.sender_id,
@@ -106,11 +106,28 @@ export const useMessagesStore = defineStore("messages", () => {
       is_read: event.is_read,
       created_at: event.created_at,
       updated_at: event.created_at,
-    });
+      message_type: event.message_type,
+      file_url: event.file_url,
+      file_size: event.file_size,
+      duration: event.duration,
+    };
 
-    console.log(
-      `[MessagesStore] ✅ Message added: ${event.id}, Total: ${messages.length}`
+    const newMessageTime = new Date(event.created_at).getTime();
+    const insertIndex = messages.findIndex(
+      (msg) => new Date(msg.created_at).getTime() > newMessageTime
     );
+
+    if (insertIndex === -1) {
+      messages.push(newMessage);
+      console.log(
+        `[MessagesStore] ✅ Message added to END: ${event.id}, Total: ${messages.length}`
+      );
+    } else {
+      messages.splice(insertIndex, 0, newMessage);
+      console.log(
+        `[MessagesStore] ✅ Message inserted at position ${insertIndex}: ${event.id}, Total: ${messages.length}`
+      );
+    }
   };
 
   const sendMessage = async (chatId: number, content: string) => {

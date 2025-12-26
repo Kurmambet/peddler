@@ -27,16 +27,15 @@ from app.ws.events import (
     TypingIndicatorEvent,
     UserStatusChangedEvent,
 )
-from app.ws.manager import ConnectionManager
-from app.ws.pubsub import RedisPubSubManager
+from app.ws.globals import manager, pubsub_manager
 from app.ws.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 
 # Создаем единственный экземпляр ConnectionManager
 # Он будет жить все время работы приложения
-manager = ConnectionManager()  #  глобальный singleton
-pubsub_manager = RedisPubSubManager(manager)
+# manager = ConnectionManager()  #  глобальный singleton
+# pubsub_manager = RedisPubSubManager(manager)
 
 router = APIRouter()
 
@@ -224,9 +223,14 @@ async def handle_send_message(
         sender_id=message.sender_id,
         sender_username=user.username,
         sender_display_name=user.display_name,
+        avatar_url=user.avatar_url,
         content=message.content,
         created_at=message.created_at,
         is_read=message.is_read,
+        message_type=message.message_type,
+        file_url=message.file_url,
+        file_size=message.file_size,
+        duration=message.duration,
     )
 
     # публикуем в Redis вместо прямого broadcast

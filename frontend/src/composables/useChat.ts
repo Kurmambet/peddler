@@ -77,6 +77,10 @@ function createChatInstance() {
       // Регистрируем обработчики
       ws.value.onMessage("message_created", (event: any) => {
         console.log("[useChat] 📨 message_created event received:", event);
+        console.log("[useChat] Message type:", event.message_type);
+        console.log("[useChat] File URL:", event.file_url);
+        console.log("[useChat] Duration:", event.duration);
+
         messagesStore.addMessage(event as MessageCreatedEvent);
       });
 

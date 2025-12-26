@@ -2,15 +2,32 @@
 from datetime import datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
+
+from app.models.message import MessageType
 
 
 class MessageBase(BaseModel):
-    content: str = Field(..., min_length=1, max_length=5000)
+    content: str = Field("", min_length=0, max_length=5000)
+    message_type: MessageType = Field(MessageType.TEXT)
 
 
 class MessageCreate(MessageBase):
     chat_id: int = Field(..., ge=1)
+    file_url: Optional[str] = None
+    file_size: Optional[int] = None
+    duration: Optional[int] = None
+
+    @model_validator(mode="after")
+    def validate_message(self):
+        """
+        Для текстовых сообщений content обязателен.
+        Для voice/video/image может быть пустым.
+        """
+        if self.message_type == MessageType.TEXT and not self.content.strip():
+            raise ValueError("Content required for text messages")
+
+        return self
 
 
 class MessageRead(MessageBase):
@@ -23,6 +40,10 @@ class MessageRead(MessageBase):
     sender_display_name: str | None = None
     avatar_url: Optional[str] = None
 
+    file_url: Optional[str] = None
+    file_size: Optional[int] = None
+    duration: Optional[int] = None
+
     class Config:
         from_attributes = True
 
@@ -30,4 +51,4 @@ class MessageRead(MessageBase):
 class MessageListResponse(BaseModel):
     messages: List[MessageRead]
     has_more: bool = False
-    next_offset: int | None = None
+    next_offset: Optional[int] = None

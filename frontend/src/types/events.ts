@@ -1,3 +1,5 @@
+import { MessageType } from "./api";
+
 // src/types/events.ts
 export type WSEventType =
   | "send_message"
@@ -27,6 +29,11 @@ export interface MessageCreatedEvent extends BaseEvent {
   content: string;
   created_at: string;
   is_read: boolean;
+
+  message_type: MessageType;
+  file_url?: string | null;
+  file_size?: number | null;
+  duration?: number | null;
 }
 
 export interface TypingIndicatorEvent extends BaseEvent {

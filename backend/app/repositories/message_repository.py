@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from app.core.exceptions import ChatAccessDenied
 from app.models.chat import Chat, ChatParticipant
-from app.models.message import Message
+from app.models.message import Message, MessageType
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -32,15 +32,27 @@ class MessageRepository:
         #     raise ValueError("User is not a participant of this chat")
         return chat
 
-    async def create_message(self, chat_id: int, sender_id: int, content: str) -> Message:
-        """Создать новое сообщение"""
+    async def create_message(
+        self,
+        chat_id: int,
+        sender_id: int,
+        content: str,
+        message_type: MessageType = MessageType.TEXT,
+        file_url: Optional[str] = None,
+        file_size: Optional[int] = None,
+        duration: Optional[int] = None,
+    ) -> Message:
         message = Message(
             chat_id=chat_id,
             sender_id=sender_id,
             content=content,
+            message_type=message_type,
+            file_url=file_url,
+            file_size=file_size,
+            duration=duration,
         )
         self.db.add(message)
-        await self.db.flush()  # Получаем ID сообщения
+        await self.db.flush()
         return message
 
     async def get_chat_messages(
