@@ -106,6 +106,7 @@
               @change-role="handleChangeRole"
               @remove="handleRemoveMember"
               @transfer-ownership="handleTransfer"
+              @view-profile="handleViewProfile"
             />
           </div>
 
@@ -141,6 +142,12 @@
     @added="reloadMembers"
   />
 
+  <!-- Nested Modals -->
+  <UserProfileModal
+    v-if="showUserProfile && selectedUserId"
+    :user-id="selectedUserId"
+    @close="showUserProfile = false"
+  />
   <!-- Nested Modal: Confirm Transfer (можно просто confirm()) -->
 </template>
 
@@ -148,6 +155,7 @@
 import Button from "@/components/ui/Button.vue";
 import Input from "@/components/ui/Input.vue";
 import Modal from "@/components/ui/Modal.vue";
+import UserProfileModal from "@/components/user/UserProfileModal.vue";
 import router from "@/router";
 import { useAuthStore } from "@/stores/auth";
 import { useChatsStore } from "@/stores/chats";
@@ -165,6 +173,9 @@ const activeTab = ref("info");
 const isLoading = ref(true);
 const isSaving = ref(false);
 const showAddMembers = ref(false);
+
+const showUserProfile = ref(false);
+const selectedUserId = ref<number | null>(null);
 
 const form = ref({
   title: "",
@@ -226,6 +237,11 @@ const saveChanges = async () => {
   } finally {
     isSaving.value = false;
   }
+};
+
+const handleViewProfile = (member: any) => {
+  selectedUserId.value = member.user_id;
+  showUserProfile.value = true;
 };
 
 const handleChangeRole = async (userId: number, role: string) => {

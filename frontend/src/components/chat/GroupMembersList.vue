@@ -9,8 +9,11 @@
         :key="member.user_id"
         class="flex items-center justify-between p-3 bg-app-bg border border-app-border rounded-lg hover:border-primary/30 transition-colors group"
       >
-        <!-- Info -->
-        <div class="flex items-center gap-3">
+        <!-- Info (clickable) -->
+        <div
+          class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity"
+          @click="$emit('view-profile', member)"
+        >
           <Avatar :username="member.username" size="sm" />
           <div>
             <div class="flex items-center gap-2">
@@ -38,11 +41,11 @@
           </div>
         </div>
 
-        <!-- Actions (Dropdown) -->
-        <div v-if="canManage(member)" class="relative">
+        <!-- Actions (Dropdown) - показываем всем кроме себя -->
+        <div v-if="member.user_id !== currentUserId" class="relative">
           <Menu as="div" class="relative inline-block text-left">
             <MenuButton
-              class="p-2 rounded-lg hover:bg-app-hover text-app-text-secondary hover:text-app-text"
+              class="p-2 rounded-lg hover:bg-app-hover text-app-text-secondary hover:text-app-text transition-colors"
             >
               <svg
                 class="w-5 h-5"
@@ -70,46 +73,68 @@
               <MenuItems
                 class="absolute right-0 mt-2 w-48 bg-app-surface border border-app-border rounded-lg shadow-xl z-50 overflow-hidden py-1 origin-top-right focus:outline-none"
               >
-                <!-- Make Admin / Remove Admin -->
-                <MenuItem
-                  v-if="myRole === 'owner' && member.role !== 'owner'"
-                  v-slot="{ active }"
-                >
+                <!-- View Profile -->
+                <MenuItem v-slot="{ active }">
                   <button
-                    @click="toggleAdmin(member)"
+                    @click="$emit('view-profile', member)"
                     class="w-full px-4 py-2 text-left text-sm flex items-center gap-2"
                     :class="
                       active ? 'bg-app-hover text-app-text' : 'text-app-text'
                     "
                   >
-                    <span v-if="member.role === 'admin'">⬇️ Remove Admin</span>
-                    <span v-else>⬆️ Make Admin</span>
+                    👤 View Profile
                   </button>
                 </MenuItem>
 
-                <!-- Transfer Ownership -->
-                <MenuItem v-if="myRole === 'owner'" v-slot="{ active }">
-                  <button
-                    @click="$emit('transfer-ownership', member)"
-                    class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-orange-500"
-                    :class="active ? 'bg-orange-50' : ''"
+                <!-- Divider if management actions exist -->
+                <div
+                  v-if="canManage(member)"
+                  class="h-px bg-app-border my-1"
+                ></div>
+
+                <!-- Management Actions -->
+                <template v-if="canManage(member)">
+                  <!-- Make/Remove Admin -->
+                  <MenuItem
+                    v-if="myRole === 'owner' && member.role !== 'owner'"
+                    v-slot="{ active }"
                   >
-                    👑 Transfer Ownership
-                  </button>
-                </MenuItem>
+                    <button
+                      @click="toggleAdmin(member)"
+                      class="w-full px-4 py-2 text-left text-sm flex items-center gap-2"
+                      :class="
+                        active ? 'bg-app-hover text-app-text' : 'text-app-text'
+                      "
+                    >
+                      <span v-if="member.role === 'admin'"
+                        >⬇️ Remove Admin</span
+                      >
+                      <span v-else>⬆️ Make Admin</span>
+                    </button>
+                  </MenuItem>
 
-                <div class="h-px bg-app-border my-1"></div>
+                  <!-- Transfer Ownership -->
+                  <MenuItem v-if="myRole === 'owner'" v-slot="{ active }">
+                    <button
+                      @click="$emit('transfer-ownership', member)"
+                      class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-orange-500"
+                      :class="active ? 'bg-orange-50' : ''"
+                    >
+                      👑 Transfer Ownership
+                    </button>
+                  </MenuItem>
 
-                <!-- Remove User -->
-                <MenuItem v-slot="{ active }">
-                  <button
-                    @click="$emit('remove', member)"
-                    class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-app-error"
-                    :class="active ? 'bg-app-error/10' : ''"
-                  >
-                    🚫 Remove from group
-                  </button>
-                </MenuItem>
+                  <!-- Remove User -->
+                  <MenuItem v-slot="{ active }">
+                    <button
+                      @click="$emit('remove', member)"
+                      class="w-full px-4 py-2 text-left text-sm flex items-center gap-2 text-app-error"
+                      :class="active ? 'bg-app-error/10' : ''"
+                    >
+                      🚫 Remove from group
+                    </button>
+                  </MenuItem>
+                </template>
               </MenuItems>
             </transition>
           </Menu>
@@ -123,12 +148,9 @@
 import Avatar from "@/components/ui/Avatar.vue";
 import Badge from "@/components/ui/Badge.vue";
 import type { ChatParticipant } from "@/types/api";
-import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue"; // Удобная библиотека для dropdowns, или можно использовать свой dropdown
+import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/vue";
 import { formatDistanceToNow } from "date-fns";
 import { computed } from "vue";
-// Если Headless UI не установлен, его нужно установить: npm install @headlessui/vue
-// ИЛИ использовать нашу самописную логику dropdown, если не хочешь ставить лишнего.
-// Давай пока без Headless UI, чтобы не усложнять deps, сделаем нативненько.
 
 interface Props {
   members: ChatParticipant[];
@@ -141,18 +163,17 @@ const emit = defineEmits<{
   "change-role": [userId: number, role: string];
   remove: [member: ChatParticipant];
   "transfer-ownership": [member: ChatParticipant];
+  "view-profile": [member: ChatParticipant];
 }>();
 
+// ... existing code (sortedMembers, formatDate, canManage, toggleAdmin) ...
 const sortedMembers = computed(() => {
   const roleOrder: Record<string, number> = { owner: 1, admin: 2, member: 3 };
   return [...props.members].sort((a, b) => {
-    // Сначала по роли
     if (roleOrder[a.role] !== roleOrder[b.role]) {
       return roleOrder[a.role] - roleOrder[b.role];
     }
-    // Потом онлайн
     if (a.is_online !== b.is_online) return a.is_online ? -1 : 1;
-    // Потом по имени
     return a.username.localeCompare(b.username);
   });
 });
@@ -163,11 +184,9 @@ const formatDate = (dateStr: string | null) => {
 };
 
 const canManage = (member: ChatParticipant) => {
-  if (member.user_id === props.currentUserId) return false; // Нельзя управлять собой здесь
-
-  if (props.myRole === "owner") return true; // Владелец может всё
-  if (props.myRole === "admin") return member.role === "member"; // Админ управляет только участниками
-
+  if (member.user_id === props.currentUserId) return false;
+  if (props.myRole === "owner") return true;
+  if (props.myRole === "admin") return member.role === "member";
   return false;
 };
 
