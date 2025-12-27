@@ -95,14 +95,6 @@ function createChatInstance() {
       ws.value.onMessage("message_created", (event: any) => {
         console.log("[useChat] 📨 message_created event received:", event);
         messagesStore.addMessage(event as MessageCreatedEvent);
-
-        // Увеличиваем счётчик, если сообщение не от нас и чат не открыт
-        if (
-          event.sender_id !== authStore.user?.id &&
-          event.chat_id !== chatId.value
-        ) {
-          chatsStore.incrementUnreadCount(event.chat_id);
-        }
       });
 
       ws.value.onMessage("typing_indicator", (event: any) => {
@@ -298,11 +290,20 @@ function createChatInstance() {
     { immediate: true }
   );
 
+  watch(
+    chatId,
+    (newId, oldId) => {
+      if (oldId && !newId) {
+        // Мы вышли из чата (например, нажали Back на мобильном)
+        chatsStore.resetCurrentChat();
+      }
+    },
+    { flush: "sync" } // Важно: синхронное обновление, чтобы успеть до прихода событий
+  );
   // Cleanup function
   function cleanup() {
     console.log(`[useChat] 🧹 Cleanup called, ref count: ${instanceRefCount}`);
     instanceRefCount--;
-
     if (instanceRefCount === 0) {
       console.log("[useChat] 🧹 Last reference removed, destroying instance");
       typing.cleanup();
@@ -310,6 +311,10 @@ function createChatInstance() {
         ws.value.disconnect();
         ws.value = null;
       }
+
+      // Явно сбрасываем ID чата в сторе при полном удалении инстанса
+      chatsStore.resetCurrentChat();
+
       chatInstance = null;
     }
   }

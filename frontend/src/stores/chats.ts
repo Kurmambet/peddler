@@ -108,6 +108,26 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
+  const decrementUnreadCount = (chatId: number) => {
+    const chat = chats.value.find((c) => c.id === chatId);
+    if (chat && chat.unread_count > 0) {
+      chat.unread_count--;
+      console.log(
+        `[ChatsStore] ⬇️ Unread count for chat ${chatId}: ${chat.unread_count}`
+      );
+    }
+  };
+
+  const setUnreadCount = (chatId: number, count: number) => {
+    const chat = chats.value.find((c) => c.id === chatId);
+    if (chat) {
+      chat.unread_count = count;
+      console.log(
+        `[ChatsStore] 🔄 Set unread count for chat ${chatId}: ${count}`
+      );
+    }
+  };
+
   const resetCurrentChat = () => {
     console.log("[ChatsStore] 🔄 Resetting current chat");
     currentChatId.value = null;
@@ -446,7 +466,8 @@ export const useChatsStore = defineStore("chats", () => {
     error,
     userStatuses,
     incrementUnreadCount,
-
+    decrementUnreadCount,
+    setUnreadCount,
     // Computed
     currentChat,
     isCurrentChatGroup,
