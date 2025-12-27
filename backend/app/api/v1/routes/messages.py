@@ -127,3 +127,30 @@ async def upload_voice_message(
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
     logger.info("[Voice] Event published successfully")
     return message
+
+
+# @router.get("/chats/{chat_id}/messages/debug", tags=["debug"])
+# async def debug_messages(
+#     chat_id: int,
+#     current_user: User = Depends(get_current_user),
+#     db: AsyncSession = Depends(get_db),
+# ):
+#     """Отладочный эндпоинт для проверки is_read"""
+#     stmt = (
+#         select(Message)
+#         .where(Message.chat_id == chat_id)
+#         .order_by(Message.created_at.desc())
+#         .limit(10)
+#     )
+#     result = await db.execute(stmt)
+#     messages = result.scalars().all()
+
+#     return [
+#         {
+#             "id": msg.id,
+#             "sender_id": msg.sender_id,
+#             "is_read": msg.is_read,
+#             "content": msg.content[:50],
+#         }
+#         for msg in messages
+#     ]

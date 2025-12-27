@@ -34,8 +34,6 @@ export interface MessageCreatedEvent extends BaseEvent {
   file_url?: string | null;
   file_size?: number | null;
   duration?: number | null;
-
-  unread_count: number | 0;
 }
 
 export interface MessageReadEvent extends BaseEvent {

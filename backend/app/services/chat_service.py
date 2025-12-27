@@ -1,4 +1,5 @@
 # app/services/chat_service.py
+import logging
 from typing import List
 
 from app.models.chat import Chat, ChatParticipantRole, ChatType
@@ -27,6 +28,8 @@ from app.ws.events import (
 )
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 
 class ChatService:
@@ -144,7 +147,10 @@ class ChatService:
         self, user_id: int, limit: int = 50, offset: int = 0
     ) -> List[ChatRead]:
         """Получить список чатов пользователя"""
+        logger.info(f"[ChatService] Getting chats for user_id: {user_id}")
+
         chats = await self.repo.get_user_chats(user_id, limit, offset)
+        logger.info(f"[ChatService] Found {len(chats)} chats")
 
         # Получаем количество участников для групповых чатов
         group_ids = [c.id for c in chats if c.type == ChatType.GROUP]
@@ -154,13 +160,17 @@ class ChatService:
 
         # Получаем количество непрочитанных для ВСЕХ чатов одним запросом
         all_chat_ids = [c.id for c in chats]
+        logger.info(f"[ChatService] Fetching unread counts for chats: {all_chat_ids}")
+
         unread_map = await self.repo.get_unread_counts_batch(all_chat_ids, user_id)
+        logger.info(f"[ChatService] Unread map: {unread_map}")
 
         results: List[ChatRead] = []
 
         for chat in chats:
             # Достаём unread_count из словаря
             unread_count = unread_map.get(chat.id, 0)
+            logger.debug(f"[ChatService] Chat {chat.id} has {unread_count} unread messages")
 
             if chat.type == ChatType.DIRECT:
                 other_participant = next(

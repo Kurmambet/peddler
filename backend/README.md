@@ -61,6 +61,7 @@ SELECT * FROM chats;
 
 # сообщения
 SELECT * FROM messages;
+SELECT is_read, message_type_enum FROM messages;
 
 # участники чатов
 SELECT * FROM chat_participants;

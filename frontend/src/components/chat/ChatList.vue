@@ -113,7 +113,7 @@
                 }}
               </h3>
 
-              <!-- ← ДОБАВИТЬ: Бадж с количеством непрочитанных -->
+              <!-- Бадж с количеством непрочитанных -->
               <span
                 v-if="chat.unread_count > 0"
                 class="ml-2 px-2 py-0.5 bg-app-primary text-white text-xs font-semibold rounded-full min-w-[20px] text-center"
