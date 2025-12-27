@@ -1,5 +1,6 @@
 # app/schemas/message.py
 from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -10,6 +11,14 @@ from app.models.message import MessageType
 class MessageBase(BaseModel):
     content: str = Field("", min_length=0, max_length=5000)
     message_type: MessageType = Field(MessageType.TEXT)
+
+
+class MessageStatus(str, Enum):
+    """Статус доставки/прочтения сообщения"""
+
+    SENT = "sent"  # Отправлено на сервер
+    DELIVERED = "delivered"  # Доставлено получателю (WebSocket активен)
+    READ = "read"  # Прочитано (чат открыт)
 
 
 class MessageCreate(MessageBase):

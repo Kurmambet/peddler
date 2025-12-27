@@ -52,6 +52,9 @@
         :to="`/chat/${chat.id}`"
         @click="$emit('chat-selected', chat.id)"
         class="block px-4 py-3 hover:bg-app-hover active:bg-app-surface transition-colors"
+        :class="{
+          'bg-app-hover': chat.unread_count > 0,
+        }"
       >
         <div class="flex items-center gap-3">
           <!-- Avatar -->
@@ -95,7 +98,12 @@
           <!-- Chat Info -->
           <div class="flex-1 min-w-0">
             <div class="flex items-baseline justify-between mb-0.5">
-              <h3 class="font-semibold text-app-text truncate">
+              <h3
+                class="font-semibold text-app-text truncate"
+                :class="{
+                  'text-app-primary': chat.unread_count > 0,
+                }"
+              >
                 {{
                   chat.type === "direct"
                     ? chat.other_display_name
@@ -104,10 +112,23 @@
                     : chat.title
                 }}
               </h3>
+
+              <!-- ← ДОБАВИТЬ: Бадж с количеством непрочитанных -->
+              <span
+                v-if="chat.unread_count > 0"
+                class="ml-2 px-2 py-0.5 bg-app-primary text-white text-xs font-semibold rounded-full min-w-[20px] text-center"
+              >
+                {{ chat.unread_count > 99 ? "99+" : chat.unread_count }}
+              </span>
             </div>
 
             <div class="flex items-center justify-between">
-              <p class="text-sm text-app-text-secondary truncate">
+              <p
+                class="text-sm text-app-text-secondary truncate"
+                :class="{
+                  'font-semibold text-app-text': chat.unread_count > 0,
+                }"
+              >
                 {{ chat.type === "direct" ? "Direct message" : "Group chat" }}
               </p>
             </div>

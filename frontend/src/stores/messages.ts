@@ -141,6 +141,19 @@ export const useMessagesStore = defineStore("messages", () => {
     }
   };
 
+  const markMessageAsRead = (messageId: number) => {
+    // Ищем сообщение во всех чатах
+    for (const [chatId, messages] of messagesByChat.value.entries()) {
+      const message = messages.find((m) => m.id === messageId);
+      if (message) {
+        message.is_read = true;
+        console.log(`[MessagesStore] ✓ Message ${messageId} marked as read`);
+        return;
+      }
+    }
+    console.warn(`[MessagesStore] ⚠️ Message ${messageId} not found`);
+  };
+
   return {
     messagesByChat,
     isLoading,
@@ -152,5 +165,6 @@ export const useMessagesStore = defineStore("messages", () => {
     loadMoreMessages,
     addMessage,
     sendMessage,
+    markMessageAsRead,
   };
 });

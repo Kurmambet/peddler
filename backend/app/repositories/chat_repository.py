@@ -2,6 +2,7 @@
 from typing import Dict, List, Optional
 
 from app.models.chat import Chat, ChatParticipant, ChatParticipantRole, ChatType
+from app.models.message import Message
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -181,3 +182,45 @@ class ChatRepository:
         chat = await self.get_chat_by_id(chat_id)
         if chat:
             await self.db.delete(chat)
+
+    async def get_unread_count(self, chat_id: int, user_id: int) -> int:
+        """Подсчитать непрочитанные сообщения в чате для пользователя"""
+        stmt = select(func.count(Message.id)).where(
+            and_(
+                Message.chat_id == chat_id,
+                Message.sender_id != user_id,  # Не свои сообщения
+                not Message.is_read,  # Непрочитанные
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one()
+
+    async def get_unread_counts_batch(self, chat_ids: list[int], user_id: int) -> dict[int, int]:
+        """
+        Получить количество непрочитанных сообщений для нескольких чатов одним запросом.
+        Возвращает dict: {chat_id: unread_count}
+        """
+        if not chat_ids:
+            return {}
+
+        stmt = (
+            select(Message.chat_id, func.count(Message.id).label("unread_count"))
+            .where(
+                and_(
+                    Message.chat_id.in_(chat_ids),
+                    Message.sender_id != user_id,
+                    not Message.is_read,
+                )
+            )
+            .group_by(Message.chat_id)
+        )
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        # Формируем словарь, для чатов без непрочитанных возвращаем 0
+        unread_map = {chat_id: 0 for chat_id in chat_ids}
+        for row in rows:
+            unread_map[row.chat_id] = row.unread_count
+
+        return unread_map

@@ -146,23 +146,28 @@ class ChatService:
         """Получить список чатов пользователя"""
         chats = await self.repo.get_user_chats(user_id, limit, offset)
 
+        # Получаем количество участников для групповых чатов
         group_ids = [c.id for c in chats if c.type == ChatType.GROUP]
         counts_map = {}
-
         if group_ids:
             counts_map = await self.repo.get_participants_counts_batch(group_ids)
 
+        # Получаем количество непрочитанных для ВСЕХ чатов одним запросом
+        all_chat_ids = [c.id for c in chats]
+        unread_map = await self.repo.get_unread_counts_batch(all_chat_ids, user_id)
+
         results: List[ChatRead] = []
+
         for chat in chats:
+            # Достаём unread_count из словаря
+            unread_count = unread_map.get(chat.id, 0)
+
             if chat.type == ChatType.DIRECT:
-                # Найти другого участника
                 other_participant = next(
                     (p.user for p in chat.participants if p.user_id != user_id),
                     None,
                 )
-
                 if not other_participant:
-                    # Если не нашли другого участника - пропускаем
                     continue
 
                 result = DirectChatRead(
@@ -175,9 +180,9 @@ class ChatService:
                     other_display_name=other_participant.display_name,
                     avatar_url=other_participant.avatar_url,
                     other_user_id=other_participant.id,
-                    # статусы
                     other_user_is_online=other_participant.is_online,
                     other_user_last_seen=other_participant.last_seen,
+                    unread_count=unread_count,
                 )
 
             else:  # GROUP
@@ -189,6 +194,7 @@ class ChatService:
                     created_by_id=chat.created_by_id,
                     created_at=chat.created_at,
                     participant_count=p_count,
+                    unread_count=unread_count,
                 )
 
             results.append(result)

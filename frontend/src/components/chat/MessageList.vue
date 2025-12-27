@@ -126,15 +126,18 @@
                 {{ msg.content }}
               </p>
 
-              <!-- Timestamp -->
-              <p
-                class="text-xs mt-1 opacity-70"
+              <!-- Timestamp + Read status -->
+              <div
+                class="flex items-center gap-1 text-xs mt-1 opacity-70"
                 :class="{
-                  'text-right': isOwn(msg),
+                  'justify-end': isOwn(msg),
                 }"
               >
-                {{ formatTime(msg.created_at) }}
-              </p>
+                <span>{{ formatTime(msg.created_at) }}</span>
+
+                <!-- Галочки только для своих сообщений -->
+                <MessageStatusIcon v-if="isOwn(msg)" :is-read="msg.is_read" />
+              </div>
             </div>
           </div>
         </div>
@@ -165,13 +168,13 @@ import {
 } from "../../utils/dateUtils";
 import Avatar from "../ui/Avatar.vue";
 import Skeleton from "../ui/Skeleton.vue";
-
 import UserProfileModal from "../user/UserProfileModal.vue";
+import MessageStatusIcon from "./MessageStatusIcon.vue";
 import VoicePlayer from "./VoicePlayer.vue";
 
 const authStore = useAuthStore();
 const messagesStore = useMessagesStore();
-const { currentMessages, isLoading, chatId } = useChat();
+const { currentMessages, isLoading, chatId, markMessagesAsRead } = useChat();
 
 const scrollContainer = ref<HTMLElement | null>(null);
 const scrollAnchor = ref<HTMLElement | null>(null);
@@ -221,7 +224,7 @@ const isNearBottom = (): boolean => {
   const container = scrollContainer.value;
   if (!container) return true;
 
-  const threshold = 150; // pixels from bottom
+  const threshold = 150;
   const scrollBottom =
     container.scrollHeight - container.scrollTop - container.clientHeight;
   return scrollBottom < threshold;
@@ -269,6 +272,22 @@ const handleScroll = () => {
   }
 };
 
+// Помечаем непрочитанные сообщения
+const markUnreadMessagesAsRead = () => {
+  if (!chatId.value) return;
+
+  const unreadMessages = currentMessages.value.filter(
+    (msg) => !msg.is_read && !isOwn(msg)
+  );
+
+  if (unreadMessages.length > 0) {
+    console.log(
+      `[MessageList] Marking ${unreadMessages.length} messages as read`
+    );
+    markMessagesAsRead(unreadMessages.map((m) => m.id));
+  }
+};
+
 // Auto-scroll on new message
 watch(
   () => currentMessages.value.length,
@@ -284,22 +303,47 @@ watch(
       } else if (isNearBottom()) {
         scrollToBottom("smooth");
       }
+
+      // Помечаем новые непрочитанные как прочитанные
+      nextTick(() => {
+        markUnreadMessagesAsRead();
+      });
     }
     previousMessageCount.value = newLength;
   }
 );
 
-// Scroll to bottom on mount and chat change
+// Отдельный watch на изменение списка сообщений
+// Это срабатывает когда загружаются старые сообщения при смене чата
+watch(
+  currentMessages,
+  () => {
+    // Даём время на рендеринг
+    nextTick(() => {
+      markUnreadMessagesAsRead();
+    });
+  },
+  { deep: true } // ← Глубокое наблюдение за изменениями
+);
+
+// Scroll to bottom on chat change + mark as read
 watch(
   chatId,
-  () => {
-    nextTick(() => {
-      scrollToBottom("auto");
-    });
+  (newChatId) => {
+    if (newChatId) {
+      nextTick(() => {
+        scrollToBottom("auto");
+        // Даём больше времени на загрузку через WebSocket
+        setTimeout(() => {
+          markUnreadMessagesAsRead();
+        }, 300); // Небольшая задержка для гарантии
+      });
+    }
   },
   { immediate: true }
 );
 
+// Монтирование - только скролл
 onMounted(() => {
   nextTick(() => {
     scrollToBottom("auto");

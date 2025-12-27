@@ -45,6 +45,23 @@ function createChatInstance() {
 
   const isLoading = computed(() => messagesStore.isLoading);
 
+  // Функция для отметки сообщений как прочитанных
+  const markMessagesAsRead = (messageIds: number[]) => {
+    if (!chatId.value || !ws.value?.isConnected) {
+      console.warn("[useChat] Cannot mark as read: no chat or WS disconnected");
+      return;
+    }
+
+    messageIds.forEach((messageId) => {
+      ws.value!.send({
+        type: "mark_read",
+        message_id: messageId,
+      });
+    });
+
+    console.log(`[useChat] 📬 Marked ${messageIds.length} messages as read`);
+  };
+
   // WebSocket Connection
   async function connectWebSocket() {
     console.log("[useChat] === Starting WebSocket connection ===");
@@ -77,11 +94,15 @@ function createChatInstance() {
       // Регистрируем обработчики
       ws.value.onMessage("message_created", (event: any) => {
         console.log("[useChat] 📨 message_created event received:", event);
-        console.log("[useChat] Message type:", event.message_type);
-        console.log("[useChat] File URL:", event.file_url);
-        console.log("[useChat] Duration:", event.duration);
-
         messagesStore.addMessage(event as MessageCreatedEvent);
+
+        // Увеличиваем счётчик, если сообщение не от нас и чат не открыт
+        if (
+          event.sender_id !== authStore.user?.id &&
+          event.chat_id !== chatId.value
+        ) {
+          chatsStore.incrementUnreadCount(event.chat_id);
+        }
       });
 
       ws.value.onMessage("typing_indicator", (event: any) => {
@@ -107,16 +128,17 @@ function createChatInstance() {
         }
       });
 
+      ws.value.onMessage("message_read", (event: any) => {
+        console.log("[useChat] ✓ message_read event:", event);
+        messagesStore.markMessageAsRead(event.message_id);
+      });
+
       ws.value.onMessage("error", (event: any) => {
         console.error("[useChat] ❌ WebSocket error event:", event);
       });
 
       ws.value.onMessage("connected", (event: any) => {
         console.log("[useChat] 🎉 connected event received:", event);
-      });
-
-      ws.value.onMessage("message_read", (event: any) => {
-        console.log("[useChat] ✓ message_read event:", event);
       });
 
       ws.value.onMessage("user_status_changed", (event: any) => {
@@ -300,6 +322,7 @@ function createChatInstance() {
     sendMessage, //отправить сообщение
     handleTyping, //обработать ввод
     typingText: typing.typingText, // кто-то печатает...
+    markMessagesAsRead,
     cleanup, //для внутреннего использования
   };
 }

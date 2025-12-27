@@ -92,6 +92,7 @@ export interface DirectChatRead {
   other_user_id: number;
   other_user_is_online: boolean;
   other_user_last_seen: string | null;
+  unread_count: number;
 }
 
 export interface DirectChatCreate {
@@ -110,6 +111,7 @@ export interface GroupChatRead {
   created_by_id: number;
   created_at: string;
   participant_count?: number;
+  unread_count: number;
 }
 
 export interface GroupChatDetailRead {

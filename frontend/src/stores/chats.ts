@@ -89,6 +89,23 @@ export const useChatsStore = defineStore("chats", () => {
 
   const setCurrentChat = (chatId: number) => {
     currentChatId.value = chatId;
+
+    // Обнуляем счётчик непрочитанных при открытии чата
+    const chat = chats.value.find((c) => c.id === chatId);
+    if (chat) {
+      chat.unread_count = 0;
+    }
+  };
+
+  // Увеличиваем счётчик при новом сообщении
+  const incrementUnreadCount = (chatId: number) => {
+    const chat = chats.value.find((c) => c.id === chatId);
+    if (chat && chatId !== currentChatId.value) {
+      chat.unread_count++;
+      console.log(
+        `[ChatsStore] Unread count for chat ${chatId}: ${chat.unread_count}`
+      );
+    }
   };
 
   const resetCurrentChat = () => {
@@ -428,6 +445,7 @@ export const useChatsStore = defineStore("chats", () => {
     isLoading,
     error,
     userStatuses,
+    incrementUnreadCount,
 
     // Computed
     currentChat,
