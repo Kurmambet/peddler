@@ -27,16 +27,15 @@ from app.ws.events import (
     TypingIndicatorEvent,
     UserStatusChangedEvent,
 )
-from app.ws.manager import ConnectionManager
-from app.ws.pubsub import RedisPubSubManager
+from app.ws.globals import manager, pubsub_manager
 from app.ws.rate_limiter import RateLimiter
 
 logger = logging.getLogger(__name__)
 
 # Создаем единственный экземпляр ConnectionManager
 # Он будет жить все время работы приложения
-manager = ConnectionManager()  #  глобальный singleton
-pubsub_manager = RedisPubSubManager(manager)
+# manager = ConnectionManager()  #  глобальный singleton
+# pubsub_manager = RedisPubSubManager(manager)
 
 router = APIRouter()
 
@@ -224,9 +223,14 @@ async def handle_send_message(
         sender_id=message.sender_id,
         sender_username=user.username,
         sender_display_name=user.display_name,
+        avatar_url=user.avatar_url,
         content=message.content,
         created_at=message.created_at,
         is_read=message.is_read,
+        message_type=message.message_type,
+        file_url=message.file_url,
+        file_size=message.file_size,
+        duration=message.duration,
     )
 
     # публикуем в Redis вместо прямого broadcast
@@ -337,6 +341,7 @@ async def status_websocket_endpoint(websocket: WebSocket, db: AsyncSession = Dep
         await manager.connect_status(user.id, websocket)
 
         await manager.set_user_online(user.id, db)
+        await pubsub_manager.subscribe_to_user(user.id)
 
         # Шаг 4: Получить все чаты пользователя
         stmt = select(ChatParticipant.chat_id).where(ChatParticipant.user_id == user.id)
@@ -397,6 +402,7 @@ async def status_websocket_endpoint(websocket: WebSocket, db: AsyncSession = Dep
                 has_devices = user.id in manager.status_connections
 
             if not has_devices:
+                await pubsub_manager.unsubscribe_from_user(user.id)
                 status_event = UserStatusChangedEvent(
                     user_id=user.id,
                     username=user.username,

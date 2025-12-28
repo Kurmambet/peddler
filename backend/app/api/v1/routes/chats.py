@@ -39,7 +39,7 @@ async def create_or_get_direct_chat(
     request: DirectChatCreate,
     current_user: User = Depends(get_current_user),
     service: ChatService = Depends(get_chat_service),
-) -> Chat:
+) -> DirectChatRead:
     """Создаёт или возвращает существующий direct-чат"""
     return await service.create_or_get_direct_chat(current_user, request.other_username)
 
@@ -60,7 +60,7 @@ async def get_user_chats(
     offset: int = 0,
     current_user: User = Depends(get_current_user),
     service: ChatService = Depends(get_chat_service),
-) -> List[Chat]:
+) -> List[ChatRead]:
     """Возвращает список чатов текущего пользователя"""
     return await service.get_user_chats(current_user.id, limit, offset)
 

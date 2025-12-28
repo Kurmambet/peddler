@@ -1,4 +1,5 @@
 # app/services/chat_service.py
+import logging
 from typing import List
 
 from app.models.chat import Chat, ChatParticipantRole, ChatType
@@ -21,12 +22,15 @@ from app.schemas.chat import (
 from app.ws import pubsub_manager
 from app.ws.events import (
     GroupUpdatedEvent,
+    NewChatEvent,
     RoleChangedEvent,
     UserJoinedEvent,
     UserLeftEvent,
 )
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 
 class ChatService:
@@ -80,7 +84,7 @@ class ChatService:
         await self.db.commit()
 
         # 5. Вернуть DirectChatRead с заполненными полями
-        return DirectChatRead(
+        response = DirectChatRead(
             id=new_chat.id,
             type="direct",
             title=new_chat.title,
@@ -91,12 +95,19 @@ class ChatService:
             other_user_is_online=other_user.is_online,
             other_user_last_seen=other_user.last_seen,
         )
+        # Отправляем событие другому пользователю, чтобы у него появился чат
+        event = NewChatEvent(chat=response.model_dump(mode="json"))
+        await pubsub_manager.publish_to_user(other_user.id, event.model_dump_json())
+
+        # Отправляем себе (на случай если открыто в другой вкладке)
+        await pubsub_manager.publish_to_user(current_user.id, event.model_dump_json())
+        return response
 
     async def create_group_chat(
         self,
         current_user: User,
         chat_in: GroupChatCreate,
-    ) -> Chat:
+    ) -> GroupChatRead:
         """
         Создать групповой чат.
         Бизнес-правила:
@@ -138,31 +149,59 @@ class ChatService:
             await self.repo.add_participant(new_chat.id, user.id, ChatParticipantRole.MEMBER)
 
         await self.db.commit()
+        # Нам нужно сформировать GroupChatRead для фронтенда
+        chat_read = GroupChatRead(
+            id=new_chat.id,
+            type="group",
+            title=new_chat.title,
+            created_by_id=new_chat.created_by_id,
+            created_at=new_chat.created_at,
+            participant_count=len(participants_data) + 1,  # +1 это создатель
+            unread_count=0,
+        )
+        event = NewChatEvent(chat=chat_read.model_dump(mode="json"))
+        # Уведомляем всех участников (включая создателя, для синхронизации вкладок)
+        all_participants = participants_data + [current_user]
+        for user in all_participants:
+            await pubsub_manager.publish_to_user(user.id, event.model_dump_json())
+
         return new_chat
 
     async def get_user_chats(
         self, user_id: int, limit: int = 50, offset: int = 0
     ) -> List[ChatRead]:
         """Получить список чатов пользователя"""
-        chats = await self.repo.get_user_chats(user_id, limit, offset)
+        logger.info(f"[ChatService] Getting chats for user_id: {user_id}")
 
+        chats = await self.repo.get_user_chats(user_id, limit, offset)
+        logger.info(f"[ChatService] Found {len(chats)} chats")
+
+        # Получаем количество участников для групповых чатов
         group_ids = [c.id for c in chats if c.type == ChatType.GROUP]
         counts_map = {}
-
         if group_ids:
             counts_map = await self.repo.get_participants_counts_batch(group_ids)
 
+        # Получаем количество непрочитанных для ВСЕХ чатов одним запросом
+        all_chat_ids = [c.id for c in chats]
+        logger.info(f"[ChatService] Fetching unread counts for chats: {all_chat_ids}")
+
+        unread_map = await self.repo.get_unread_counts_batch(all_chat_ids, user_id)
+        logger.info(f"[ChatService] Unread map: {unread_map}")
+
         results: List[ChatRead] = []
+
         for chat in chats:
+            # Достаём unread_count из словаря
+            unread_count = unread_map.get(chat.id, 0)
+            logger.debug(f"[ChatService] Chat {chat.id} has {unread_count} unread messages")
+
             if chat.type == ChatType.DIRECT:
-                # Найти другого участника
                 other_participant = next(
                     (p.user for p in chat.participants if p.user_id != user_id),
                     None,
                 )
-
                 if not other_participant:
-                    # Если не нашли другого участника - пропускаем
                     continue
 
                 result = DirectChatRead(
@@ -175,9 +214,9 @@ class ChatService:
                     other_display_name=other_participant.display_name,
                     avatar_url=other_participant.avatar_url,
                     other_user_id=other_participant.id,
-                    # статусы
                     other_user_is_online=other_participant.is_online,
                     other_user_last_seen=other_participant.last_seen,
+                    unread_count=unread_count,
                 )
 
             else:  # GROUP
@@ -189,6 +228,7 @@ class ChatService:
                     created_by_id=chat.created_by_id,
                     created_at=chat.created_at,
                     participant_count=p_count,
+                    unread_count=unread_count,
                 )
 
             results.append(result)

@@ -1,11 +1,17 @@
 # app/models/message.py
-from sqlalchemy import Boolean, ForeignKey, Integer, Text
+from enum import Enum as PyEnum
+
+from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
 
-# from app.models.chat import Chat
-# from app.models.user import User
+
+class MessageType(str, PyEnum):
+    TEXT = "text"
+    VOICE = "voice"
+    VIDEO = "video"
+    IMAGE = "image"
 
 
 class Message(BaseModel):
@@ -26,6 +32,17 @@ class Message(BaseModel):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    message_type: Mapped[MessageType] = mapped_column(
+        Enum(MessageType),
+        name="message_type_enum",
+        nullable=False,
+        default=MessageType.TEXT,
+        index=True,
+    )
+    file_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)  # байты
+    duration: Mapped[int | None] = mapped_column(Integer, nullable=True)  # секунды
 
     chat: Mapped["Chat"] = relationship(
         "Chat",

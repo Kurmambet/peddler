@@ -1,6 +1,5 @@
 # app/services/message_service.py
-
-from app.models.message import Message
+from app.models.message import Message, MessageType
 from app.models.user import User
 from app.repositories.message_repository import MessageRepository
 from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
@@ -33,14 +32,28 @@ class MessageService:
 
         # Проверяем chat_id из body
         if msg_in.chat_id != chat_id:
-            # raise HTTPException(400, "chat_id mismatch")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="chat_id mismatch")
 
-        # Создаём сообщение
+        if msg_in.message_type == MessageType.VOICE:
+            if not msg_in.file_url:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="file_url required for voice messages",
+                )
+            if not msg_in.duration or msg_in.duration <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="duration required for voice messages",
+                )
+
         message = await self.repo.create_message(
             chat_id=chat_id,
             sender_id=current_user.id,
             content=msg_in.content,
+            message_type=msg_in.message_type,
+            file_url=msg_in.file_url,
+            file_size=msg_in.file_size,
+            duration=msg_in.duration,
         )
 
         await self.db.commit()
@@ -80,6 +93,10 @@ class MessageService:
                 content=msg.content,
                 is_read=msg.is_read,
                 created_at=msg.created_at,
+                message_type=msg.message_type,
+                file_url=msg.file_url,
+                file_size=msg.file_size,
+                duration=msg.duration,
             )
             for msg in messages
         ]

@@ -77,6 +77,10 @@ class RedisPubSubManager:
         """
         return f"chat:{chat_id}:events"
 
+    def _get_user_channel(self, user_id: int) -> str:
+        """Канал для личных уведомлений пользователя"""
+        return f"user:{user_id}:events"
+
     async def subscribe_to_chat(self, chat_id: int):
         """
         Подписывается на канал чата.
@@ -112,6 +116,30 @@ class RedisPubSubManager:
         self._subscribed_chats.discard(chat_id)
 
         logger.info(f"📡 Unsubscribed from Redis channel: {channel}")
+
+    async def subscribe_to_user(self, user_id: int):
+        """Подписываем сервер на личный канал пользователя"""
+        channel = self._get_user_channel(user_id)
+        # Подписываемся, даже если уже есть (Redis PubSub handle it),
+        # но для оптимизации можно проверить локальный сет, если нужно.
+        await self.pubsub.subscribe(channel)
+        logger.info(f"📡 Subscribed to User channel: {channel}")
+
+        if not self._listener_task or self._listener_task.done():
+            self._listener_task = asyncio.create_task(self._listen_to_redis())
+
+    async def unsubscribe_from_user(self, user_id: int):
+        channel = self._get_user_channel(user_id)
+        await self.pubsub.unsubscribe(channel)
+        logger.info(f"📡 Unsubscribed from User channel: {channel}")
+
+    async def publish_to_user(self, user_id: int, message: str):
+        channel = self._get_user_channel(user_id)
+        try:
+            await self.redis.publish(channel, message)
+            logger.debug(f"📤 Published to user channel {channel}")
+        except Exception as e:
+            logger.error(f"❌ Failed to publish to user {channel}: {e}")
 
     async def publish_to_chat(self, chat_id: int, message: str):
         """
@@ -154,17 +182,21 @@ class RedisPubSubManager:
                 channel = message["channel"]
                 data = message["data"]
 
-                # Извлекаем chat_id из имени канала
-                # Формат: chat:42:events → 42
-                try:
-                    chat_id = int(channel.split(":")[1])
-                except (IndexError, ValueError):
-                    logger.error(f"Invalid channel format: {channel}")
-                    continue
+                # Обработка каналов чатов
+                if channel.startswith("chat:"):
+                    try:
+                        chat_id = int(channel.split(":")[1])
+                        await self.connection_manager.broadcast_to_chat(chat_id, data)
+                    except (IndexError, ValueError):
+                        logger.error(f"Invalid chat channel format: {channel}")
 
-                # Broadcast локальным клиентам через ConnectionManager
-                await self.connection_manager.broadcast_to_chat(chat_id, data)
-                logger.debug(f"📥 Received from Redis {channel}, broadcasted locally")
+                # Обработка каналов пользователей
+                elif channel.startswith("user:"):
+                    try:
+                        user_id = int(channel.split(":")[1])
+                        await self.connection_manager.broadcast_to_user(user_id, data)
+                    except (IndexError, ValueError):
+                        logger.error(f"Invalid user channel format: {channel}")
 
         except asyncio.CancelledError:
             logger.info("👂 Redis listener cancelled")

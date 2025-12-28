@@ -34,14 +34,17 @@ class DirectChatRead(BaseModel):
     id: int
     type: Literal["direct"]
     title: Optional[str] = None
-    created_by_id: int
     created_at: datetime
+
+    created_by_id: int
     other_username: str
     other_display_name: Optional[str] = None
     avatar_url: Optional[str] = None
     other_user_id: int
     other_user_is_online: bool
     other_user_last_seen: Optional[datetime] = None
+
+    unread_count: int = 0
 
     class Config:
         from_attributes = True
@@ -54,6 +57,7 @@ class GroupChatRead(BaseModel):
     created_by_id: int
     created_at: datetime
     participant_count: Optional[int] = 0
+    unread_count: int = 0
 
 
 ChatRead = Union[DirectChatRead, GroupChatRead]

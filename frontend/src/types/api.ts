@@ -1,5 +1,12 @@
 // src/types/api.ts
 
+export enum MessageType {
+  TEXT = "text",
+  VOICE = "voice",
+  VIDEO = "video",
+  IMAGE = "image",
+}
+
 // ============================================================
 // USER TYPES
 // ============================================================
@@ -85,6 +92,7 @@ export interface DirectChatRead {
   other_user_id: number;
   other_user_is_online: boolean;
   other_user_last_seen: string | null;
+  unread_count: number;
 }
 
 export interface DirectChatCreate {
@@ -103,6 +111,7 @@ export interface GroupChatRead {
   created_by_id: number;
   created_at: string;
   participant_count?: number;
+  unread_count: number;
 }
 
 export interface GroupChatDetailRead {
@@ -202,6 +211,11 @@ export interface MessageRead {
   is_read: boolean;
   created_at: string;
   updated_at: string;
+
+  message_type: MessageType;
+  file_url?: string | null;
+  file_size?: number | null;
+  duration?: number | null;
 }
 
 export interface MessageCreate {

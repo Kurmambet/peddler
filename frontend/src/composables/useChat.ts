@@ -45,6 +45,23 @@ function createChatInstance() {
 
   const isLoading = computed(() => messagesStore.isLoading);
 
+  // Функция для отметки сообщений как прочитанных
+  const markMessagesAsRead = (messageIds: number[]) => {
+    if (!chatId.value || !ws.value?.isConnected) {
+      console.warn("[useChat] Cannot mark as read: no chat or WS disconnected");
+      return;
+    }
+
+    messageIds.forEach((messageId) => {
+      ws.value!.send({
+        type: "mark_read",
+        message_id: messageId,
+      });
+    });
+
+    console.log(`[useChat] 📬 Marked ${messageIds.length} messages as read`);
+  };
+
   // WebSocket Connection
   async function connectWebSocket() {
     console.log("[useChat] === Starting WebSocket connection ===");
@@ -103,16 +120,17 @@ function createChatInstance() {
         }
       });
 
+      ws.value.onMessage("message_read", (event: any) => {
+        console.log("[useChat] ✓ message_read event:", event);
+        messagesStore.markMessageAsRead(event.message_id);
+      });
+
       ws.value.onMessage("error", (event: any) => {
         console.error("[useChat] ❌ WebSocket error event:", event);
       });
 
       ws.value.onMessage("connected", (event: any) => {
         console.log("[useChat] 🎉 connected event received:", event);
-      });
-
-      ws.value.onMessage("message_read", (event: any) => {
-        console.log("[useChat] ✓ message_read event:", event);
       });
 
       ws.value.onMessage("user_status_changed", (event: any) => {
@@ -272,11 +290,20 @@ function createChatInstance() {
     { immediate: true }
   );
 
+  watch(
+    chatId,
+    (newId, oldId) => {
+      if (oldId && !newId) {
+        // Мы вышли из чата (например, нажали Back на мобильном)
+        chatsStore.resetCurrentChat();
+      }
+    },
+    { flush: "sync" } // Важно: синхронное обновление, чтобы успеть до прихода событий
+  );
   // Cleanup function
   function cleanup() {
     console.log(`[useChat] 🧹 Cleanup called, ref count: ${instanceRefCount}`);
     instanceRefCount--;
-
     if (instanceRefCount === 0) {
       console.log("[useChat] 🧹 Last reference removed, destroying instance");
       typing.cleanup();
@@ -284,6 +311,10 @@ function createChatInstance() {
         ws.value.disconnect();
         ws.value = null;
       }
+
+      // Явно сбрасываем ID чата в сторе при полном удалении инстанса
+      chatsStore.resetCurrentChat();
+
       chatInstance = null;
     }
   }
@@ -296,6 +327,7 @@ function createChatInstance() {
     sendMessage, //отправить сообщение
     handleTyping, //обработать ввод
     typingText: typing.typingText, // кто-то печатает...
+    markMessagesAsRead,
     cleanup, //для внутреннего использования
   };
 }

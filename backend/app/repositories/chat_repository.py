@@ -1,10 +1,14 @@
 # app/repositories/chat_repository.py
+import logging
 from typing import Dict, List, Optional
 
 from app.models.chat import Chat, ChatParticipant, ChatParticipantRole, ChatType
+from app.models.message import Message
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+logger = logging.getLogger(__name__)
 
 
 class ChatRepository:
@@ -181,3 +185,56 @@ class ChatRepository:
         chat = await self.get_chat_by_id(chat_id)
         if chat:
             await self.db.delete(chat)
+
+    async def get_unread_count(self, chat_id: int, user_id: int) -> int:
+        """Подсчитать непрочитанные сообщения в чате для пользователя"""
+        stmt = select(func.count(Message.id)).where(
+            and_(
+                Message.chat_id == chat_id,
+                Message.sender_id != user_id,  # Не свои сообщения
+                Message.is_read == False,  # noqa: E712
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one()
+
+    async def get_unread_counts_batch(self, chat_ids: list[int], user_id: int) -> dict[int, int]:
+        """
+        Получить количество непрочитанных сообщений для нескольких чатов одним запросом.
+        Возвращает dict: {chat_id: unread_count}
+        """
+        if not chat_ids:
+            logger.warning("[get_unread_counts_batch] No chat_ids provided")
+            return {}
+
+        logger.info(
+            f"[get_unread_counts_batch] Checking unread for chats: {chat_ids}, user_id: {user_id}"
+        )
+
+        stmt = (
+            select(Message.chat_id, func.count(Message.id).label("unread_count"))
+            .where(
+                and_(
+                    Message.chat_id.in_(chat_ids),
+                    Message.sender_id != user_id,
+                    Message.is_read == False,  # noqa: E712
+                )
+            )
+            .group_by(Message.chat_id)
+        )
+
+        logger.debug(f"[get_unread_counts_batch] SQL: {stmt}")
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        logger.info(f"[get_unread_counts_batch] Query returned {len(rows)} rows: {rows}")
+
+        # Формируем словарь, для чатов без непрочитанных возвращаем 0
+        unread_map = {chat_id: 0 for chat_id in chat_ids}
+        for row in rows:
+            unread_map[row.chat_id] = row.unread_count
+            logger.debug(f"[get_unread_counts_batch] Chat {row.chat_id}: {row.unread_count} unread")
+
+        logger.info(f"[get_unread_counts_batch] Final unread_map: {unread_map}")
+        return unread_map

@@ -1,16 +1,21 @@
 // frontend/src/composables/useGlobalStatus.ts
 import { onMounted, onUnmounted, ref } from "vue";
+import { useRoute } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { useChatsStore } from "../stores/chats";
-import type { UserStatusChangedEvent } from "../types/events";
+import type {
+  MessageCreatedEvent,
+  UserStatusChangedEvent,
+} from "../types/events";
 import { WebSocketClient } from "../ws/client";
 
 export function useGlobalStatus() {
   const authStore = useAuthStore();
   const chatsStore = useChatsStore();
-
+  const route = useRoute();
   const ws = ref<WebSocketClient | null>(null);
   const isConnected = ref(false);
+
   const lastUserStatuses = ref<
     Map<number, { isOnline: boolean; timestamp: number }>
   >(new Map());
@@ -39,7 +44,6 @@ export function useGlobalStatus() {
 
       ws.value.onMessage("user_status_changed", (event: any) => {
         const statusEvent = event as UserStatusChangedEvent;
-
         const now = Date.now();
         const lastStatus = lastUserStatuses.value.get(statusEvent.user_id);
 
@@ -74,10 +78,33 @@ export function useGlobalStatus() {
         );
       });
 
-      // 3. Теперь подключаемся
+      // Обработка новых сообщений для обновления счётчика
+      ws.value.onMessage("message_created", (event: any) => {
+        const msgEvent = event as MessageCreatedEvent;
+
+        if (msgEvent.sender_id !== authStore.user?.id) {
+          // Проверяем:
+          // 1. ID чата в сторе
+          // 2. ИЛИ мы вообще не на странице чата (на всякий случай)
+          const isChatOpen =
+            chatsStore.currentChatId === msgEvent.chat_id &&
+            route.name !== "Home"; // или проверка пути, если нужно
+
+          if (!isChatOpen) {
+            console.log(
+              `[useGlobalStatus] 🔔 Incrementing unread for chat ${msgEvent.chat_id}`
+            );
+            chatsStore.incrementUnreadCount(msgEvent.chat_id);
+          }
+        }
+      });
+      ws.value.onMessage("new_chat", (event: any) => {
+        console.log("[useGlobalStatus] 🆕 New chat received:", event.chat);
+        // Добавляем в начало списка
+        chatsStore.chats.unshift(event.chat);
+      });
       await ws.value.connect();
       isConnected.value = true;
-
       console.log("[useGlobalStatus] ✅ Connected to status WebSocket");
     } catch (err) {
       console.error("[useGlobalStatus] ❌ Connection failed:", err);
