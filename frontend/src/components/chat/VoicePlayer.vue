@@ -51,7 +51,6 @@
     </button>
 
     <div class="flex-1 flex flex-col gap-1 min-w-0">
-      <!-- Волна -->
       <div
         class="h-8 relative cursor-pointer group w-full flex items-center"
         @click="handleSeek"
@@ -67,7 +66,6 @@
         ></div>
       </div>
 
-      <!-- Таймер и Скорость -->
       <div
         class="flex items-center justify-between text-[11px] font-medium leading-none opacity-90"
       >
@@ -75,7 +73,6 @@
           {{ formatTime(currentTime) }} <span class="opacity-50">/</span>
           {{ formatTime(duration) }}
         </div>
-
         <button
           @click.stop="cycleSpeed"
           class="px-1.5 py-0.5 rounded-md transition-colors font-bold flex-shrink-0"
@@ -85,6 +82,15 @@
         </button>
       </div>
     </div>
+
+    <!-- Скрытый аудио-элемент для воспроизведения с сохранением питча -->
+    <audio
+      ref="audioRef"
+      @ended="onEnded"
+      @timeupdate="onTimeUpdate"
+      @play="isPlaying = true"
+      @pause="isPlaying = false"
+    />
   </div>
 </template>
 
@@ -100,6 +106,7 @@ const props = defineProps<{
 }>();
 
 const playerStore = usePlayerStore();
+const audioRef = ref<HTMLAudioElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 const isPlaying = ref(false);
@@ -109,12 +116,7 @@ const playbackRate = ref(1.0);
 const peaks = ref<number[]>([]);
 const hoverProgress = ref<number | null>(null);
 
-let audioContext: AudioContext | null = null;
-let audioBuffer: AudioBuffer | null = null;
-let sourceNode: AudioBufferSourceNode | null = null;
-let startTime = 0;
-let pausedAt = 0;
-let updateInterval: any = null;
+let wavUrl: string | null = null;
 
 const fullUrl = computed(() => {
   if (props.url.startsWith("http") || props.url.startsWith("blob:"))
@@ -124,15 +126,13 @@ const fullUrl = computed(() => {
   }`;
 });
 
-// --- Canvas Logic ---
+// --- Waveform Drawing ---
 
 const initCanvas = () => {
   const canvas = canvasRef.value;
   if (!canvas) return;
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
-  if (rect.width === 0) return; // Элемент еще не в DOM или скрыт
-
   canvas.width = rect.width * dpr;
   canvas.height = rect.height * dpr;
   const ctx = canvas.getContext("2d");
@@ -147,13 +147,11 @@ const draw = () => {
 
   const w = canvas.width / (window.devicePixelRatio || 1);
   const h = canvas.height / (window.devicePixelRatio || 1);
-
   ctx.clearRect(0, 0, w, h);
 
   const barWidth = w / peaks.value.length;
   const progress =
-    currentTime.value / (audioBuffer?.duration || props.duration || 1);
-
+    currentTime.value / (audioRef.value?.duration || props.duration || 1);
   const playedColor = props.isOwn ? "#FFFFFF" : "#21808d";
   const backgroundColor = props.isOwn ? "rgba(255, 255, 255, 0.3)" : "#d1d5db";
 
@@ -161,17 +159,14 @@ const draw = () => {
     ctx.fillStyle =
       i / peaks.value.length < progress ? playedColor : backgroundColor;
     const bh = Math.max(val * h, 3);
-    const rx = i * barWidth;
-    const ry = (h - bh) / 2;
-
-    roundRect(ctx, rx, ry, barWidth - 2, bh, 2);
+    roundRect(ctx, i * barWidth, (h - bh) / 2, barWidth - 2, bh, 2);
     ctx.fill();
   });
 };
 
-// --- Audio Engine ---
+// --- Audio Logic (The WAV Hack) ---
 
-const fetchAndDecode = async () => {
+const fetchAndPrepare = async () => {
   try {
     isBuffering.value = true;
     const response = await fetch(fullUrl.value);
@@ -179,141 +174,114 @@ const fetchAndDecode = async () => {
 
     const AudioContextClass =
       window.AudioContext || (window as any).webkitAudioContext;
-    audioContext = new AudioContextClass();
-    audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const ctx = new AudioContextClass();
+    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
 
+    // 1. Генерируем 20 полосок
     generatePeaks(audioBuffer);
-    isBuffering.value = false;
 
-    // Сразу инициализируем отрисовку
-    await nextTick();
-    initCanvas();
-    draw();
-  } catch (e) {
-    console.error("Load failed:", e);
-    peaks.value = Array.from({ length: 20 }, () => Math.random() * 0.5 + 0.2);
+    // 2. Конвертируем в WAV (чтобы включить preservesPitch)
+    const wavBlob = bufferToWave(audioBuffer, audioBuffer.length);
+    wavUrl = URL.createObjectURL(wavBlob);
+
+    if (audioRef.value) {
+      audioRef.value.src = wavUrl;
+      // ВКЛЮЧАЕМ КОМПЕНСАЦИЮ ПИТЧА
+      audioRef.value.preservesPitch = true;
+      // @ts-ignore (для старых Safari)
+      audioRef.value.webkitPreservesPitch = true;
+    }
+
     isBuffering.value = false;
     await nextTick();
     initCanvas();
     draw();
+    ctx.close();
+  } catch (e) {
+    console.error("Voice load failed", e);
+    isBuffering.value = false;
   }
 };
+
+// Хелпер конвертации AudioBuffer в WAV
+function bufferToWave(abuffer: AudioBuffer, len: number) {
+  let numOfChan = abuffer.numberOfChannels,
+    length = len * numOfChan * 2 + 44,
+    buffer = new ArrayBuffer(length),
+    view = new DataView(buffer),
+    channels = [],
+    i,
+    sample,
+    offset = 0,
+    pos = 0;
+
+  const setUint16 = (d: number) => {
+    view.setUint16(pos, d, true);
+    pos += 2;
+  };
+  const setUint32 = (d: number) => {
+    view.setUint32(pos, d, true);
+    pos += 4;
+  };
+
+  setUint32(0x46464952);
+  setUint32(length - 8);
+  setUint32(0x45564157);
+  setUint32(0x20746d66);
+  setUint32(16);
+  setUint16(1);
+  setUint16(numOfChan);
+  setUint32(abuffer.sampleRate);
+  setUint32(abuffer.sampleRate * 2 * numOfChan);
+  setUint16(numOfChan * 2);
+  setUint16(16);
+  setUint32(0x61746164);
+  setUint32(length - pos - 4);
+
+  for (i = 0; i < numOfChan; i++) channels.push(abuffer.getChannelData(i));
+  while (pos < length) {
+    for (i = 0; i < numOfChan; i++) {
+      sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+      view.setInt16(pos, sample, true);
+      pos += 2;
+    }
+    offset++;
+  }
+  return new Blob([buffer], { type: "audio/wav" });
+}
 
 const togglePlay = () => {
-  if (isBuffering.value || !audioBuffer) return;
-  isPlaying.value ? pauseAudio() : playAudio(pausedAt);
-};
-
-const playAudio = (offset: number) => {
-  if (!audioContext || !audioBuffer) return;
-  if (audioContext.state === "suspended") audioContext.resume();
-
-  stopAudioNode();
-
-  sourceNode = audioContext.createBufferSource();
-  sourceNode.buffer = audioBuffer;
-  sourceNode.playbackRate.value = playbackRate.value;
-  sourceNode.connect(audioContext.destination);
-
-  // startTime - это момент в будущем/прошлом контекста, когда currentTime был бы 0
-  startTime = audioContext.currentTime - offset / playbackRate.value;
-  sourceNode.start(0, offset);
-
-  isPlaying.value = true;
-  playerStore.setPlaying(props.messageId);
-
-  sourceNode.onended = () => {
-    if (currentTime.value >= (audioBuffer?.duration || 0) - 0.1) handleEnded();
-  };
-  startTimer();
-};
-
-const pauseAudio = () => {
-  if (!sourceNode) return;
-  pausedAt = currentTime.value;
-  stopAudioNode();
-  isPlaying.value = false;
-};
-
-const stopAudioNode = () => {
-  if (sourceNode) {
-    try {
-      sourceNode.stop();
-    } catch (e) {}
-    sourceNode.onended = null;
-    sourceNode.disconnect();
-    sourceNode = null;
+  if (!audioRef.value || isBuffering.value) return;
+  if (isPlaying.value) {
+    audioRef.value.pause();
+  } else {
+    playerStore.setPlaying(props.messageId);
+    audioRef.value.play().catch(console.error);
   }
-  stopTimer();
 };
 
 const handleSeek = (event: MouseEvent) => {
-  if (!audioBuffer || !canvasRef.value) return;
+  if (!audioRef.value || !canvasRef.value) return;
   const rect = canvasRef.value.getBoundingClientRect();
   const percent = Math.max(
     0,
     Math.min(1, (event.clientX - rect.left) / rect.width)
   );
-  const newTime = percent * audioBuffer.duration;
-
-  currentTime.value = newTime;
-  pausedAt = newTime;
-  if (isPlaying.value) playAudio(newTime);
-  else draw();
-};
-
-const handleEnded = () => {
-  isPlaying.value = false;
-  currentTime.value = 0;
-  pausedAt = 0;
-  stopAudioNode();
+  audioRef.value.currentTime = percent * audioRef.value.duration;
   draw();
-  playerStore.stopPlaying();
 };
 
-// --- Watchers ---
-
-// Фикс скорости воспроизведения
-watch(playbackRate, (newRate) => {
-  if (sourceNode) {
-    sourceNode.playbackRate.value = newRate;
-  }
-  // Пересчитываем startTime, чтобы текущий прогресс (currentTime) не изменился
-  if (isPlaying.value && audioContext) {
-    startTime = audioContext.currentTime - currentTime.value / newRate;
-  }
-});
-
-watch(
-  () => playerStore.currentPlayingId,
-  (newId) => {
-    if (newId !== props.messageId && isPlaying.value) pauseAudio();
-  }
-);
-
-// --- Utils ---
-
-const startTimer = () => {
-  stopTimer();
-  updateInterval = setInterval(() => {
-    if (audioContext && isPlaying.value) {
-      currentTime.value =
-        (audioContext.currentTime - startTime) * playbackRate.value;
-      if (currentTime.value > (audioBuffer?.duration || 0)) {
-        currentTime.value = audioBuffer?.duration || 0;
-      }
-      draw();
-    }
-  }, 30);
-};
-
-const stopTimer = () => {
-  if (updateInterval) clearInterval(updateInterval);
+const cycleSpeed = () => {
+  const rates = [1.0, 1.5, 2.0, 0.5];
+  playbackRate.value =
+    rates[(rates.indexOf(playbackRate.value) + 1) % rates.length];
+  if (audioRef.value) audioRef.value.playbackRate = playbackRate.value;
 };
 
 const generatePeaks = (buffer: AudioBuffer) => {
   const data = buffer.getChannelData(0);
-  const samples = 20; // Твоя просьба - 20 штук
+  const samples = 20;
   const blockSize = Math.floor(data.length / samples);
   const p = [];
   for (let i = 0; i < samples; i++) {
@@ -324,6 +292,37 @@ const generatePeaks = (buffer: AudioBuffer) => {
   }
   const max = Math.max(...p);
   peaks.value = p.map((v) => v / (max || 1));
+};
+
+const onTimeUpdate = () => {
+  if (audioRef.value) {
+    currentTime.value = audioRef.value.currentTime;
+    draw();
+  }
+};
+const onEnded = () => {
+  isPlaying.value = false;
+  currentTime.value = 0;
+  playerStore.stopPlaying();
+  draw();
+};
+const formatTime = (s: number) => {
+  if (!s || s === Infinity) return "0:00";
+  const m = Math.floor(s / 60);
+  return `${m}:${Math.floor(s % 60)
+    .toString()
+    .padStart(2, "0")}`;
+};
+const handleMouseMove = (e: MouseEvent) => {
+  if (canvasRef.value)
+    hoverProgress.value = Math.max(
+      0,
+      Math.min(
+        1,
+        (e.clientX - canvasRef.value.getBoundingClientRect().left) /
+          canvasRef.value.getBoundingClientRect().width
+      )
+    );
 };
 
 function roundRect(
@@ -343,31 +342,16 @@ function roundRect(
   ctx.closePath();
 }
 
-const formatTime = (seconds: number) => {
-  if (!seconds || seconds === Infinity) return "0:00";
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m}:${s.toString().padStart(2, "0")}`;
-};
-
-const cycleSpeed = () => {
-  const rates = [1.0, 1.5, 2.0, 0.5];
-  playbackRate.value =
-    rates[(rates.indexOf(playbackRate.value) + 1) % rates.length];
-};
-
-const handleMouseMove = (event: MouseEvent) => {
-  if (!canvasRef.value) return;
-  const rect = canvasRef.value.getBoundingClientRect();
-  hoverProgress.value = Math.max(
-    0,
-    Math.min(1, (event.clientX - rect.left) / rect.width)
-  );
-};
-
-onMounted(() => fetchAndDecode());
+onMounted(() => fetchAndPrepare());
 onUnmounted(() => {
-  stopAudioNode();
-  if (audioContext) audioContext.close();
+  if (isPlaying.value) playerStore.stopPlaying();
+  if (wavUrl) URL.revokeObjectURL(wavUrl);
 });
+
+watch(
+  () => playerStore.currentPlayingId,
+  (id) => {
+    if (id !== props.messageId && isPlaying.value) audioRef.value?.pause();
+  }
+);
 </script>
