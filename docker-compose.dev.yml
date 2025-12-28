@@ -58,7 +58,7 @@ services:
       # ===== Переопределяет для Docker =====
       DB_HOST: db
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      ALLOWED_ORIGINS: http://localhost:5173,http://localhost:3000,http://host.docker.internal:5173
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
       USE_REDIS_PUBSUB: "true"
       APP_NAME: Peddler Dev
       DEBUG: "true"

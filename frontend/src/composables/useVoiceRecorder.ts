@@ -1,3 +1,4 @@
+// frontend\src\composables\useVoiceRecorder.ts
 import { ref } from "vue";
 
 export function useVoiceRecorder() {
@@ -13,12 +14,20 @@ export function useVoiceRecorder() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // const types = [
+      //   "audio/webm;codecs=opus",
+      //   "audio/webm",
+      //   "audio/ogg;codecs=opus",
+      //   "audio/mp4",
+      // ];
 
       // Проверяем поддержку Opus
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : "audio/webm";
 
+      // const mimeType = types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+      // const mimeType = "audio/webm";
       mediaRecorder = new MediaRecorder(stream, { mimeType });
       audioChunks = [];
 

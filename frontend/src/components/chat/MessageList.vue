@@ -117,7 +117,12 @@
 
               <!-- Message content -->
               <div v-if="msg.message_type === 'voice'" class="my-1">
-                <VoicePlayer :url="msg.file_url!" :duration="msg.duration!" />
+                <VoicePlayer
+                  :url="msg.file_url!"
+                  :duration="msg.duration!"
+                  :message-id="msg.id"
+                  :is-own="isOwn(msg)"
+                />
               </div>
               <p
                 v-else
@@ -136,7 +141,11 @@
                 <span>{{ formatTime(msg.created_at) }}</span>
 
                 <!-- Галочки только для своих сообщений -->
-                <MessageStatusIcon v-if="isOwn(msg)" :is-read="msg.is_read" />
+                <MessageStatusIcon
+                  v-if="isOwn(msg)"
+                  :is-read="msg.is_read"
+                  :is-own="true"
+                />
               </div>
             </div>
           </div>

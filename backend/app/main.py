@@ -1,4 +1,5 @@
 # backend/app/main.py
+import mimetypes
 import os
 from contextlib import asynccontextmanager
 
@@ -18,9 +19,23 @@ from .api.v1 import api_router
 
 settings = get_settings()
 
+mimetypes.init()
+mimetypes.add_type("audio/webm", ".webm")
+mimetypes.add_type("audio/ogg", ".ogg")
+
 UPLOAD_DIR = "uploads"
 VOICE_DIR = f"{UPLOAD_DIR}/voice"
 AVATARS_DIR = f"{UPLOAD_DIR}/avatars"
+
+
+# class CORSStaticFiles(StaticFiles):
+#     async def get_response(self, path: str, scope):
+#         response = await super().get_response(path, scope)
+#         response.headers["Access-Control-Allow-Origin"] = "*"
+#         response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+#         response.headers["Access-Control-Allow-Headers"] = "*"
+#         return response
+
 
 # Создаём родительскую папку
 if not os.path.exists(UPLOAD_DIR):
@@ -73,10 +88,12 @@ app.add_middleware(
     allow_credentials=settings.CORS_CREDENTIALS,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
 )
 
 # app.mount("/static", StaticFiles(directory="uploads"), name="static") - у меня уже была тут дирректория uploads/avatars, так же в докере она есть
 app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
+# app.mount("/static", CORSStaticFiles(directory=UPLOAD_DIR), name="static")
 
 
 @app.get("/health")
