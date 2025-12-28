@@ -133,7 +133,11 @@
                 class="my-2 flex"
                 :class="{ 'justify-end': isOwn(msg) }"
               >
-                <VideoNotePlayer :url="msg.file_url!" :message-id="msg.id" />
+                <VideoNotePlayer
+                  :url="msg.file_url!"
+                  :message-id="msg.id"
+                  :duration="msg.duration!"
+                />
               </div>
 
               <!-- Текст (дефолт) -->

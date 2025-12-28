@@ -41,9 +41,9 @@
       </div>
     </div>
 
-    <!-- Прогресс-бар (скрываем, если длительность неизвестна, чтобы не моргал) -->
+    <!-- Прогресс-бар -->
     <svg
-      v-if="!isMuted && !isBuffering && hasValidDuration"
+      v-if="!isMuted && !isBuffering"
       class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none z-30"
       viewBox="0 0 100 100"
     >
@@ -78,6 +78,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 const props = defineProps<{
   url: string;
   messageId: number;
+  duration?: number;
 }>();
 
 let playPromise: Promise<void> | null = null;
@@ -100,16 +101,21 @@ const fullUrl = computed(() => {
   }`;
 });
 
+// const handleCanPlay = () => {
+//   isBuffering.value = false;
+//   // Сразу проверяем длительность
+//   if (
+//     videoRef.value &&
+//     videoRef.value.duration !== Infinity &&
+//     !isNaN(videoRef.value.duration)
+//   ) {
+//     hasValidDuration.value = true;
+//   }
+//   if (isInViewport.value) attemptPlay();
+// };
+
 const handleCanPlay = () => {
   isBuffering.value = false;
-  // Сразу проверяем длительность
-  if (
-    videoRef.value &&
-    videoRef.value.duration !== Infinity &&
-    !isNaN(videoRef.value.duration)
-  ) {
-    hasValidDuration.value = true;
-  }
   if (isInViewport.value) attemptPlay();
 };
 
@@ -118,17 +124,24 @@ const attemptPlay = async () => {
 
   try {
     if (playPromise) await playPromise;
+
+    // Если видео закончилось (currentTime в конце), сбрасываем в 0 вручную
+    // Это лечит баг "воспроизводится только один раз" в Chrome
+    if (
+      videoRef.value.ended ||
+      videoRef.value.currentTime >= videoRef.value.duration - 0.1
+    ) {
+      videoRef.value.currentTime = 0;
+    }
+
     playPromise = videoRef.value.play();
     await playPromise;
     playPromise = null;
   } catch (err: any) {
     playPromise = null;
     if (err.name !== "AbortError") {
-      // Если видео не играет, пробуем один раз пнуть его (перемотать на начало)
-      if (videoRef.value) {
-        videoRef.value.currentTime = 0;
-        // videoRef.value.load(); // Load слишком агрессивно, лучше просто оставить как есть
-      }
+      console.warn("[VideoNote] Play failed, retrying load...", err);
+      videoRef.value?.load(); // Жесткая перезагрузка если всё сломалось
     }
   }
 };
@@ -175,8 +188,14 @@ const handleMetadata = () => {
 
 const handleTimeUpdate = () => {
   if (videoRef.value && !isMuted.value) {
-    const d = videoRef.value.duration;
-    if (d && d !== Infinity) {
+    // ФИКС ПРОГРЕСС-БАРА:
+    // Если video.duration === Infinity (баг Chrome), берем длительность из пропсов (БД)
+    const d =
+      videoRef.value.duration && videoRef.value.duration !== Infinity
+        ? videoRef.value.duration
+        : props.duration;
+
+    if (d) {
       progress.value = videoRef.value.currentTime / d;
     }
   }
