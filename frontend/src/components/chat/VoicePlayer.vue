@@ -1,15 +1,16 @@
 <!-- frontend/src/components/chat/VoicePlayer.vue -->
 <template>
-  <div class="flex items-center gap-3 min-w-[240px] select-none py-1">
-    <!-- Play/Pause Button -->
+  <div
+    class="flex items-center gap-2 w-full max-w-[280px] sm:max-w-[320px] select-none py-1 overflow-hidden"
+  >
+    <!-- Play/Pause -->
     <button
       @click.stop="togglePlay"
-      class="w-10 h-10 flex items-center justify-center rounded-full bg-app-primary text-white hover:opacity-90 transition-opacity flex-shrink-0"
-      :class="{ 'opacity-75': isLoading }"
-      :disabled="isLoading"
+      class="w-9 h-9 flex items-center justify-center rounded-full bg-app-primary text-white hover:opacity-90 transition-opacity flex-shrink-0"
+      :disabled="isBuffering"
     >
       <svg
-        v-if="isLoading"
+        v-if="isBuffering"
         class="w-5 h-5 animate-spin"
         fill="none"
         viewBox="0 0 24 24"
@@ -41,52 +42,37 @@
       </svg>
     </button>
 
-    <!-- Waveform & Time -->
     <div class="flex-1 flex flex-col gap-1 min-w-0">
-      <!-- Waveform Canvas -->
+      <!-- Волна (Canvas) -->
       <div
-        class="h-8 relative cursor-pointer group"
-        @click="seek"
+        class="h-7 relative cursor-pointer group w-full"
+        @click="handleSeek"
         @mousemove="handleMouseMove"
         @mouseleave="hoverProgress = null"
       >
-        <canvas ref="canvasRef" class="w-full h-full block"></canvas>
-
-        <!-- Hover effect overlay -->
+        <canvas ref="canvasRef" class="w-full h-full block touch-none"></canvas>
         <div
           v-if="hoverProgress !== null"
-          class="absolute top-0 bottom-0 w-0.5 bg-app-text/20 pointer-events-none"
+          class="absolute top-0 bottom-0 w-px bg-app-text/20 pointer-events-none"
           :style="{ left: `${hoverProgress * 100}%` }"
         ></div>
       </div>
 
-      <!-- Metadata line -->
+      <!-- Метаданные -->
       <div
-        class="flex items-center justify-between text-xs text-app-text-secondary font-mono leading-none"
+        class="flex items-center justify-between text-[10px] sm:text-xs text-app-text-secondary font-mono leading-none"
       >
-        <span>{{ formatTime(currentTime) }} / {{ formatTime(duration) }}</span>
-
-        <!-- Speed Control -->
+        <div class="w-20 flex-shrink-0">
+          {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
+        </div>
         <button
           @click.stop="cycleSpeed"
-          class="hover:bg-black/5 dark:hover:bg-white/10 px-1.5 py-0.5 rounded transition-colors font-semibold"
-          title="Playback Speed"
+          class="hover:bg-black/5 dark:hover:bg-white/10 px-1.5 py-0.5 rounded transition-colors font-bold flex-shrink-0"
         >
           {{ playbackRate }}x
         </button>
       </div>
     </div>
-
-    <!-- Hidden Audio Element -->
-    <audio
-      ref="audioRef"
-      :src="fullUrl"
-      @ended="onEnded"
-      @timeupdate="onTimeUpdate"
-      @loadedmetadata="onLoadedMetadata"
-      @play="onPlay"
-      @pause="onPause"
-    />
   </div>
 </template>
 
@@ -101,239 +87,253 @@ const props = defineProps<{
 }>();
 
 const playerStore = usePlayerStore();
-const audioRef = ref<HTMLAudioElement | null>(null);
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
 // State
 const isPlaying = ref(false);
-const isLoading = ref(false);
+const isBuffering = ref(true);
 const currentTime = ref(0);
 const playbackRate = ref(1.0);
 const peaks = ref<number[]>([]);
 const hoverProgress = ref<number | null>(null);
 
-// Полный URL
+// Web Audio API объекты
+let audioContext: AudioContext | null = null;
+let audioBuffer: AudioBuffer | null = null;
+let sourceNode: AudioBufferSourceNode | null = null;
+let startTime = 0; // Время начала воспроизведения в контексте
+let pausedAt = 0; // Момент, на котором нажали паузу
+let updateInterval: any = null;
+
 const fullUrl = computed(() => {
-  if (props.url.startsWith("http") || props.url.startsWith("blob:")) {
+  if (props.url.startsWith("http") || props.url.startsWith("blob:"))
     return props.url;
-  }
-  const baseUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
-  const cleanBase = baseUrl.replace(/\/api\/v1\/?$/, "");
-  const cleanPath = props.url.startsWith("/") ? props.url : `/${props.url}`;
-  return `${cleanBase}${cleanPath}`;
+  return `http://localhost:8000${
+    props.url.startsWith("/") ? props.url : `/${props.url}`
+  }`;
 });
 
-// --- Lifecycle & Stores ---
+// --- Lifecycle ---
 
+onMounted(() => {
+  fetchAndDecode();
+});
+
+onUnmounted(() => {
+  stopAudio();
+  if (audioContext) audioContext.close();
+});
+
+// Следим за глобальной паузой (если включили другое ГС)
 watch(
   () => playerStore.currentPlayingId,
   (newId) => {
     if (newId !== props.messageId && isPlaying.value) {
-      audioRef.value?.pause();
-      isPlaying.value = false;
+      pauseAudio();
     }
   }
 );
 
-watch(playbackRate, (rate) => {
-  if (audioRef.value) {
-    audioRef.value.playbackRate = rate;
+// При смене скорости на лету (если играет)
+watch(playbackRate, (newRate) => {
+  if (sourceNode && isPlaying.value) {
+    sourceNode.playbackRate.value = newRate;
+    // При смене скорости нужно пересчитать startTime, чтобы currentTime не прыгал
+    // Но для простоты ГС мы просто применим скорость к ноде
   }
 });
 
-onMounted(() => {
-  drawWaveform([0.5, 0.3, 0.7, 0.4, 0.8, 0.2, 0.6], 0);
-  fetchAndAnalyzeAudio();
-});
+// --- Audio Logic (Web Audio API) ---
 
-onUnmounted(() => {
-  if (isPlaying.value) {
-    playerStore.stopPlaying();
-  }
-});
-
-// --- Audio Logic ---
-
-const togglePlay = async () => {
-  if (!audioRef.value) return;
-
-  if (isPlaying.value) {
-    audioRef.value.pause();
-  } else {
-    playerStore.setPlaying(props.messageId);
-    try {
-      await audioRef.value.play();
-    } catch (e) {
-      console.error("Play failed", e);
-    }
-  }
-};
-
-const cycleSpeed = () => {
-  const rates = [1.0, 1.5, 2.0, 0.5];
-  const idx = rates.indexOf(playbackRate.value);
-  playbackRate.value = rates[(idx + 1) % rates.length];
-};
-
-const seek = (event: MouseEvent) => {
-  if (!audioRef.value || !canvasRef.value) return;
-  const rect = canvasRef.value.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  const percent = Math.max(0, Math.min(1, x / rect.width));
-  const time = percent * props.duration;
-
-  audioRef.value.currentTime = time;
-  currentTime.value = time;
-  requestAnimationFrame(draw);
-};
-
-const handleMouseMove = (event: MouseEvent) => {
-  if (!canvasRef.value) return;
-  const rect = canvasRef.value.getBoundingClientRect();
-  const x = event.clientX - rect.left;
-  hoverProgress.value = Math.max(0, Math.min(1, x / rect.width));
-};
-
-const onPlay = () => {
-  isPlaying.value = true;
-};
-const onPause = () => {
-  isPlaying.value = false;
-};
-
-const onTimeUpdate = () => {
-  if (!audioRef.value) return;
-  currentTime.value = audioRef.value.currentTime;
-  requestAnimationFrame(draw);
-};
-
-const onEnded = () => {
-  isPlaying.value = false;
-  currentTime.value = 0;
-  playerStore.stopPlaying();
-  requestAnimationFrame(draw);
-};
-
-const onLoadedMetadata = () => {
-  // Metadata loaded
-};
-
-const formatTime = (seconds: number) => {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
-};
-
-// --- Waveform Visualization ---
-
-const fetchAndAnalyzeAudio = async () => {
-  // Локальный контекст, создается и удаляется в рамках этой функции
-  let ctx: AudioContext | null = null;
-
+const fetchAndDecode = async () => {
   try {
+    isBuffering.value = true;
     const response = await fetch(fullUrl.value);
     const arrayBuffer = await response.arrayBuffer();
 
-    // Инициализация контекста
     const AudioContextClass =
       window.AudioContext || (window as any).webkitAudioContext;
-    ctx = new AudioContextClass();
+    audioContext = new AudioContextClass();
 
-    // Декодирование (тяжелая операция)
-    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-    analyzePeaks(audioBuffer);
+    // Декодируем WebM/Opus в сырой AudioBuffer
+    audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    // Генерируем волну на основе декодированных данных
+    generatePeaks(audioBuffer);
+    isBuffering.value = false;
   } catch (e) {
-    console.error("Waveform generation failed:", e);
-    generateFakePeaks();
+    console.error("Failed to load voice message:", e);
+    peaks.value = Array.from({ length: 40 }, () => Math.random() * 0.5 + 0.2);
+    isBuffering.value = false;
   } finally {
-    // Обязательно закрываем контекст
-    if (ctx && ctx.state !== "closed") {
-      ctx.close().catch(console.error);
-    }
+    draw();
   }
 };
 
-const analyzePeaks = (buffer: AudioBuffer) => {
-  const rawData = buffer.getChannelData(0);
-  const samples = 60;
-  const blockSize = Math.floor(rawData.length / samples);
-  const calculatedPeaks = [];
+const togglePlay = () => {
+  if (isBuffering.value || !audioBuffer) return;
 
-  for (let i = 0; i < samples; i++) {
-    const start = i * blockSize;
-    let sum = 0;
-    for (let j = 0; j < blockSize; j++) {
-      sum += Math.abs(rawData[start + j]);
-    }
-    calculatedPeaks.push(sum / blockSize);
+  if (isPlaying.value) {
+    pauseAudio();
+  } else {
+    playAudio(pausedAt);
   }
+};
 
-  const max = Math.max(...calculatedPeaks);
-  peaks.value = calculatedPeaks.map((p) => p / max);
+const playAudio = (offset: number) => {
+  if (!audioContext || !audioBuffer) return;
+
+  // Если контекст "заснул" (политика браузеров)
+  if (audioContext.state === "suspended") audioContext.resume();
+
+  stopAudio(); // На всякий случай чистим старую ноду
+
+  sourceNode = audioContext.createBufferSource();
+  sourceNode.buffer = audioBuffer;
+  sourceNode.playbackRate.value = playbackRate.value;
+  sourceNode.connect(audioContext.destination);
+
+  // Считаем время
+  startTime = audioContext.currentTime - offset / playbackRate.value;
+  sourceNode.start(0, offset);
+
+  isPlaying.value = true;
+  playerStore.setPlaying(props.messageId);
+
+  sourceNode.onended = () => {
+    if (currentTime.value >= (audioBuffer?.duration || 0) - 0.1) {
+      handleEnded();
+    }
+  };
+
+  // Запускаем таймер прогресса
+  startTimer();
+};
+
+const pauseAudio = () => {
+  if (!sourceNode) return;
+  stopAudio();
+  pausedAt = currentTime.value;
+  isPlaying.value = false;
+};
+
+const stopAudio = () => {
+  if (sourceNode) {
+    try {
+      sourceNode.stop();
+    } catch (e) {}
+    sourceNode.onended = null;
+    sourceNode.disconnect();
+    sourceNode = null;
+  }
+  stopTimer();
+};
+
+const handleSeek = (event: MouseEvent) => {
+  if (!audioBuffer || !canvasRef.value) return;
+  const rect = canvasRef.value.getBoundingClientRect();
+  const percent = Math.max(
+    0,
+    Math.min(1, (event.clientX - rect.left) / rect.width)
+  );
+  const newTime = percent * audioBuffer.duration;
+
+  currentTime.value = newTime;
+  pausedAt = newTime;
+
+  if (isPlaying.value) {
+    playAudio(newTime);
+  } else {
+    draw();
+  }
+};
+
+const handleEnded = () => {
+  isPlaying.value = false;
+  currentTime.value = 0;
+  pausedAt = 0;
+  stopTimer();
   draw();
+  playerStore.stopPlaying();
 };
 
-const generateFakePeaks = () => {
+// --- Utils ---
+
+const startTimer = () => {
+  stopTimer();
+  updateInterval = setInterval(() => {
+    if (audioContext && isPlaying.value) {
+      currentTime.value =
+        (audioContext.currentTime - startTime) * playbackRate.value;
+      if (currentTime.value > (audioBuffer?.duration || 0)) {
+        currentTime.value = audioBuffer?.duration || 0;
+      }
+      draw();
+    }
+  }, 30);
+};
+
+const stopTimer = () => {
+  if (updateInterval) clearInterval(updateInterval);
+};
+
+const generatePeaks = (buffer: AudioBuffer) => {
+  const data = buffer.getChannelData(0);
+  const samples = 40;
+  const blockSize = Math.floor(data.length / samples);
   const p = [];
-  for (let i = 0; i < 60; i++) p.push(Math.random() * 0.8 + 0.2);
-  peaks.value = p;
-  draw();
+  for (let i = 0; i < samples; i++) {
+    let sum = 0;
+    for (let j = 0; j < blockSize; j++)
+      sum += Math.abs(data[i * blockSize + j]);
+    p.push(sum / blockSize);
+  }
+  const max = Math.max(...p);
+  peaks.value = p.map((v) => v / (max || 1));
 };
 
 const draw = () => {
-  drawWaveform(peaks.value, currentTime.value / props.duration);
-};
-
-const drawWaveform = (data: number[], progress: number) => {
   const canvas = canvasRef.value;
-  if (!canvas) return;
-
+  if (!canvas || peaks.value.length === 0) return;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
   const dpr = window.devicePixelRatio || 1;
-  const width = canvas.offsetWidth;
-  const height = canvas.offsetHeight;
-
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
+  const w = canvas.offsetWidth;
+  const h = canvas.offsetHeight;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
   ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
 
-  ctx.clearRect(0, 0, width, height);
-
-  const barWidth = width / data.length;
-  const gap = 1;
-
-  // Цвета
-  const colorPlayed = "#21808d";
+  const barWidth = w / peaks.value.length;
+  const progress =
+    currentTime.value / (audioBuffer?.duration || props.duration || 1);
   const isDark =
     document.documentElement.classList.contains("dark") ||
     document.body.getAttribute("data-theme") === "dark";
-  const bgBase = isDark ? "#4b5563" : "#d1d5db";
 
-  data.forEach((value, index) => {
-    const x = index * barWidth;
-    const barHeight = Math.max(value * height, 2);
-    const y = (height - barHeight) / 2;
-    const barProgress = index / data.length;
-
-    ctx.fillStyle = barProgress < progress ? colorPlayed : bgBase;
-
-    roundRect(ctx, x, y, barWidth - gap, barHeight, 2);
+  peaks.value.forEach((val, i) => {
+    ctx.fillStyle =
+      i / peaks.value.length < progress
+        ? "#21808d"
+        : isDark
+        ? "#4b5563"
+        : "#d1d5db";
+    const bh = Math.max(val * h, 2);
+    roundRect(ctx, i * barWidth, (h - bh) / 2, barWidth - 2, bh, 2);
     ctx.fill();
   });
 };
 
 function roundRect(
-  ctx: CanvasRenderingContext2D,
+  ctx: any,
   x: number,
   y: number,
   w: number,
   h: number,
   r: number
 ) {
-  if (w < 2 * r) r = w / 2;
-  if (h < 2 * r) r = h / 2;
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -342,4 +342,26 @@ function roundRect(
   ctx.arcTo(x, y, x + w, y, r);
   ctx.closePath();
 }
+
+const formatTime = (seconds: number) => {
+  if (!seconds || seconds === Infinity) return "0:00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+};
+
+const cycleSpeed = () => {
+  const rates = [1.0, 1.5, 2.0, 0.5];
+  playbackRate.value =
+    rates[(rates.indexOf(playbackRate.value) + 1) % rates.length];
+};
+
+const handleMouseMove = (event: MouseEvent) => {
+  if (!canvasRef.value) return;
+  const rect = canvasRef.value.getBoundingClientRect();
+  hoverProgress.value = Math.max(
+    0,
+    Math.min(1, (event.clientX - rect.left) / rect.width)
+  );
+};
 </script>
