@@ -20,7 +20,7 @@ from .api.v1 import api_router
 settings = get_settings()
 
 mimetypes.init()
-mimetypes.add_type("audio/webm", ".webm")
+mimetypes.add_type("video/webm", ".webm")
 mimetypes.add_type("audio/ogg", ".ogg")
 
 UPLOAD_DIR = "uploads"
