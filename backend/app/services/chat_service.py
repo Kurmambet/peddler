@@ -22,6 +22,7 @@ from app.schemas.chat import (
 from app.ws import pubsub_manager
 from app.ws.events import (
     GroupUpdatedEvent,
+    NewChatEvent,
     RoleChangedEvent,
     UserJoinedEvent,
     UserLeftEvent,
@@ -83,7 +84,7 @@ class ChatService:
         await self.db.commit()
 
         # 5. Вернуть DirectChatRead с заполненными полями
-        return DirectChatRead(
+        response = DirectChatRead(
             id=new_chat.id,
             type="direct",
             title=new_chat.title,
@@ -94,12 +95,19 @@ class ChatService:
             other_user_is_online=other_user.is_online,
             other_user_last_seen=other_user.last_seen,
         )
+        # Отправляем событие другому пользователю, чтобы у него появился чат
+        event = NewChatEvent(chat=response.model_dump(mode="json"))
+        await pubsub_manager.publish_to_user(other_user.id, event.model_dump_json())
+
+        # Отправляем себе (на случай если открыто в другой вкладке)
+        await pubsub_manager.publish_to_user(current_user.id, event.model_dump_json())
+        return response
 
     async def create_group_chat(
         self,
         current_user: User,
         chat_in: GroupChatCreate,
-    ) -> Chat:
+    ) -> GroupChatRead:
         """
         Создать групповой чат.
         Бизнес-правила:
@@ -141,6 +149,22 @@ class ChatService:
             await self.repo.add_participant(new_chat.id, user.id, ChatParticipantRole.MEMBER)
 
         await self.db.commit()
+        # Нам нужно сформировать GroupChatRead для фронтенда
+        chat_read = GroupChatRead(
+            id=new_chat.id,
+            type="group",
+            title=new_chat.title,
+            created_by_id=new_chat.created_by_id,
+            created_at=new_chat.created_at,
+            participant_count=len(participants_data) + 1,  # +1 это создатель
+            unread_count=0,
+        )
+        event = NewChatEvent(chat=chat_read.model_dump(mode="json"))
+        # Уведомляем всех участников (включая создателя, для синхронизации вкладок)
+        all_participants = participants_data + [current_user]
+        for user in all_participants:
+            await pubsub_manager.publish_to_user(user.id, event.model_dump_json())
+
         return new_chat
 
     async def get_user_chats(

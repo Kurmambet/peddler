@@ -2,7 +2,7 @@
 # Pydantic-схемы событий
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
@@ -34,6 +34,7 @@ class EventType(str, Enum):
     USER_LEFT = "user_left"
     GROUP_UPDATED = "group_updated"
     ROLE_CHANGED = "role_changed"
+    NEW_CHAT = "new_chat"
 
 
 class WSEvent(BaseModel):
@@ -253,3 +254,10 @@ class RoleChangedEvent(WSEvent):
     new_role: str
     changed_by_id: int
     changed_by_username: str
+
+
+class NewChatEvent(WSEvent):
+    type: EventType = EventType.NEW_CHAT
+    chat: Dict[
+        str, Any
+    ]  # Здесь будет сериализованный объект чата (DirectChatRead или GroupChatRead)

@@ -341,6 +341,7 @@ async def status_websocket_endpoint(websocket: WebSocket, db: AsyncSession = Dep
         await manager.connect_status(user.id, websocket)
 
         await manager.set_user_online(user.id, db)
+        await pubsub_manager.subscribe_to_user(user.id)
 
         # Шаг 4: Получить все чаты пользователя
         stmt = select(ChatParticipant.chat_id).where(ChatParticipant.user_id == user.id)
@@ -401,6 +402,7 @@ async def status_websocket_endpoint(websocket: WebSocket, db: AsyncSession = Dep
                 has_devices = user.id in manager.status_connections
 
             if not has_devices:
+                await pubsub_manager.unsubscribe_from_user(user.id)
                 status_event = UserStatusChangedEvent(
                     user_id=user.id,
                     username=user.username,

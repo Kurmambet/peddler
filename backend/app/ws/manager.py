@@ -92,7 +92,17 @@ class ConnectionManager:
             device_count = len(self.status_connections[user_id])
         logger.info(f"[Manager] User {user_id} registered /ws/status (devices: {device_count})")
 
-    # Метод для /ws/status
+    async def broadcast_to_user(self, user_id: int, message: str):
+        """Отправляет сообщение во все активные status-соединения пользователя"""
+        async with self._lock:
+            websockets = self.status_connections.get(user_id, set()).copy()
+
+        for ws in websockets:
+            try:
+                await ws.send_text(message)
+            except Exception as e:
+                logger.debug(f"Failed to send to user {user_id}: {e}")
+
     async def disconnect_status(self, user_id: int, websocket: WebSocket):
         """Отключение /ws/status соединения (удаляет конкретное устройство)"""
         async with self._lock:

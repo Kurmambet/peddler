@@ -98,7 +98,11 @@ export function useGlobalStatus() {
           }
         }
       });
-
+      ws.value.onMessage("new_chat", (event: any) => {
+        console.log("[useGlobalStatus] 🆕 New chat received:", event.chat);
+        // Добавляем в начало списка
+        chatsStore.chats.unshift(event.chat);
+      });
       await ws.value.connect();
       isConnected.value = true;
       console.log("[useGlobalStatus] ✅ Connected to status WebSocket");
