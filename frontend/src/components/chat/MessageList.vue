@@ -116,6 +116,7 @@
               </p>
 
               <!-- Message content -->
+              <!-- Голосовое сообщение -->
               <div v-if="msg.message_type === 'voice'" class="my-1">
                 <VoicePlayer
                   :url="msg.file_url!"
@@ -124,6 +125,17 @@
                   :is-own="isOwn(msg)"
                 />
               </div>
+
+              <!-- ВИДЕОКРУЖОЧЕК -->
+              <div
+                v-else-if="msg.message_type === 'video_note'"
+                class="my-2 flex"
+                :class="{ 'justify-end': isOwn(msg) }"
+              >
+                <VideoNotePlayer :url="msg.file_url!" :message-id="msg.id" />
+              </div>
+
+              <!-- Текст (дефолт) -->
               <p
                 v-else
                 class="text-sm break-all whitespace-pre-wrap leading-relaxed"
@@ -179,6 +191,7 @@ import Avatar from "../ui/Avatar.vue";
 import Skeleton from "../ui/Skeleton.vue";
 import UserProfileModal from "../user/UserProfileModal.vue";
 import MessageStatusIcon from "./MessageStatusIcon.vue";
+import VideoNotePlayer from "./VideoNotePlayer.vue";
 import VoicePlayer from "./VoicePlayer.vue";
 
 const authStore = useAuthStore();

@@ -1,10 +1,10 @@
 <!-- frontend/src/components/chat/MessageInput.vue -->
 <template>
   <div class="relative border-t border-app-border bg-app-surface">
-    <!-- Video Preview Overlay (Кружочек над инпутом при записи) -->
+    <!-- Video Preview (Кружочек) -->
     <div
       v-if="isRecordingVideo"
-      class="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 w-48 h-48 sm:w-64 sm:h-64 rounded-full border-4 border-app-primary overflow-hidden shadow-2xl bg-black z-50"
+      class="absolute bottom-full left-1/2 -translate-x-1/2 mb-6 w-56 h-56 rounded-full border-4 border-app-primary overflow-hidden shadow-2xl bg-black z-50 flex items-center justify-center"
     >
       <video
         ref="videoPreviewRef"
@@ -13,22 +13,24 @@
         playsinline
         class="w-full h-full object-cover scale-x-[-1]"
       ></video>
-      <!-- Индикатор записи внутри круга -->
       <div
-        class="absolute top-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs font-bold animate-pulse"
+        class="absolute top-4 bg-red-500 text-white px-2 py-0.5 rounded-full text-[10px] font-bold animate-pulse"
       >
         REC {{ formatDuration(videoDuration) }}
       </div>
     </div>
 
-    <!-- Voice Recording UI -->
+    <!-- UI Записи Голоса -->
     <div
       v-if="isRecordingVoice"
-      class="flex items-center gap-3 p-4 bg-app-hover"
+      class="flex items-center gap-3 p-4 bg-app-hover animate-in fade-in slide-in-from-bottom-2"
     >
-      <button @click="cancelVoice" class="p-2 text-app-error hover:opacity-80">
+      <button
+        @click="cancelVoice"
+        class="p-2 text-app-error hover:bg-app-error/10 rounded-full transition-colors"
+      >
         <svg
-          class="w-5 h-5"
+          class="w-6 h-6"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -41,36 +43,36 @@
           />
         </svg>
       </button>
-      <div class="flex-1 flex items-center gap-2">
-        <div class="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-        <span class="text-sm font-mono">{{
-          formatDuration(voiceDuration)
-        }}</span>
-        <div class="flex-1 h-1 bg-app-border rounded-full overflow-hidden">
-          <div
-            class="h-full bg-app-primary animate-pulse"
-            style="width: 100%"
-          />
+      <div class="flex-1 flex items-center gap-3">
+        <span
+          class="text-sm font-mono font-bold text-app-error animate-pulse"
+          >{{ formatDuration(voiceDuration) }}</span
+        >
+        <div class="flex-1 h-1.5 bg-app-border rounded-full overflow-hidden">
+          <div class="h-full bg-app-primary animate-pulse w-full" />
         </div>
       </div>
       <button
         @click="stopAndSendVoice"
-        class="p-2 bg-app-primary text-white rounded-full hover:opacity-90"
+        class="p-3 bg-app-primary text-white rounded-full hover:scale-105 transition-transform shadow-lg"
       >
-        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
           <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
         </svg>
       </button>
     </div>
 
-    <!--  Video Note Recording UI (Control Bar) -->
+    <!-- UI Записи Видео (Нижняя панель) -->
     <div
       v-else-if="isRecordingVideo"
-      class="flex items-center gap-3 p-4 bg-app-hover"
+      class="flex items-center gap-3 p-4 bg-app-hover animate-in fade-in"
     >
-      <button @click="cancelVideo" class="p-2 text-app-error hover:opacity-80">
+      <button
+        @click="cancelVideo"
+        class="p-2 text-app-error hover:bg-app-error/10 rounded-full"
+      >
         <svg
-          class="w-5 h-5"
+          class="w-6 h-6"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -83,35 +85,36 @@
           />
         </svg>
       </button>
-      <div
-        class="flex-1 text-center text-sm font-medium text-app-text-secondary"
-      >
-        Recording video note...
+      <div class="flex-1 text-center">
+        <span
+          class="text-sm font-bold text-app-primary uppercase tracking-wider"
+          >Recording Video Note</span
+        >
       </div>
       <button
         @click="stopAndSendVideo"
-        class="p-2 bg-app-primary text-white rounded-full hover:opacity-90"
+        class="p-3 bg-app-primary text-white rounded-full hover:scale-105 transition-transform shadow-lg"
       >
-        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+        <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
           <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
         </svg>
       </button>
     </div>
 
-    <!-- Standard Input -->
+    <!--  Стандартное поле ввода -->
     <form
       v-else
       @submit.prevent="handleMainAction"
       class="flex items-end gap-2 p-3 sm:p-4"
     >
-      <!-- Mode Toggle Button (Mic/Cam) -->
+      <!-- Переключатель Mic/Cam -->
       <button
         v-if="!newMessageContent.trim()"
         type="button"
         @click="toggleMode"
-        class="p-2.5 text-app-text-secondary hover:text-app-primary transition-colors flex-shrink-0"
+        class="p-2.5 text-app-text-secondary hover:text-app-primary transition-all active:scale-90 flex-shrink-0"
       >
-        <!-- Microphone Icon -->
+        <!-- Mic Icon -->
         <svg
           v-if="mode === 'voice'"
           class="w-6 h-6"
@@ -126,7 +129,7 @@
             d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
           />
         </svg>
-        <!-- Camera Icon -->
+        <!-- Cam Icon -->
         <svg
           v-else
           class="w-6 h-6"
@@ -153,25 +156,29 @@
         />
       </div>
 
-      <!-- Main Action Button -->
-      <Button
+      <!-- Главная кнопка -->
+      <button
         type="submit"
-        variant="primary"
-        class="!rounded-full w-11 h-11 flex-shrink-0 !p-0"
+        class="flex-shrink-0 w-11 h-11 flex items-center justify-center rounded-full transition-all active:scale-95 shadow-sm"
+        :class="
+          newMessageContent.trim()
+            ? 'bg-app-primary text-white'
+            : 'bg-transparent text-app-text-secondary hover:text-app-primary'
+        "
       >
-        <!-- Send Arrow (if text) -->
+        <!-- Send Arrow -->
         <svg
           v-if="newMessageContent.trim()"
-          class="w-5 h-5 rotate-45 -mt-0.5 -ml-0.5"
+          class="w-6 h-6 -rotate-45 -mt-0.5 ml-1"
           fill="currentColor"
           viewBox="0 0 24 24"
         >
           <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
         </svg>
-        <!-- Mic (if voice mode) -->
+        <!-- Mic (Trigger) -->
         <svg
           v-else-if="mode === 'voice'"
-          class="w-5 h-5"
+          class="w-6 h-6"
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -189,13 +196,18 @@
             d="M19 10v1a7 7 0 01-14 0v-1M12 18.5V21M8 21h8"
           />
         </svg>
-        <!-- Cam (if video mode) -->
-        <svg v-else class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+        <!-- Cam (Trigger) -->
+        <svg
+          v-else-if="mode === 'video'"
+          class="w-6 h-6"
+          fill="currentColor"
+          viewBox="0 0 24 24"
+        >
           <path
             d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"
           />
         </svg>
-      </Button>
+      </button>
     </form>
   </div>
 </template>
@@ -206,10 +218,10 @@ import { messagesAPI } from "../../api/messages";
 import { useChat } from "../../composables/useChat";
 import { useVideoRecorder } from "../../composables/useVideoRecorder";
 import { useVoiceRecorder } from "../../composables/useVoiceRecorder";
-import Button from "../ui/Button.vue";
 import Input from "../ui/Input.vue";
 
 const { newMessageContent, sendMessage, handleTyping, chatId } = useChat();
+
 const {
   isRecording: isRecordingVoice,
   recordingDuration: voiceDuration,
@@ -227,26 +239,24 @@ const {
   cancelRecording: cancelVideo,
 } = useVideoRecorder();
 
-// Режимы: 'voice' или 'video'
 const mode = ref<"voice" | "video">("voice");
 const videoPreviewRef = ref<HTMLVideoElement | null>(null);
 
-// Переключение режимов
 const toggleMode = () => {
   mode.value = mode.value === "voice" ? "video" : "voice";
 };
 
-// Привязка стрима к видео-элементу превью
+// Исправленный watch для превью
 watch(
   videoStream,
   async (newStream) => {
     if (newStream) {
-      // Ждем, пока Vue отрендерит video-тег в DOM
       await nextTick();
       if (videoPreviewRef.value) {
         videoPreviewRef.value.srcObject = newStream;
-        // Принудительно запускаем, если autoplay не сработал
-        videoPreviewRef.value.play().catch(console.error);
+        videoPreviewRef.value
+          .play()
+          .catch((err) => console.error("Preview play failed", err));
       }
     }
   },
@@ -254,21 +264,16 @@ watch(
 );
 
 const handleMainAction = async () => {
-  // 1. Если есть текст — отправляем сообщение
   if (newMessageContent.value.trim()) {
     await sendMessage();
     return;
   }
 
-  // 2. Если текста нет — начинаем запись в зависимости от режима
   try {
-    if (mode.value === "voice") {
-      await startVoice();
-    } else {
-      await startVideo();
-    }
+    if (mode.value === "voice") await startVoice();
+    else await startVideo();
   } catch (err) {
-    alert("Permission denied or device not found");
+    alert("Please allow camera/microphone access");
   }
 };
 
@@ -278,7 +283,7 @@ const stopAndSendVoice = async () => {
     const blob = await stopVoice();
     await messagesAPI.sendVoice(chatId.value, blob, voiceDuration.value);
   } catch (err) {
-    console.error("Failed to send voice", err);
+    console.error(err);
   }
 };
 
