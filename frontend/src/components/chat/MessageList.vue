@@ -117,7 +117,11 @@
 
               <!-- Message content -->
               <div v-if="msg.message_type === 'voice'" class="my-1">
-                <VoicePlayer :url="msg.file_url!" :duration="msg.duration!" />
+                <VoicePlayer
+                  :url="msg.file_url!"
+                  :duration="msg.duration!"
+                  :message-id="msg.id"
+                />
               </div>
               <p
                 v-else

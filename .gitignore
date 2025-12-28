@@ -91,4 +91,6 @@ notes.py
 project_structure.md
 uploads/
 avatars/
-voice/
+uploads/voice/
+/1/
+*.webm
