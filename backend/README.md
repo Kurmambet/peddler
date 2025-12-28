@@ -29,6 +29,7 @@ taskkill /PID 8200 /F
 ```bash
 # Автогенерация миграции на основе моделей
 alembic revision --autogenerate -m "Initial migration"
+alembic revision --autogenerate -m "message_type_change"
 
 # Применить миграцию
 alembic upgrade head

@@ -26,16 +26,7 @@ mimetypes.add_type("audio/ogg", ".ogg")
 UPLOAD_DIR = "uploads"
 VOICE_DIR = f"{UPLOAD_DIR}/voice"
 AVATARS_DIR = f"{UPLOAD_DIR}/avatars"
-
-
-# class CORSStaticFiles(StaticFiles):
-#     async def get_response(self, path: str, scope):
-#         response = await super().get_response(path, scope)
-#         response.headers["Access-Control-Allow-Origin"] = "*"
-#         response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
-#         response.headers["Access-Control-Allow-Headers"] = "*"
-#         return response
-
+VIDEO_NOTES_DIR = f"{UPLOAD_DIR}/video_notes"
 
 # Создаём родительскую папку
 if not os.path.exists(UPLOAD_DIR):
@@ -46,6 +37,8 @@ if not os.path.exists(VOICE_DIR):
     os.makedirs(VOICE_DIR, exist_ok=True)
 if not os.path.exists(AVATARS_DIR):
     os.makedirs(AVATARS_DIR, exist_ok=True)
+if not os.path.exists(VIDEO_NOTES_DIR):
+    os.makedirs(VIDEO_NOTES_DIR, exist_ok=True)
 
 
 @asynccontextmanager

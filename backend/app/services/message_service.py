@@ -23,29 +23,35 @@ class MessageService:
     ) -> Message:
         """
         Отправить сообщение в чат.
-        Бизнес-правила:
-        - Пользователь должен быть участником чата
-        - chat_id из URL == chat_id из body
         """
-        # Проверяем доступ к чату
-        await self.repo.verify_chat_access(chat_id, current_user.id)  # raise 403 если нет доступа
+        # 1. Проверяем доступ к чату
+        await self.repo.verify_chat_access(chat_id, current_user.id)
 
-        # Проверяем chat_id из body
+        # 2. Проверяем chat_id на соответствие
         if msg_in.chat_id != chat_id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="chat_id mismatch")
 
-        if msg_in.message_type == MessageType.VOICE:
+        # 3. Валидация медиа-сообщений (Voice и Video Note)
+        if msg_in.message_type in [MessageType.VOICE, MessageType.VIDEO_NOTE]:
             if not msg_in.file_url:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="file_url required for voice messages",
+                    detail=f"file_url required for {msg_in.message_type} messages",
                 )
             if not msg_in.duration or msg_in.duration <= 0:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="duration required for voice messages",
+                    detail=f"duration required for {msg_in.message_type} messages",
                 )
 
+        # 4. Валидация обычных файлов
+        if msg_in.message_type == MessageType.FILE and not msg_in.file_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="file_url required for file messages",
+            )
+
+        # 5. Создание сообщения
         message = await self.repo.create_message(
             chat_id=chat_id,
             sender_id=current_user.id,

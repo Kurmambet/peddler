@@ -129,28 +129,60 @@ async def upload_voice_message(
     return message
 
 
-# @router.get("/chats/{chat_id}/messages/debug", tags=["debug"])
-# async def debug_messages(
-#     chat_id: int,
-#     current_user: User = Depends(get_current_user),
-#     db: AsyncSession = Depends(get_db),
-# ):
-#     """Отладочный эндпоинт для проверки is_read"""
-#     stmt = (
-#         select(Message)
-#         .where(Message.chat_id == chat_id)
-#         .order_by(Message.created_at.desc())
-#         .limit(10)
-#     )
-#     result = await db.execute(stmt)
-#     messages = result.scalars().all()
+VIDEO_NOTES_DIR = "uploads/video_notes"
 
-#     return [
-#         {
-#             "id": msg.id,
-#             "sender_id": msg.sender_id,
-#             "is_read": msg.is_read,
-#             "content": msg.content[:50],
-#         }
-#         for msg in messages
-#     ]
+
+@router.post("/chats/{chat_id}/messages/video_note", response_model=MessageRead)
+async def upload_video_note(
+    chat_id: int,
+    file: UploadFile = File(...),
+    duration: int = Query(..., ge=1, le=60),  # Кружочки обычно до 1 минуты
+    current_user: User = Depends(get_current_user),
+    service: MessageService = Depends(get_message_service),
+):
+    if not file.content_type or not file.content_type.startswith("video/"):
+        raise HTTPException(400, "File must be a video")
+
+    content = await file.read()
+    new_filename = f"{uuid.uuid4()}.webm"
+    chat_dir = f"{VIDEO_NOTES_DIR}/{chat_id}"
+    os.makedirs(chat_dir, exist_ok=True)
+
+    filepath = f"{chat_dir}/{new_filename}"
+    async with aiofiles.open(filepath, "wb") as f:
+        await f.write(content)
+
+    public_url = f"/static/video_notes/{chat_id}/{new_filename}"
+
+    msg_create = MessageCreate(
+        content="",
+        chat_id=chat_id,
+        message_type=MessageType.VIDEO_NOTE,
+        file_url=public_url,
+        file_size=len(content),
+        duration=duration,
+    )
+
+    message = await service.send_message(chat_id, msg_create, current_user)
+
+    message_event = MessageCreatedEvent(
+        id=message.id,
+        chat_id=message.chat_id,
+        sender_id=message.sender_id,
+        sender_username=current_user.username,
+        sender_display_name=current_user.display_name,
+        avatar_url=current_user.avatar_url,
+        content=message.content,
+        created_at=message.created_at,
+        is_read=message.is_read,
+        message_type=message.message_type,
+        file_url=message.file_url,
+        file_size=message.file_size,
+        duration=message.duration,
+    )
+    logger.info(
+        f"[VIDEO_NOTE] Publishing event to chat {chat_id}: message_id={message.id}, file_url={message.file_url}"
+    )
+    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    logger.info("[VIDEO_NOTE] Event published successfully")
+    return message

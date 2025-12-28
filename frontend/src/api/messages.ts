@@ -29,4 +29,15 @@ export const messagesAPI = {
       }
     );
   },
+  sendVideoNote: (chatId: number, videoBlob: Blob, duration: number) => {
+    const formData = new FormData();
+    formData.append("file", videoBlob, "video_note.webm");
+    return apiClient.post<MessageRead>(
+      `/chats/${chatId}/messages/video_note?duration=${duration}`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+      }
+    );
+  },
 };
