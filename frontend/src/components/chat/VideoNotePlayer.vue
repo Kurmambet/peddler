@@ -14,11 +14,10 @@
       muted
       preload="auto"
       @timeupdate="handleTimeUpdate"
-      @loadedmetadata="handleMetadata"
       @loadeddata="handleCanPlay"
     ></video>
 
-    <!-- Лоадер висит до события canplay -->
+    <!-- Лоадер -->
     <div
       v-if="isBuffering"
       class="absolute inset-0 flex items-center justify-center bg-black/60 z-20"
@@ -42,9 +41,9 @@
       </div>
     </div>
 
-    <!-- Прогресс-бар -->
+    <!-- Прогресс-бар (скрываем, если длительность неизвестна, чтобы не моргал) -->
     <svg
-      v-if="!isMuted && !isBuffering"
+      v-if="!isMuted && !isBuffering && hasValidDuration"
       class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none z-30"
       viewBox="0 0 100 100"
     >
@@ -90,8 +89,8 @@ const isBuffering = ref(true);
 const isMuted = ref(true);
 const isInViewport = ref(false);
 const progress = ref(0);
+const hasValidDuration = ref(false); // Новый флаг для UI
 let localBlobUrl: string | null = null;
-let bufferingTimeout: number | null = null; // Таймер для зависших видео
 
 const fullUrl = computed(() => {
   if (props.url.startsWith("http") || props.url.startsWith("blob:"))
@@ -102,126 +101,113 @@ const fullUrl = computed(() => {
 });
 
 const handleCanPlay = () => {
-  if (bufferingTimeout) clearTimeout(bufferingTimeout);
   isBuffering.value = false;
-
-  // Хак для Chrome: "толкаем" видео, чтобы оно поняло, что данные есть
-  if (videoRef.value && videoRef.value.paused && isInViewport.value) {
-    attemptPlay();
+  // Сразу проверяем длительность
+  if (
+    videoRef.value &&
+    videoRef.value.duration !== Infinity &&
+    !isNaN(videoRef.value.duration)
+  ) {
+    hasValidDuration.value = true;
   }
+  if (isInViewport.value) attemptPlay();
 };
 
 const attemptPlay = async () => {
   if (!videoRef.value || isBuffering.value || !isInViewport.value) return;
 
   try {
-    // Храним промис, чтобы знать, что идет процесс запуска
+    if (playPromise) await playPromise;
     playPromise = videoRef.value.play();
     await playPromise;
     playPromise = null;
   } catch (err: any) {
     playPromise = null;
     if (err.name !== "AbortError") {
-      console.warn("[VideoNote] Play failed, forcing reload:", err);
-      // Если видео зависло, пробуем перегрузить один раз
-      // videoRef.value?.load();
+      // Если видео не играет, пробуем один раз пнуть его (перемотать на начало)
+      if (videoRef.value) {
+        videoRef.value.currentTime = 0;
+        // videoRef.value.load(); // Load слишком агрессивно, лучше просто оставить как есть
+      }
     }
   }
 };
 
 const stopPlayback = async () => {
-  // Защита от TypeError: Cannot read properties of null
   if (!videoRef.value) return;
-
   if (playPromise) {
     try {
       await playPromise;
     } catch (e) {}
   }
-
-  // Еще раз проверяем, так как после await видео могло исчезнуть из DOM
-  if (videoRef.value) {
-    videoRef.value.pause();
-  }
+  if (videoRef.value) videoRef.value.pause();
 };
 
 const fetchAndPrepareVideo = async () => {
   try {
     isBuffering.value = true;
     const response = await fetch(fullUrl.value);
-    const arrayBuffer = await response.arrayBuffer();
-
-    // Создаем НОВЫЙ Blob с ПРИНУДИТЕЛЬНЫМ типом video/webm
-    // Это заставит Chrome игнорировать любые заголовки сервера
-    const videoBlob = new Blob([arrayBuffer], { type: "video/webm" });
+    const blob = await response.blob();
+    // Принудительно ставим video/webm
+    const videoBlob = new Blob([blob], { type: "video/webm" });
     localBlobUrl = URL.createObjectURL(videoBlob);
 
     if (videoRef.value) {
       videoRef.value.src = localBlobUrl;
       videoRef.value.load();
-
-      // ДАЕМ CHROME ВРЕМЯ ПОДУМАТЬ
-      setTimeout(() => {
-        if (videoRef.value) {
-          videoRef.value.currentTime = 0.1; // Сдвиг на 100мс "будит" декодер
-          if (isInViewport.value) attemptPlay();
-        }
-      }, 200);
     }
   } catch (e) {
-    console.error("[VideoNote] Prep error:", e);
-  } finally {
-    // isBuffering выключится по событию canplay или loadeddata
+    console.error("[VideoNote] Fetch error:", e);
+    isBuffering.value = false;
   }
 };
 
-watch([isBuffering, isInViewport], ([buf, view]) => {
-  if (!buf && view) {
-    setTimeout(attemptPlay, 50);
-  }
-});
+// --- УДАЛИЛИ handleMetadata с хаком 1e101 ---
+// Этот хак вешал Chrome на файлах из Firefox.
+// Теперь мы просто позволяем видео быть "Infinity" (как стрим).
 
 const handleMetadata = () => {
-  const video = videoRef.value;
-  if (!video) return;
-
-  // Последняя попытка зафиксировать бесконечную длительность
-  if (video.duration === Infinity) {
-    video.currentTime = 1e101;
-    video.ontimeupdate = function () {
-      this.ontimeupdate = null;
-      video.currentTime = 0.1;
-      attemptPlay();
-    };
+  // Просто проверяем длительность для UI
+  if (videoRef.value && isFinite(videoRef.value.duration)) {
+    hasValidDuration.value = true;
   }
 };
 
 const handleTimeUpdate = () => {
   if (videoRef.value && !isMuted.value) {
     const d = videoRef.value.duration;
-    // Если длительность все еще Infinity, прогресс-бар не рисуем
-    if (d && d !== Infinity && !isNaN(d)) {
+    if (d && d !== Infinity) {
       progress.value = videoRef.value.currentTime / d;
     }
   }
 };
 
-const toggleSound = () => {
+const toggleSound = async () => {
   if (!videoRef.value || isBuffering.value) return;
+
   isMuted.value = !isMuted.value;
   videoRef.value.muted = isMuted.value;
+
   if (!isMuted.value) {
     playerStore.setPlaying(props.messageId);
-    videoRef.value.play().catch(() => {});
+    await attemptPlay();
+  } else {
+    progress.value = 0;
   }
 };
 
 watch(
   () => playerStore.currentPlayingId,
-  (newId) => {
+  async (newId) => {
     if (newId !== props.messageId && !isMuted.value) {
       isMuted.value = true;
-      if (videoRef.value) videoRef.value.muted = true;
+      if (videoRef.value) {
+        videoRef.value.muted = true;
+        // Если это видео из FF (Infinity), лучше не делать стоп,
+        // а просто выключить звук, иначе оно может зависнуть при рестарте
+        // Но для порядка пробуем стоп.
+        await stopPlayback();
+      }
     }
   }
 );
@@ -257,7 +243,6 @@ onUnmounted(() => {
 video {
   border-radius: 50%;
   background: #000;
-  /* Форсируем аппаратное ускорение для плавности */
   transform: translateZ(0);
   -webkit-mask-image: -webkit-radial-gradient(circle, white 100%, black 100%);
 }

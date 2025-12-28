@@ -5,6 +5,7 @@ export function useVideoRecorder() {
   const isRecording = ref(false);
   const recordingDuration = ref(0);
   const stream = ref<MediaStream | null>(null);
+
   let mediaRecorder: MediaRecorder | null = null;
   let chunks: Blob[] = [];
   let timer: any = null;
@@ -13,6 +14,7 @@ export function useVideoRecorder() {
     if (stream.value) {
       stream.value.getTracks().forEach((track) => {
         track.stop();
+        // В Firefox важно явно отключать треки перед stop()
         track.enabled = false;
       });
       stream.value = null;
@@ -21,38 +23,43 @@ export function useVideoRecorder() {
 
   const startRecording = async () => {
     try {
-      stopAllTracks(); // Тотальная зачистка перед стартом
+      stopAllTracks(); // Чистим перед стартом
 
+      // ФИКС ДЛЯ FIREFOX:
+      // Убираем требования к разрешению. Firefox сам выберет оптимальное (обычно 640x480).
+      // CSS object-fit: cover сделает видео квадратным визуально.
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: {
           facingMode: "user",
-          // Запрашиваем стандарт, который есть у ЛЮБОЙ камеры
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          // frameRate можно оставить, это обычно не ломает
+          frameRate: { ideal: 30 },
         },
       });
 
       stream.value = mediaStream;
       chunks = [];
 
-      // Явно указываем кодеки, которые Chrome понимает на 100%
-      const mimeType = MediaRecorder.isTypeSupported(
-        "video/webm;codecs=vp8,opus"
-      )
-        ? "video/webm;codecs=vp8,opus"
-        : "video/webm";
+      // Приоритет кодеков: VP8 самый совместимый для Chrome <-> Firefox
+      const types = [
+        "video/webm;codecs=vp8,opus",
+        "video/webm;codecs=vp8",
+        "video/webm",
+      ];
+      const mimeType =
+        types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+      console.log("[VideoRecorder] Using mimeType:", mimeType);
 
       mediaRecorder = new MediaRecorder(mediaStream, {
         mimeType,
-        videoBitsPerSecond: 1200000,
+        videoBitsPerSecond: 1500000, // 1.5 Mbps для хорошего качества
       });
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
       };
 
-      // Тайм-слайс 1000мс заставляет Firefox вшивать временные метки (Clusters)
+      // Timeslice 1000мс обязателен для создания Clusters
       mediaRecorder.start(1000);
       isRecording.value = true;
 
@@ -62,7 +69,7 @@ export function useVideoRecorder() {
       }, 1000);
     } catch (err) {
       console.error("Camera access error:", err);
-      stopAllTracks();
+      stopAllTracks(); // Чистим, если упало
       throw err;
     }
   };
@@ -70,28 +77,26 @@ export function useVideoRecorder() {
   const stopRecording = (): Promise<{ blob: Blob; duration: number }> => {
     return new Promise((resolve) => {
       if (!mediaRecorder) return;
+
       mediaRecorder.onstop = () => {
         const finalBlob = new Blob(chunks, { type: mediaRecorder?.mimeType });
         const finalDuration = recordingDuration.value;
-        stream.value?.getTracks().forEach((t) => t.stop());
-        stream.value = null;
+        stopAllTracks();
         isRecording.value = false;
         recordingDuration.value = 0;
         if (timer) clearInterval(timer);
         resolve({ blob: finalBlob, duration: finalDuration });
       };
+
       mediaRecorder.stop();
     });
   };
 
   const cancelRecording = () => {
-    if (mediaRecorder) {
-      try {
-        mediaRecorder.stop();
-      } catch (e) {}
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
     }
-    stream.value?.getTracks().forEach((t) => t.stop());
-    stream.value = null;
+    stopAllTracks();
     isRecording.value = false;
     recordingDuration.value = 0;
     if (timer) clearInterval(timer);
