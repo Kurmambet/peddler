@@ -121,6 +121,7 @@
                   :url="msg.file_url!"
                   :duration="msg.duration!"
                   :message-id="msg.id"
+                  :is-own="isOwn(msg)"
                 />
               </div>
               <p
@@ -140,7 +141,11 @@
                 <span>{{ formatTime(msg.created_at) }}</span>
 
                 <!-- Галочки только для своих сообщений -->
-                <MessageStatusIcon v-if="isOwn(msg)" :is-read="msg.is_read" />
+                <MessageStatusIcon
+                  v-if="isOwn(msg)"
+                  :is-read="msg.is_read"
+                  :is-own="true"
+                />
               </div>
             </div>
           </div>
