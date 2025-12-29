@@ -3,8 +3,8 @@
 export enum MessageType {
   TEXT = "text",
   VOICE = "voice",
-  VIDEO = "video",
-  IMAGE = "image",
+  VIDEO_NOTE = "video_note",
+  FILE = "file",
 }
 
 // ============================================================

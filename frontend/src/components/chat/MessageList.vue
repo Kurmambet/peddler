@@ -94,28 +94,30 @@
 
             <!-- Message bubble -->
             <div
-              class="max-w-[85%] sm:max-w-md px-3 py-2 rounded-lg shadow-sm overflow-hidden"
-              :class="{
-                'bg-app-message-outgoing text-app-message-text-outgoing':
-                  isOwn(msg),
-                'bg-app-message-incoming text-app-message-text-incoming':
-                  !isOwn(msg),
-              }"
+              class="max-w-[85%] sm:max-w-md shadow-sm overflow-hidden"
+              :class="[
+                // Если это НЕ кружочек, добавляем отступы, скругление и фон
+                msg.message_type !== 'video_note' ? 'px-3 py-2 rounded-lg' : '',
+
+                // Цвета фона только для обычных сообщений
+                msg.message_type !== 'video_note'
+                  ? isOwn(msg)
+                    ? 'bg-app-message-outgoing text-app-message-text-outgoing'
+                    : 'bg-app-message-incoming text-app-message-text-incoming'
+                  : 'bg-transparent shadow-none', // Для кружочков фон прозрачный
+              ]"
             >
               <!-- Sender name for group chats -->
               <p
-                v-if="!isOwn(msg)"
+                v-if="!isOwn(msg) && msg.message_type !== 'video_note'"
                 class="text-xs font-semibold mb-1 opacity-75 break-words cursor-pointer hover:underline"
                 @click="openProfile(msg.sender_id)"
               >
-                {{
-                  msg.sender_display_name
-                    ? msg.sender_display_name
-                    : msg.sender_username
-                }}
+                {{ msg.sender_display_name || msg.sender_username }}
               </p>
 
               <!-- Message content -->
+              <!-- Голосовое сообщение -->
               <div v-if="msg.message_type === 'voice'" class="my-1">
                 <VoicePlayer
                   :url="msg.file_url!"
@@ -124,6 +126,21 @@
                   :is-own="isOwn(msg)"
                 />
               </div>
+
+              <!-- ВИДЕОКРУЖОЧЕК -->
+              <div
+                v-else-if="msg.message_type === 'video_note'"
+                class="my-2 flex"
+                :class="{ 'justify-end': isOwn(msg) }"
+              >
+                <VideoNotePlayer
+                  :url="msg.file_url!"
+                  :message-id="msg.id"
+                  :duration="msg.duration!"
+                />
+              </div>
+
+              <!-- Текст (дефолт) -->
               <p
                 v-else
                 class="text-sm break-all whitespace-pre-wrap leading-relaxed"
@@ -133,18 +150,19 @@
 
               <!-- Timestamp + Read status -->
               <div
-                class="flex items-center gap-1 text-xs mt-1 opacity-70"
+                class="flex items-center gap-1 text-[10px] mt-1 opacity-70"
                 :class="{
                   'justify-end': isOwn(msg),
+                  // Если это кружочек, приподнимаем время чуть выше или делаем его белым (опционально)
+                  'text-white drop-shadow-md':
+                    msg.message_type === 'video_note',
                 }"
               >
                 <span>{{ formatTime(msg.created_at) }}</span>
-
-                <!-- Галочки только для своих сообщений -->
                 <MessageStatusIcon
                   v-if="isOwn(msg)"
                   :is-read="msg.is_read"
-                  :is-own="true"
+                  :is-own="isOwn(msg)"
                 />
               </div>
             </div>
@@ -179,6 +197,7 @@ import Avatar from "../ui/Avatar.vue";
 import Skeleton from "../ui/Skeleton.vue";
 import UserProfileModal from "../user/UserProfileModal.vue";
 import MessageStatusIcon from "./MessageStatusIcon.vue";
+import VideoNotePlayer from "./VideoNotePlayer.vue";
 import VoicePlayer from "./VoicePlayer.vue";
 
 const authStore = useAuthStore();

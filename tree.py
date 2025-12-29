@@ -14,6 +14,8 @@ EXCLUDE_DIRS = {
     "redis_dev_data",
     "avatars",
     "versions",
+    "video_notes",
+    "voice",
 }
 
 SKIP_CONTENT_DIRS = {
@@ -23,6 +25,8 @@ SKIP_CONTENT_DIRS = {
     ".vscode",
     "uploads",
     "avatars",
+    "video_notes",
+    "voice",
     # "backend",
     # "api",
     # "stores",

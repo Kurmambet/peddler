@@ -10,8 +10,8 @@ from app.models.base import BaseModel
 class MessageType(str, PyEnum):
     TEXT = "text"
     VOICE = "voice"
-    VIDEO = "video"
-    IMAGE = "image"
+    VIDEO_NOTE = "video_note"
+    FILE = "file"
 
 
 class Message(BaseModel):
