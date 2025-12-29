@@ -1,6 +1,7 @@
 # app/api/v1/routes/messages.py
 import logging
 import os
+import subprocess
 import uuid
 
 import aiofiles
@@ -132,11 +133,52 @@ async def upload_voice_message(
 VIDEO_NOTES_DIR = "uploads/video_notes"
 
 
+def fix_webm_container(filepath: str):
+    """
+    Перепаковывает WebM контейнер через FFmpeg для исправления метаданных и таймстемпов.
+    Использует stream copy, поэтому это очень быстро и не теряет качество.
+    """
+    tmp_path = f"{filepath}.tmp.webm"
+    try:
+        # Команда ffmpeg:
+        # -i input - входной файл
+        # -c copy - копировать видео и аудио потоки БЕЗ перекодирования
+        # -movflags +faststart - оптимизация для веб-воспроизведения (метаданные в начало)
+        # -y - перезаписать output
+        command = [
+            "ffmpeg",
+            "-v",
+            "error",  # Меньше логов
+            "-i",
+            filepath,
+            "-c",
+            "copy",  # Просто копируем потоки (решает 99% проблем совместимости FF->Chrome)
+            "-movflags",
+            "+faststart",
+            "-y",
+            tmp_path,
+        ]
+
+        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+        # Если всё ок, заменяем оригинал
+        os.replace(tmp_path, filepath)
+        logger.info(f"Successfully fixed WebM container: {filepath}")
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"FFmpeg failed: {e.stderr.decode()}")
+        # Если упало, удаляем времянку, оставляем как есть (лучше кривой файл, чем никакого)
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+    except Exception as ex:
+        logger.error(f"FFmpeg generic error: {ex}")
+
+
 @router.post("/chats/{chat_id}/messages/video_note", response_model=MessageRead)
 async def upload_video_note(
     chat_id: int,
     file: UploadFile = File(...),
-    duration: int = Query(..., ge=1, le=60),  # Кружочки обычно до 1 минуты
+    duration: int = Query(..., ge=1, le=60),
     current_user: User = Depends(get_current_user),
     service: MessageService = Depends(get_message_service),
 ):
@@ -145,12 +187,19 @@ async def upload_video_note(
 
     content = await file.read()
     new_filename = f"{uuid.uuid4()}.webm"
-    chat_dir = f"{VIDEO_NOTES_DIR}/{chat_id}"
+    chat_dir = f"uploads/video_notes/{chat_id}"  # Убедитесь, что путь совпадает с вашей настройкой
     os.makedirs(chat_dir, exist_ok=True)
 
     filepath = f"{chat_dir}/{new_filename}"
+
+    # 1. Сохраняем "сырой" файл от клиента
     async with aiofiles.open(filepath, "wb") as f:
         await f.write(content)
+
+    # 2. !!! МАГИЯ: Исправляем файл на сервере !!!
+    # Это синхронная операция, но для -c copy она занимает миллисекунды.
+    # Для high-load это выносят в Celery/BackgroundTasks, но для мессенджера пока ок.
+    fix_webm_container(filepath)
 
     public_url = f"/static/video_notes/{chat_id}/{new_filename}"
 
@@ -159,7 +208,7 @@ async def upload_video_note(
         chat_id=chat_id,
         message_type=MessageType.VIDEO_NOTE,
         file_url=public_url,
-        file_size=len(content),
+        file_size=len(content),  # Размер может чуть измениться, но не критично
         duration=duration,
     )
 
@@ -180,9 +229,6 @@ async def upload_video_note(
         file_size=message.file_size,
         duration=message.duration,
     )
-    logger.info(
-        f"[VIDEO_NOTE] Publishing event to chat {chat_id}: message_id={message.id}, file_url={message.file_url}"
-    )
+
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
-    logger.info("[VIDEO_NOTE] Event published successfully")
     return message

@@ -5,8 +5,12 @@
 # ============================================================================
 FROM python:3.12-slim AS builder
 
+# Добавляем ffmpeg
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+
 # Устанавливаем uv для быстрой установки пакетов
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 
 # Рабочая директория
 WORKDIR /app

@@ -1,15 +1,9 @@
 <template>
   <div
     ref="containerRef"
-    class="relative w-48 h-48 sm:w-60 sm:h-60 rounded-full overflow-hidden shadow-md bg-black group cursor-pointer transform-gpu"
+    class="relative w-48 h-48 sm:w-60 sm:h-60 rounded-full overflow-hidden shadow-2xl bg-black group cursor-pointer transform-gpu"
     @click="toggleSound"
   >
-    <!-- 
-      Важно:
-      loop - зацикливание (работает нативно с исправленными файлами)
-      muted - по умолчанию без звука
-      playsinline - для iOS, чтобы не открывалось на весь экран
-    -->
     <video
       ref="videoRef"
       class="w-full h-full object-cover"
@@ -17,14 +11,15 @@
       loop
       muted
       playsinline
-      preload="metadata"
+      preload="auto"
       @timeupdate="handleTimeUpdate"
       @waiting="isBuffering = true"
       @playing="isBuffering = false"
       @loadeddata="onLoadedData"
+      @error="handleError"
     ></video>
 
-    <!-- Лоадер (показываем пока нет данных или идет буферизация) -->
+    <!-- Лоадер -->
     <div
       v-if="isBuffering && !isConnected"
       class="absolute inset-0 flex items-center justify-center bg-black/40 z-20 pointer-events-none"
@@ -34,7 +29,7 @@
       ></div>
     </div>
 
-    <!-- Иконка звука (показываем если звук выключен) -->
+    <!-- Иконка звука -->
     <div
       v-if="isMuted"
       class="absolute inset-0 flex items-center justify-center bg-black/10 transition-opacity duration-300 z-10"
@@ -49,7 +44,7 @@
       </div>
     </div>
 
-    <!-- Прогресс-бар (SVG кольцо) -->
+    <!-- Прогресс -->
     <svg
       v-if="!isMuted"
       class="absolute inset-0 w-full h-full -rotate-90 pointer-events-none z-30"
@@ -93,25 +88,20 @@ const playerStore = usePlayerStore();
 const containerRef = ref<HTMLElement | null>(null);
 const videoRef = ref<HTMLVideoElement | null>(null);
 
-const isBuffering = ref(true); // Состояние загрузки
-const isConnected = ref(false); // Флаг: видео готово к воспроизведению
+const isBuffering = ref(true);
+const isConnected = ref(false);
 const isMuted = ref(true);
 const isInViewport = ref(false);
 const progress = ref(0);
 
-// Формируем полный URL
 const fullUrl = computed(() => {
   if (!props.url) return "";
   if (props.url.startsWith("http") || props.url.startsWith("blob:"))
     return props.url;
-  // Добавляем timestamp, чтобы избежать проблем с кэшированием при разработке, если нужно
-  // return `http://localhost:8000${props.url.startsWith("/") ? props.url : `/${props.url}`}`;
   return `http://localhost:8000${
     props.url.startsWith("/") ? props.url : `/${props.url}`
   }`;
 });
-
-// --- Логика воспроизведения ---
 
 const onLoadedData = () => {
   isBuffering.value = false;
@@ -123,41 +113,32 @@ const onLoadedData = () => {
 
 const safePlay = async () => {
   if (!videoRef.value) return;
-
   try {
-    // ВАЖНО: Всегда ловим ошибки play(), иначе Chrome кидает Uncaught (in promise) при скролле
     await videoRef.value.play();
   } catch (err: any) {
-    // AbortError нормален при быстром скролле (начал грузить и сразу остановили)
+    // AbortError - норм
     if (err.name !== "AbortError") {
-      console.warn("Auto-play prevented:", err);
+      // console.warn("Auto-play prevented", err);
     }
   }
 };
 
 const pause = () => {
-  if (videoRef.value) {
-    videoRef.value.pause();
-  }
+  if (videoRef.value) videoRef.value.pause();
 };
-
-// --- Управление звуком ---
 
 const toggleSound = () => {
   if (!videoRef.value) return;
 
   if (isMuted.value) {
-    // Включаем звук
     isMuted.value = false;
     videoRef.value.muted = false;
-    videoRef.value.currentTime = 0; // При включении звука логичнее начать сначала
+    videoRef.value.currentTime = 0;
     playerStore.setPlaying(props.messageId);
     safePlay();
   } else {
-    // Выключаем звук
     isMuted.value = true;
     videoRef.value.muted = true;
-    // Оставляем играть без звука (как в Telegram)
   }
 };
 
@@ -167,9 +148,19 @@ const handleTimeUpdate = () => {
   progress.value = videoRef.value.currentTime / d;
 };
 
-// --- Наблюдатели (Watchers) ---
+// ПРАВИЛЬНЫЙ ЛОГ ОШИБОК
+const handleError = (e: Event) => {
+  const target = e.target as HTMLVideoElement;
+  if (target && target.error) {
+    console.error(
+      `[VideoNote Error] Code: ${target.error.code}, Message: ${target.error.message}`
+    );
+    // Code 3 = MEDIA_ERR_DECODE (битый файл)
+    // Code 4 = MEDIA_ERR_SRC_NOT_SUPPORTED (неподдерживаемый формат)
+  }
+  isBuffering.value = false;
+};
 
-// 1. Если другой компонент начал играть со звуком - мы замолкаем
 watch(
   () => playerStore.currentPlayingId,
   (newId) => {
@@ -180,7 +171,6 @@ watch(
   }
 );
 
-// 2. Реакция на видимость
 watch(isInViewport, (isVisible) => {
   if (isVisible && isConnected.value) {
     safePlay();
@@ -189,46 +179,23 @@ watch(isInViewport, (isVisible) => {
   }
 });
 
-// --- Intersection Observer ---
-
 let observer: IntersectionObserver | null = null;
 
 onMounted(() => {
   if (!containerRef.value) return;
-
   observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
-        // isIntersecting достаточно точен для запуска
         isInViewport.value = entry.isIntersecting;
       });
     },
-    {
-      threshold: 0.5, // Видео должно быть видно хотя бы на 50%
-      rootMargin: "0px",
-    }
+    { threshold: 0.5 }
   );
-
   observer.observe(containerRef.value);
 });
 
 onUnmounted(() => {
   observer?.disconnect();
-  // Останавливаем звук в сторе, если это видео играло
-  if (!isMuted.value) {
-    playerStore.stopPlaying();
-  }
+  if (!isMuted.value) playerStore.stopPlaying();
 });
 </script>
-
-<style scoped>
-/* 
-  Маска сглаживает края видео в Safari/Chrome, 
-  чтобы при border-radius не было "артефактов" на углах 
-*/
-video {
-  -webkit-mask-image: -webkit-radial-gradient(white, black);
-  backface-visibility: hidden;
-  transform: translateZ(0);
-}
-</style>
