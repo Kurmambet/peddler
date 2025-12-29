@@ -1,5 +1,7 @@
 // frontend/src/composables/useVideoRecorder.ts
 import { ref } from "vue";
+// @ts-ignore — так как у библиотеки может не быть типов
+import fixWebmDuration from "fix-webm-duration";
 
 export function useVideoRecorder() {
   const isRecording = ref(false);
@@ -9,12 +11,12 @@ export function useVideoRecorder() {
   let mediaRecorder: MediaRecorder | null = null;
   let chunks: Blob[] = [];
   let timer: any = null;
+  let startTime = 0; // Для точного подсчета времени
 
   const stopAllTracks = () => {
     if (stream.value) {
       stream.value.getTracks().forEach((track) => {
         track.stop();
-        // В Firefox важно явно отключать треки перед stop()
         track.enabled = false;
       });
       stream.value = null;
@@ -23,24 +25,21 @@ export function useVideoRecorder() {
 
   const startRecording = async () => {
     try {
-      stopAllTracks(); // Чистим перед стартом
+      stopAllTracks();
 
-      // ФИКС ДЛЯ FIREFOX:
-      // Убираем требования к разрешению. Firefox сам выберет оптимальное (обычно 640x480).
-      // CSS object-fit: cover сделает видео квадратным визуально.
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: {
           facingMode: "user",
-          // frameRate можно оставить, это обычно не ломает
           frameRate: { ideal: 30 },
+          // width/height можно не задавать, Firefox сам подберет
         },
       });
 
       stream.value = mediaStream;
       chunks = [];
 
-      // Приоритет кодеков: VP8 самый совместимый для Chrome <-> Firefox
+      // Пробуем кодеки. VP8 — самый надежный для кросс-браузерности (Chrome <-> FF)
       const types = [
         "video/webm;codecs=vp8,opus",
         "video/webm;codecs=vp8",
@@ -48,28 +47,32 @@ export function useVideoRecorder() {
       ];
       const mimeType =
         types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+
       console.log("[VideoRecorder] Using mimeType:", mimeType);
 
       mediaRecorder = new MediaRecorder(mediaStream, {
         mimeType,
-        videoBitsPerSecond: 1500000, // 1.5 Mbps для хорошего качества
+        videoBitsPerSecond: 1500000,
       });
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunks.push(e.data);
       };
 
-      // Timeslice 1000мс обязателен для создания Clusters
+      // timeslice 1000мс можно оставить, но для fixWebmDuration
+      // важнее всего итоговый Blob всех чанков
       mediaRecorder.start(1000);
-      isRecording.value = true;
 
-      const startTs = Date.now();
+      isRecording.value = true;
+      startTime = Date.now();
+
       timer = setInterval(() => {
-        recordingDuration.value = Math.floor((Date.now() - startTs) / 1000);
+        // Обновляем UI (секунды)
+        recordingDuration.value = Math.floor((Date.now() - startTime) / 1000);
       }, 1000);
     } catch (err) {
       console.error("Camera access error:", err);
-      stopAllTracks(); // Чистим, если упало
+      stopAllTracks();
       throw err;
     }
   };
@@ -79,13 +82,26 @@ export function useVideoRecorder() {
       if (!mediaRecorder) return;
 
       mediaRecorder.onstop = () => {
-        const finalBlob = new Blob(chunks, { type: mediaRecorder?.mimeType });
-        const finalDuration = recordingDuration.value;
+        // 1. Собираем "сырой" Blob
+        const rawBlob = new Blob(chunks, { type: mediaRecorder?.mimeType });
+
+        // 2. Вычисляем точную длительность в мс
+        const durationMs = Date.now() - startTime;
+        const finalDurationSec = Math.floor(durationMs / 1000); // Для UI/БД
+
         stopAllTracks();
         isRecording.value = false;
         recordingDuration.value = 0;
         if (timer) clearInterval(timer);
-        resolve({ blob: finalBlob, duration: finalDuration });
+
+        // 3. МАГИЯ: Исправляем заголовки WebM
+        fixWebmDuration(rawBlob, durationMs, (fixedBlob: Blob) => {
+          // fixedBlob теперь содержит корректный Header с Duration
+          resolve({
+            blob: fixedBlob,
+            duration: finalDurationSec || 1, // Минимум 1 сек, чтобы не ломать логику
+          });
+        });
       };
 
       mediaRecorder.stop();
