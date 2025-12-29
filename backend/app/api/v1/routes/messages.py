@@ -174,6 +174,60 @@ def fix_webm_container(filepath: str):
         logger.error(f"FFmpeg generic error: {ex}")
 
 
+# более агрессивный метод, полное перекодирование. сильно замедляет процесс
+# def fix_webm_container(filepath: str):
+#     """
+#     Перекодирует видео в чистый VP8/Opus WebM.
+#     Исправляет 'demuxer seek failed' и ошибки навигации.
+#     """
+#     tmp_path = f"{filepath}.tmp.webm"
+#     try:
+#         # Основные флаги:
+#         # -c:v libvpx       -> Используем кодек VP8 (максимальная совместимость)
+#         # -b:v 1M           -> Битрейт 1 Мбит/с (достаточно для кружочка 480p)
+#         # -cpu-used 4       -> Ускорение кодирования (диапазон 0-5, 4 - быстро)
+#         # -c:a libopus      -> Перекодируем звук в Opus
+#         # -movflags +faststart -> Оптимизация для веба (хотя для WebM это делает ffmpeg сам)
+
+#         command = [
+#             "ffmpeg",
+#             "-hide_banner",
+#             "-loglevel",
+#             "error",
+#             "-i",
+#             filepath,
+#             "-c:v",
+#             "libvpx",
+#             "-b:v",
+#             "1M",
+#             "-cpu-used",
+#             "4",
+#             "-c:a",
+#             "libopus",
+#             "-y",
+#             tmp_path,
+#         ]
+
+#         # Запускаем процесс
+#         subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+
+#         # Если файл создался и он не пустой
+#         if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
+#             os.replace(tmp_path, filepath)
+#             logger.info(f"Successfully transcoded WebM: {filepath}")
+#         else:
+#             logger.error("FFmpeg produced empty file")
+
+#     except subprocess.CalledProcessError as e:
+#         logger.error(
+#             f"FFmpeg transcoding failed: {e.stderr.decode() if e.stderr else 'Unknown error'}"
+#         )
+#         if os.path.exists(tmp_path):
+#             os.remove(tmp_path)
+#     except Exception as ex:
+#         logger.error(f"FFmpeg generic error: {ex}")
+
+
 @router.post("/chats/{chat_id}/messages/video_note", response_model=MessageRead)
 async def upload_video_note(
     chat_id: int,

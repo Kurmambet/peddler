@@ -5,7 +5,7 @@
 # ============================================================================
 FROM python:3.12-slim AS builder
 
-# Добавляем ffmpeg
+# Тут ffmpeg нужен только если вы что-то компилируете с ним, иначе можно убрать
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 # Устанавливаем uv для быстрой установки пакетов
@@ -32,7 +32,7 @@ LABEL maintainer="p.vis@gmail.com"
 LABEL description="Peddler Backend API"
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
+    apt-get install -y --no-install-recommends curl ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
 # Создаем пользователя без root прав

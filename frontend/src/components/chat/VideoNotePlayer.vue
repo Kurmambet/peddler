@@ -127,16 +127,24 @@ const pause = () => {
   if (videoRef.value) videoRef.value.pause();
 };
 
-const toggleSound = () => {
+const toggleSound = async () => {
   if (!videoRef.value) return;
 
   if (isMuted.value) {
+    // Включаем звук
     isMuted.value = false;
     videoRef.value.muted = false;
-    videoRef.value.currentTime = 0;
+
+    // Не используем 0, так как иногда браузер тупит с точным началом потока
+    // Используем небольшое смещение, это безопасно.
+    videoRef.value.currentTime = 0.01;
+
     playerStore.setPlaying(props.messageId);
-    safePlay();
+
+    // Ждем play, чтобы убедиться, что всё ок
+    await safePlay();
   } else {
+    // Выключаем звук
     isMuted.value = true;
     videoRef.value.muted = true;
   }
