@@ -39,8 +39,25 @@ async def send_message(
     current_user: User = Depends(get_current_user),
     service: MessageService = Depends(get_message_service),
 ) -> Message:
-    """Отправляет сообщение в чат"""
+    """Отправляет текстовое сообщение в чат"""
     return await service.send_message(chat_id, msg_in, current_user)
+    # message = await service.send_message(chat_id, msg_in, current_user)
+    # message_event = MessageCreatedEvent(
+    #     id=message.id,
+    #     chat_id=message.chat_id,
+    #     sender_id=message.sender_id,
+    #     sender_username=current_user.username,
+    #     sender_display_name=current_user.display_name,
+    #     avatar_url=current_user.avatar_url,
+    #     content=message.content,
+    #     created_at=message.created_at,
+    #     is_read=message.is_read,
+    #     message_type=message.message_type,
+    # )
+
+    # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    # logger.info("[Text] Event published successfully")
+    # return message
 
 
 @router.get("/chats/{chat_id}/messages", response_model=MessageListResponse)
@@ -174,60 +191,6 @@ def fix_webm_container(filepath: str):
         logger.error(f"FFmpeg generic error: {ex}")
 
 
-# более агрессивный метод, полное перекодирование. сильно замедляет процесс
-# def fix_webm_container(filepath: str):
-#     """
-#     Перекодирует видео в чистый VP8/Opus WebM.
-#     Исправляет 'demuxer seek failed' и ошибки навигации.
-#     """
-#     tmp_path = f"{filepath}.tmp.webm"
-#     try:
-#         # Основные флаги:
-#         # -c:v libvpx       -> Используем кодек VP8 (максимальная совместимость)
-#         # -b:v 1M           -> Битрейт 1 Мбит/с (достаточно для кружочка 480p)
-#         # -cpu-used 4       -> Ускорение кодирования (диапазон 0-5, 4 - быстро)
-#         # -c:a libopus      -> Перекодируем звук в Opus
-#         # -movflags +faststart -> Оптимизация для веба (хотя для WebM это делает ffmpeg сам)
-
-#         command = [
-#             "ffmpeg",
-#             "-hide_banner",
-#             "-loglevel",
-#             "error",
-#             "-i",
-#             filepath,
-#             "-c:v",
-#             "libvpx",
-#             "-b:v",
-#             "1M",
-#             "-cpu-used",
-#             "4",
-#             "-c:a",
-#             "libopus",
-#             "-y",
-#             tmp_path,
-#         ]
-
-#         # Запускаем процесс
-#         subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-
-#         # Если файл создался и он не пустой
-#         if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
-#             os.replace(tmp_path, filepath)
-#             logger.info(f"Successfully transcoded WebM: {filepath}")
-#         else:
-#             logger.error("FFmpeg produced empty file")
-
-#     except subprocess.CalledProcessError as e:
-#         logger.error(
-#             f"FFmpeg transcoding failed: {e.stderr.decode() if e.stderr else 'Unknown error'}"
-#         )
-#         if os.path.exists(tmp_path):
-#             os.remove(tmp_path)
-#     except Exception as ex:
-#         logger.error(f"FFmpeg generic error: {ex}")
-
-
 @router.post("/chats/{chat_id}/messages/video_note", response_model=MessageRead)
 async def upload_video_note(
     chat_id: int,
@@ -241,7 +204,7 @@ async def upload_video_note(
 
     content = await file.read()
     new_filename = f"{uuid.uuid4()}.webm"
-    chat_dir = f"uploads/video_notes/{chat_id}"  # Убедитесь, что путь совпадает с вашей настройкой
+    chat_dir = f"uploads/video_notes/{chat_id}"
     os.makedirs(chat_dir, exist_ok=True)
 
     filepath = f"{chat_dir}/{new_filename}"
@@ -250,7 +213,6 @@ async def upload_video_note(
     async with aiofiles.open(filepath, "wb") as f:
         await f.write(content)
 
-    # 2. !!! МАГИЯ: Исправляем файл на сервере !!!
     # Это синхронная операция, но для -c copy она занимает миллисекунды.
     # Для high-load это выносят в Celery/BackgroundTasks, но для мессенджера пока ок.
     fix_webm_container(filepath)
