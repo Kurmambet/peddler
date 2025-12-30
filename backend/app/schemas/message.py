@@ -26,6 +26,7 @@ class MessageCreate(MessageBase):
     file_url: Optional[str] = None
     file_size: Optional[int] = None
     duration: Optional[int] = None
+    created_at: Optional[datetime] = Field(default_factory=datetime.utcnow)
 
     @model_validator(mode="after")
     def validate_message(self):

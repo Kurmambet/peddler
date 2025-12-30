@@ -218,6 +218,11 @@ export interface MessageRead {
   duration?: number | null;
 }
 
+export interface MessageWithStatus extends MessageRead {
+  status?: "sending" | "sent" | "error";
+  localBlobUrl?: string;
+}
+
 export interface MessageCreate {
   content: string;
 }

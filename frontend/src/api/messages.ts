@@ -12,28 +12,48 @@ export const messagesAPI = {
     apiClient.post<MessageRead>(`/chats/${chatId}/messages`, {
       chat_id: chatId,
       content,
+      message_type: "text",
     }),
 
   markAsRead: (chatId: number, messageId: number) =>
     apiClient.patch<MessageRead>(`/chats/${chatId}/messages/${messageId}/read`),
 
-  sendVoice: (chatId: number, audioBlob: Blob, duration: number) => {
+  sendVoice: (
+    chatId: number,
+    audioBlob: Blob,
+    duration: number,
+    createdAt?: Date
+  ) => {
     const formData = new FormData();
     formData.append("file", audioBlob, "voice.webm");
+    formData.append("duration", Math.ceil(duration).toString());
+    if (createdAt) {
+      formData.append("created_at", createdAt.toISOString());
+    }
 
     return apiClient.post<MessageRead>(
-      `/chats/${chatId}/messages/voice?duration=${duration}`,
+      `/chats/${chatId}/messages/voice`,
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
       }
     );
   },
-  sendVideoNote: (chatId: number, videoBlob: Blob, duration: number) => {
+
+  sendVideoNote: (
+    chatId: number,
+    videoBlob: Blob,
+    duration: number,
+    createdAt?: Date
+  ) => {
     const formData = new FormData();
     formData.append("file", videoBlob, "video_note.webm");
+    if (createdAt) {
+      formData.append("created_at", createdAt.toISOString());
+    }
+    formData.append("duration", Math.ceil(duration).toString());
     return apiClient.post<MessageRead>(
-      `/chats/${chatId}/messages/video_note?duration=${duration}`,
+      `/chats/${chatId}/messages/video_note`,
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },

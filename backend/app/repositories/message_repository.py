@@ -1,4 +1,5 @@
 # app/repositories/message_repository.py
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from app.core.exceptions import ChatAccessDenied
@@ -41,7 +42,11 @@ class MessageRepository:
         file_url: Optional[str] = None,
         file_size: Optional[int] = None,
         duration: Optional[int] = None,
+        created_at: Optional[datetime] = None,
     ) -> Message:
+        if not created_at:
+            created_at = datetime.now(timezone.utc)
+
         message = Message(
             chat_id=chat_id,
             sender_id=sender_id,
@@ -97,3 +102,9 @@ class MessageRepository:
         await self.db.commit()
         await self.db.refresh(message)
         return message
+
+    async def get_chat_participant_ids(self, chat_id: int) -> List[int]:
+        result = await self.db.execute(
+            select(ChatParticipant.user_id).where(ChatParticipant.chat_id == chat_id)
+        )
+        return list(result.scalars().all())

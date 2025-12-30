@@ -1,4 +1,7 @@
 # app/services/message_service.py
+from datetime import datetime
+from typing import Optional
+
 from app.models.message import Message, MessageType
 from app.models.user import User
 from app.repositories.message_repository import MessageRepository
@@ -19,7 +22,11 @@ class MessageService:
         self.db = db
 
     async def send_message(
-        self, chat_id: int, msg_in: MessageCreate, current_user: User
+        self,
+        chat_id: int,
+        msg_in: MessageCreate,
+        current_user: User,
+        created_at: Optional[datetime] = None,
     ) -> Message:
         """
         Отправить сообщение в чат.
@@ -60,6 +67,7 @@ class MessageService:
             file_url=msg_in.file_url,
             file_size=msg_in.file_size,
             duration=msg_in.duration,
+            created_at=created_at,
         )
 
         await self.db.commit()

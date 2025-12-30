@@ -3,6 +3,8 @@ import logging
 import os
 import subprocess
 import uuid
+from datetime import datetime
+from typing import Optional
 
 import aiofiles
 from app.api.dependencies import get_current_user
@@ -13,10 +15,7 @@ from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
 from app.services.message_service import MessageService
 from app.ws.events import MessageCreatedEvent
 from app.ws.globals import pubsub_manager
-
-# from app.ws.manager import ConnectionManager
-# from app.ws.pubsub import RedisPubSubManager
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -70,10 +69,14 @@ async def mark_message_read(
 async def upload_voice_message(
     chat_id: int,
     file: UploadFile = File(...),
-    duration: int = Query(..., ge=1, le=600),
+    duration: int = Form(...),
+    created_at: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
     service: MessageService = Depends(get_message_service),
 ):
+    print(f"время создания гс:{created_at}, его продолжительность:{duration}")
+    dt_created_at = parse_created_at(created_at)
+
     # Валидация типа файла
     if not file.content_type or not file.content_type.startswith("audio/"):
         raise HTTPException(400, "File must be audio")
@@ -104,7 +107,9 @@ async def upload_voice_message(
         duration=duration,
     )
 
-    message = await service.send_message(chat_id, msg_create, current_user)
+    message = await service.send_message(
+        chat_id, msg_create, current_user, created_at=dt_created_at
+    )
 
     # Публикуем событие в Redis/WebSocket
     message_event = MessageCreatedEvent(
@@ -126,6 +131,13 @@ async def upload_voice_message(
         f"[Voice] Publishing event to chat {chat_id}: message_id={message.id}, file_url={message.file_url}"
     )
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    chat_users = await service.repo.get_chat_participant_ids(chat_id)
+
+    for user_id in chat_users:
+        # Не отправляем самому себе в личный канал (опционально, можно и отправлять)
+        if user_id != current_user.id:
+            await pubsub_manager.publish_to_user(user_id, message_event.model_dump_json())
+
     logger.info("[Voice] Event published successfully")
     return message
 
@@ -174,68 +186,19 @@ def fix_webm_container(filepath: str):
         logger.error(f"FFmpeg generic error: {ex}")
 
 
-# более агрессивный метод, полное перекодирование. сильно замедляет процесс
-# def fix_webm_container(filepath: str):
-#     """
-#     Перекодирует видео в чистый VP8/Opus WebM.
-#     Исправляет 'demuxer seek failed' и ошибки навигации.
-#     """
-#     tmp_path = f"{filepath}.tmp.webm"
-#     try:
-#         # Основные флаги:
-#         # -c:v libvpx       -> Используем кодек VP8 (максимальная совместимость)
-#         # -b:v 1M           -> Битрейт 1 Мбит/с (достаточно для кружочка 480p)
-#         # -cpu-used 4       -> Ускорение кодирования (диапазон 0-5, 4 - быстро)
-#         # -c:a libopus      -> Перекодируем звук в Opus
-#         # -movflags +faststart -> Оптимизация для веба (хотя для WebM это делает ffmpeg сам)
-
-#         command = [
-#             "ffmpeg",
-#             "-hide_banner",
-#             "-loglevel",
-#             "error",
-#             "-i",
-#             filepath,
-#             "-c:v",
-#             "libvpx",
-#             "-b:v",
-#             "1M",
-#             "-cpu-used",
-#             "4",
-#             "-c:a",
-#             "libopus",
-#             "-y",
-#             tmp_path,
-#         ]
-
-#         # Запускаем процесс
-#         subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-
-#         # Если файл создался и он не пустой
-#         if os.path.exists(tmp_path) and os.path.getsize(tmp_path) > 0:
-#             os.replace(tmp_path, filepath)
-#             logger.info(f"Successfully transcoded WebM: {filepath}")
-#         else:
-#             logger.error("FFmpeg produced empty file")
-
-#     except subprocess.CalledProcessError as e:
-#         logger.error(
-#             f"FFmpeg transcoding failed: {e.stderr.decode() if e.stderr else 'Unknown error'}"
-#         )
-#         if os.path.exists(tmp_path):
-#             os.remove(tmp_path)
-#     except Exception as ex:
-#         logger.error(f"FFmpeg generic error: {ex}")
-
-
 @router.post("/chats/{chat_id}/messages/video_note", response_model=MessageRead)
 async def upload_video_note(
     chat_id: int,
     file: UploadFile = File(...),
-    duration: int = Query(..., ge=1, le=60),
+    duration: int = Form(...),
+    created_at: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
     service: MessageService = Depends(get_message_service),
 ):
+    dt_created_at = parse_created_at(created_at)
+
+    logger.info(f"кружочек создан {created_at}, его продолжительность:{duration}")
+
     if not file.content_type or not file.content_type.startswith("video/"):
         raise HTTPException(400, "File must be a video")
 
@@ -250,7 +213,6 @@ async def upload_video_note(
     async with aiofiles.open(filepath, "wb") as f:
         await f.write(content)
 
-    # 2. !!! МАГИЯ: Исправляем файл на сервере !!!
     # Это синхронная операция, но для -c copy она занимает миллисекунды.
     # Для high-load это выносят в Celery/BackgroundTasks, но для мессенджера пока ок.
     fix_webm_container(filepath)
@@ -266,7 +228,9 @@ async def upload_video_note(
         duration=duration,
     )
 
-    message = await service.send_message(chat_id, msg_create, current_user)
+    message = await service.send_message(
+        chat_id, msg_create, current_user, created_at=dt_created_at
+    )
 
     message_event = MessageCreatedEvent(
         id=message.id,
@@ -286,3 +250,15 @@ async def upload_video_note(
 
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
     return message
+
+
+# Вспомогательная функция для безопасного парсинга
+def parse_created_at(created_at_str: Optional[str]) -> Optional[datetime]:
+    if not created_at_str:
+        return None
+    try:
+        # JS toISOString() возвращает "2024-12-30T10:00:00.123Z"
+        # Python < 3.11 плохо ест "Z", заменим на "+00:00"
+        return datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
+    except ValueError:
+        return None

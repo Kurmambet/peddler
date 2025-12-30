@@ -29,6 +29,7 @@
         @click="cancelVoice"
         class="p-2 text-app-error hover:bg-app-error/10 rounded-full transition-colors"
       >
+        <!-- Icon Cancel -->
         <svg
           class="w-6 h-6"
           fill="none"
@@ -56,13 +57,14 @@
         @click="stopAndSendVoice"
         class="p-3 bg-app-primary text-white rounded-full hover:scale-105 transition-transform shadow-lg"
       >
+        <!-- Icon Send -->
         <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
           <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
         </svg>
       </button>
     </div>
 
-    <!-- UI Записи Видео (Нижняя панель) -->
+    <!-- UI Записи Видео -->
     <div
       v-else-if="isRecordingVideo"
       class="flex items-center gap-3 p-4 bg-app-hover animate-in fade-in"
@@ -101,13 +103,13 @@
       </button>
     </div>
 
-    <!--  Стандартное поле ввода -->
+    <!-- Стандартное поле ввода -->
     <form
       v-else
       @submit.prevent="handleMainAction"
       class="flex items-end gap-2 p-3 sm:p-4"
     >
-      <!-- Переключатель Mic/Cam -->
+      <!-- Toggle Button -->
       <button
         v-if="!newMessageContent.trim()"
         type="button"
@@ -214,13 +216,14 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
-import { messagesAPI } from "../../api/messages";
 import { useChat } from "../../composables/useChat";
 import { useVideoRecorder } from "../../composables/useVideoRecorder";
 import { useVoiceRecorder } from "../../composables/useVoiceRecorder";
+import { useMessagesStore } from "../../stores/messages";
 import Input from "../ui/Input.vue";
 
 const { newMessageContent, sendMessage, handleTyping, chatId } = useChat();
+const messagesStore = useMessagesStore();
 
 const {
   isRecording: isRecordingVoice,
@@ -246,7 +249,6 @@ const toggleMode = () => {
   mode.value = mode.value === "voice" ? "video" : "voice";
 };
 
-// Исправленный watch для превью
 watch(
   videoStream,
   async (newStream) => {
@@ -268,7 +270,6 @@ const handleMainAction = async () => {
     await sendMessage();
     return;
   }
-
   try {
     if (mode.value === "voice") await startVoice();
     else await startVideo();
@@ -281,7 +282,12 @@ const stopAndSendVoice = async () => {
   if (!chatId.value) return;
   try {
     const blob = await stopVoice();
-    await messagesAPI.sendVoice(chatId.value, blob, voiceDuration.value);
+    // ИСПОЛЬЗУЕМ STORE ACTION вместо API
+    await messagesStore.sendVoiceMessage(
+      chatId.value,
+      blob,
+      voiceDuration.value
+    );
   } catch (err) {
     console.error(err);
   }
@@ -291,7 +297,8 @@ const stopAndSendVideo = async () => {
   if (!chatId.value) return;
   try {
     const { blob, duration } = await stopVideo();
-    await messagesAPI.sendVideoNote(chatId.value, blob, duration);
+    // ИСПОЛЬЗУЕМ STORE ACTION
+    await messagesStore.sendVideoNoteMessage(chatId.value, blob, duration);
   } catch (err) {
     console.error("Failed to send video note", err);
   }
