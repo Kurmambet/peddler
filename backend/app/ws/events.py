@@ -18,7 +18,6 @@ class EventType(str, Enum):
     """
 
     # Client -> Server
-    SEND_MESSAGE = "send_message"  # клиент отправляет новое сообщение в чат
     TYPING_START = "typing_start"
     TYPING_STOP = "typing_stop"
     MARK_READ = "mark_read"
@@ -57,23 +56,6 @@ class WSEvent(BaseModel):
 # ============================================================================
 # Client -> Server Events
 # ============================================================================
-class SendMessageEvent(WSEvent):
-    """
-    Клиент отправляет новое сообщение в чат.
-
-    Пример JSON от клиента:
-    {
-        "type": "send_message",
-        "content": "Привет, как дела?",
-        "client_message_id": "uuid-1234"  // опционально для идемпотентности
-            Если клиент отправит дважды одно и то же (из-за сбоя сети),
-            сервер может проигнорировать повтор.
-    }
-    """
-
-    type: EventType = EventType.SEND_MESSAGE
-    content: str = Field(..., min_length=1, max_length=5000)
-    client_message_id: Optional[str] = None  # Для дедупликации на клиенте
 
 
 class TypingStartEvent(WSEvent):

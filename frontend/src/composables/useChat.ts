@@ -149,8 +149,8 @@ function createChatInstance() {
 
   // Message Sending
   async function sendMessage() {
+    // 1. Проверки
     if (!newMessageContent.value.trim()) {
-      console.log("[useChat] ⚠️ Message is empty");
       return;
     }
 
@@ -159,66 +159,47 @@ function createChatInstance() {
       return;
     }
 
+    // 2. Останавливаем индикатор печати
     typing.sendTypingStop(() => {
       if (ws.value?.isConnected) {
         ws.value.send({ type: "typing_stop" });
       }
     });
 
+    // 3. Подготовка контента
     const content = newMessageContent.value;
-    const wsConnected = ws.value?.isConnected ?? false;
 
-    console.log("[useChat] === Sending message ===");
-    console.log("[useChat] Content length:", content.length);
-    console.log("[useChat] ChatID:", chatId.value);
-    console.log("[useChat] WebSocket connected:", wsConnected);
-
+    // Разбиваем сообщение
     const messageParts = splitMessage(content);
     console.log(`[useChat] 📤 Splitting into ${messageParts.length} part(s)`);
 
+    // Оптимистичная очистка поля ввода
     newMessageContent.value = "";
 
     try {
+      // 4. Цикл отправки частей
       for (let i = 0; i < messageParts.length; i++) {
         const part = messageParts[i];
 
-        if (wsConnected && ws.value) {
-          console.log(
-            `[useChat] 📤 Sending part ${i + 1}/${
-              messageParts.length
-            } via WebSocket (${part.length} chars)`
-          );
-          ws.value.send({
-            type: "send_message",
-            content: part,
-          });
-          console.log(`[useChat] ✅ Part ${i + 1} queued on WebSocket`);
-        } else {
-          console.warn(
-            `[useChat] ⚠️ WebSocket not connected, using REST API for part ${
-              i + 1
-            }/${messageParts.length}`
-          );
+        console.log(
+          `[useChat] 📤 Sending part ${i + 1}/${messageParts.length} via REST`
+        );
 
-          const sentMessage = await messagesStore.sendMessage(
-            chatId.value,
-            part
-          );
-          console.log(
-            `[useChat] ✅ Part ${i + 1} sent via REST (ID: ${sentMessage.id})`
-          );
-        }
+        // ВСЕГДА отправляем через Store -> REST API
+        // Это гарантирует новую транзакцию и правильный created_at на бэкенде
+        await messagesStore.sendMessage(chatId.value, part);
 
+        // Небольшая задержка между частями, чтобы гарантировать
+        // разное время создания в БД (миллисекунды) для правильной сортировки
         if (i < messageParts.length - 1) {
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
       }
 
-      if (!wsConnected) {
-        await messagesStore.loadMessages(chatId.value);
-      }
+      console.log("[useChat] ✅ All parts sent successfully");
     } catch (err) {
       console.error("[useChat] ❌ Error sending message:", err);
+      // Если произошла ошибка, возвращаем текст в поле ввода, чтобы юзер не потерял его
       newMessageContent.value = content;
       throw err;
     }

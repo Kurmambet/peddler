@@ -40,24 +40,24 @@ async def send_message(
     service: MessageService = Depends(get_message_service),
 ) -> Message:
     """Отправляет текстовое сообщение в чат"""
-    return await service.send_message(chat_id, msg_in, current_user)
-    # message = await service.send_message(chat_id, msg_in, current_user)
-    # message_event = MessageCreatedEvent(
-    #     id=message.id,
-    #     chat_id=message.chat_id,
-    #     sender_id=message.sender_id,
-    #     sender_username=current_user.username,
-    #     sender_display_name=current_user.display_name,
-    #     avatar_url=current_user.avatar_url,
-    #     content=message.content,
-    #     created_at=message.created_at,
-    #     is_read=message.is_read,
-    #     message_type=message.message_type,
-    # )
+    # return await service.send_message(chat_id, msg_in, current_user)
+    message = await service.send_message(chat_id, msg_in, current_user)
+    message_event = MessageCreatedEvent(
+        id=message.id,
+        chat_id=message.chat_id,
+        sender_id=message.sender_id,
+        sender_username=current_user.username,
+        sender_display_name=current_user.display_name,
+        avatar_url=current_user.avatar_url,
+        content=message.content,
+        created_at=message.created_at,
+        is_read=message.is_read,
+        message_type=message.message_type,
+    )
 
-    # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
-    # logger.info("[Text] Event published successfully")
-    # return message
+    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    logger.info("[Text] Event published successfully")
+    return message
 
 
 @router.get("/chats/{chat_id}/messages", response_model=MessageListResponse)

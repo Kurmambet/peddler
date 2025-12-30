@@ -10,7 +10,6 @@ from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models.chat import ChatParticipant
 from app.models.user import User
-from app.schemas.message import MessageCreate
 from app.services.message_service import MessageService
 from app.ws.auth import authenticate_websocket, reject_websocket, verify_chat_access
 from app.ws.events import (
@@ -18,9 +17,7 @@ from app.ws.events import (
     ErrorEvent,
     EventType,
     MarkReadEvent,
-    MessageCreatedEvent,
     MessageReadEvent,
-    SendMessageEvent,
     TypingIndicatorEvent,
     UserStatusChangedEvent,
 )
@@ -144,10 +141,6 @@ async def handle_client_event(
         if not event_type:
             raise ValueError("Event type is missing")
 
-        # Routing по типу события
-        if event_type == EventType.SEND_MESSAGE:
-            await handle_send_message(data, websocket, user, chat_id, db)
-
         elif event_type == EventType.TYPING_START:
             await handle_typing_start(user, chat_id, websocket)
 
@@ -174,55 +167,6 @@ async def handle_client_event(
         logger.error(f"Error handling event from user {user.id}: {e}")
         error_event = ErrorEvent(code="PROCESSING_ERROR", message="Failed to process event")
         await manager.send_personal_message(error_event.model_dump_json(), websocket)
-
-
-async def handle_send_message(
-    data: Dict[str, Any],
-    websocket: WebSocket,
-    user: User,
-    chat_id: int,
-    db: Any,  # AsyncSession
-):
-    """
-    Обрабатывает отправку нового сообщения в чат.
-    """
-
-    if not await rate_limiter.is_allowed(user.id):
-        error_event = ErrorEvent(code="RATE_LIMIT_EXCEEDED", message="Too many messages, slow down")
-        await manager.send_personal_message(error_event.model_dump_json(), websocket)
-        return
-
-    # Валидация Pydantic
-    event = SendMessageEvent(**data)
-
-    # Создаем MessageCreate DTO для существующего сервиса
-    message_create = MessageCreate(content=event.content, chat_id=chat_id)
-
-    # Сервис использует переданную свежую сессию
-    service = MessageService(db)
-    message = await service.send_message(chat_id, message_create, user)
-
-    # Формируем событие для broadcast
-    message_event = MessageCreatedEvent(
-        id=message.id,
-        chat_id=message.chat_id,
-        sender_id=message.sender_id,
-        sender_username=user.username,
-        sender_display_name=user.display_name,
-        avatar_url=user.avatar_url,
-        content=message.content,
-        created_at=message.created_at,
-        is_read=message.is_read,
-        message_type=message.message_type,
-        file_url=message.file_url,
-        file_size=message.file_size,
-        duration=message.duration,
-    )
-
-    # публикуем в Redis
-    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
-
-    logger.info(f"Message {message.id} sent by user {user.id} to chat {chat_id}")
 
 
 async def handle_typing_start(user: User, chat_id: int, websocket: WebSocket):
