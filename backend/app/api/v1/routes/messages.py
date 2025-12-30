@@ -39,7 +39,7 @@ async def send_message(
     service: MessageService = Depends(get_message_service),
 ) -> Message:
     """Отправляет сообщение в чат"""
-    return await service.send_message(chat_id, msg_in, current_user)
+    return await service.send_message(chat_id, msg_in, current_user, created_at=msg_in.created_at)
 
 
 @router.get("/chats/{chat_id}/messages", response_model=MessageListResponse)

@@ -8,11 +8,12 @@ export const messagesAPI = {
       params: { limit, offset },
     }),
 
-  send: (chatId: number, content: string) =>
+  send: (chatId: number, content: string, createdAt?: string) =>
     apiClient.post<MessageRead>(`/chats/${chatId}/messages`, {
       chat_id: chatId,
       content,
       message_type: "text",
+      created_at: createdAt,
     }),
 
   markAsRead: (chatId: number, messageId: number) =>

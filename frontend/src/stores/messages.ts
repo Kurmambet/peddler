@@ -265,7 +265,8 @@ export const useMessagesStore = defineStore("messages", () => {
 
   const sendMessage = async (chatId: number, content: string) => {
     try {
-      const { data } = await messagesAPI.send(chatId, content);
+      const createdAt = new Date().toISOString();
+      const { data } = await messagesAPI.send(chatId, content, createdAt);
       console.log("[MessagesStore] Message sent via REST:", data.id);
       return data;
     } catch (err: any) {
