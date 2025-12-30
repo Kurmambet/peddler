@@ -2,7 +2,6 @@
 import { MessageType } from "./api";
 
 export type WSEventType =
-  | "send_message"
   | "message_created"
   | "message_read"
   | "typing_start"
