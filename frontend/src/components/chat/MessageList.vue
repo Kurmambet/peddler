@@ -140,6 +140,78 @@
                 />
               </div>
 
+              <!-- ФАЙЛ -->
+              <div v-else-if="msg.message_type === 'file'" class="my-1">
+                <a
+                  :href="msg.file_url || '#'"
+                  target="_blank"
+                  :download="msg.filename"
+                  class="flex items-center gap-3 p-3 rounded-lg transition-colors group/file"
+                  :class="
+                    isOwn(msg)
+                      ? 'bg-white/10 hover:bg-white/20'
+                      : 'bg-app-primary/5 hover:bg-app-primary/10'
+                  "
+                >
+                  <!-- Иконка файла -->
+                  <div
+                    class="p-2 rounded-full bg-app-surface text-app-primary shrink-0"
+                  >
+                    <svg
+                      class="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                      />
+                    </svg>
+                  </div>
+
+                  <div class="min-w-0 flex-1">
+                    <!-- Имя файла (или fallback) -->
+                    <div class="text-sm font-medium truncate max-w-[200px]">
+                      {{ msg.filename || "File" }}
+                    </div>
+                    <!-- Размер файла -->
+                    <div class="text-xs opacity-70">
+                      {{ formatFileSize(msg.file_size) }}
+                    </div>
+                  </div>
+
+                  <!-- Иконка загрузки (показывается при наведении) -->
+                  <div
+                    class="opacity-0 group-hover/file:opacity-100 transition-opacity"
+                  >
+                    <svg
+                      class="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                      />
+                    </svg>
+                  </div>
+                </a>
+
+                <!-- Caption (если есть) -->
+                <p
+                  v-if="msg.content"
+                  class="mt-1 text-sm whitespace-pre-wrap break-words px-1"
+                >
+                  {{ msg.content }}
+                </p>
+              </div>
+
               <!-- Текст (дефолт) -->
               <p
                 v-else
@@ -314,6 +386,14 @@ const markUnreadMessagesAsRead = () => {
     );
     markMessagesAsRead(unreadMessages.map((m) => m.id));
   }
+};
+
+const formatFileSize = (bytes?: number | null) => {
+  if (!bytes) return "0 B";
+  const k = 1024;
+  const sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 };
 
 // Auto-scroll on new message

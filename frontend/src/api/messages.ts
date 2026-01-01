@@ -17,6 +17,24 @@ export const messagesAPI = {
   markAsRead: (chatId: number, messageId: number) =>
     apiClient.patch<MessageRead>(`/chats/${chatId}/messages/${messageId}/read`),
 
+  sendFile(chatId: number, file: File, caption?: string) {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (caption) {
+      formData.append("caption", caption);
+    }
+    return apiClient.post<MessageRead>(
+      `/chats/${chatId}/messages/file`,
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 0,
+      }
+    );
+  },
+
   sendVoice: (chatId: number, audioBlob: Blob, duration: number) => {
     const formData = new FormData();
     formData.append("file", audioBlob, "voice.webm");

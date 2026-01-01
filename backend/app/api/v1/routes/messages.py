@@ -141,6 +141,8 @@ async def upload_voice_message(
         file_url=message.file_url,
         file_size=message.file_size,
         duration=message.duration,
+        filename=message.filename,
+        mimetype=message.mimetype,
     )
     logger.info(
         f"[Voice] Publishing event to chat {chat_id}: message_id={message.id}, file_url={message.file_url}"
@@ -244,6 +246,8 @@ async def upload_video_note(
         file_url=message.file_url,
         file_size=message.file_size,
         duration=message.duration,
+        filename=message.filename,
+        mimetype=message.mimetype,
     )
 
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
