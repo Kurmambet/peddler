@@ -21,7 +21,7 @@ export const messagesAPI = {
     chatId: number,
     file: File,
     caption?: string,
-    onProgress?: (progress: number) => void // <--- Callback
+    onProgress?: (progress: number) => void
   ) {
     const formData = new FormData();
     formData.append("file", file);
@@ -49,7 +49,12 @@ export const messagesAPI = {
     );
   },
 
-  sendVoice: (chatId: number, audioBlob: Blob, duration: number) => {
+  sendVoice(
+    chatId: number,
+    audioBlob: Blob,
+    duration: number,
+    onProgress?: (progress: number) => void
+  ) {
     const formData = new FormData();
     formData.append("file", audioBlob, "voice.webm");
 
@@ -58,17 +63,42 @@ export const messagesAPI = {
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total && onProgress) {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(percent);
+          }
+        },
+        timeout: 0,
       }
     );
   },
-  sendVideoNote: (chatId: number, videoBlob: Blob, duration: number) => {
+
+  sendVideoNote(
+    chatId: number,
+    videoBlob: Blob,
+    duration: number,
+    onProgress?: (progress: number) => void
+  ) {
     const formData = new FormData();
-    formData.append("file", videoBlob, "video_note.webm");
+    formData.append("file", videoBlob, "videonote.webm");
+
     return apiClient.post<MessageRead>(
       `/chats/${chatId}/messages/video_note?duration=${duration}`,
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total && onProgress) {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(percent);
+          }
+        },
+        timeout: 0,
       }
     );
   },

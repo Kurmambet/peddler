@@ -3,6 +3,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { messagesAPI } from "../api/messages";
 import type { MessageRead } from "../types/api";
+import { MessageType } from "../types/api";
 import type { MessageCreatedEvent } from "../types/events";
 import { useAuthStore } from "./auth";
 
@@ -161,6 +162,117 @@ export const useMessagesStore = defineStore("messages", () => {
     console.warn(`[MessagesStore] ⚠️ Message ${messageId} not found`);
   };
 
+  // === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ СОЗДАНИЯ ОПТИМИСТИЧНЫХ СООБЩЕНИЙ ===
+  const createOptimisticMessage = (
+    chatId: number,
+    type: MessageType,
+    file: Blob | File,
+    duration: number = 0
+  ): MessageRead => {
+    const authStore = useAuthStore();
+    return {
+      id: -Date.now(), // Временный ID
+      chat_id: chatId,
+      sender_id: authStore.user?.id || 0,
+      sender_username: authStore.user?.username || "",
+      sender_display_name: authStore.user?.display_name || "",
+      avatar_url: authStore.user?.avatar_url || "",
+      content: "",
+      is_read: false,
+      created_at: new Date().toISOString(),
+      updated_at: "", //TODO
+      message_type: type,
+
+      // File Metadata
+      filename: (file as File).name || "voice.webm",
+      file_size: file.size,
+      mimetype: file.type,
+      file_url: URL.createObjectURL(file), // <--- Генерируем локальный URL для превью!
+      duration: duration,
+
+      // Local state
+      isLocal: true,
+      isUploading: true,
+      uploadProgress: 0,
+      isError: false,
+    };
+  };
+
+  // === VOICE ACTION ===
+  const sendVoiceOptimistic = async (
+    chatId: number,
+    blob: Blob,
+    duration: number
+  ) => {
+    const optimisticMsg = createOptimisticMessage(
+      chatId,
+      MessageType.VOICE,
+      blob,
+      duration
+    );
+
+    if (!pendingMessages.value[chatId]) pendingMessages.value[chatId] = [];
+    pendingMessages.value[chatId].push(optimisticMsg);
+
+    try {
+      await messagesAPI.sendVoice(chatId, blob, duration, (progress) => {
+        const msg = pendingMessages.value[chatId]?.find(
+          (m) => m.id === optimisticMsg.id
+        );
+        if (msg) msg.uploadProgress = progress;
+      });
+      // Удаляем, так как придет реальное сообщение через WS
+      removePendingMessage(chatId, optimisticMsg.id);
+      // Очищаем URL (освобождаем память)
+      if (optimisticMsg.file_url) URL.revokeObjectURL(optimisticMsg.file_url);
+    } catch (err) {
+      console.error("Voice upload failed", err);
+      const msg = pendingMessages.value[chatId]?.find(
+        (m) => m.id === optimisticMsg.id
+      );
+      if (msg) {
+        msg.isError = true;
+        msg.isUploading = false;
+      }
+    }
+  };
+
+  // === VIDEO NOTE ACTION ===
+  const sendVideoNoteOptimistic = async (
+    chatId: number,
+    blob: Blob,
+    duration: number
+  ) => {
+    const optimisticMsg = createOptimisticMessage(
+      chatId,
+      MessageType.VIDEO_NOTE,
+      blob,
+      duration
+    );
+
+    if (!pendingMessages.value[chatId]) pendingMessages.value[chatId] = [];
+    pendingMessages.value[chatId].push(optimisticMsg);
+
+    try {
+      await messagesAPI.sendVideoNote(chatId, blob, duration, (progress) => {
+        const msg = pendingMessages.value[chatId]?.find(
+          (m) => m.id === optimisticMsg.id
+        );
+        if (msg) msg.uploadProgress = progress;
+      });
+      removePendingMessage(chatId, optimisticMsg.id);
+      if (optimisticMsg.file_url) URL.revokeObjectURL(optimisticMsg.file_url);
+    } catch (err) {
+      console.error("Video note upload failed", err);
+      const msg = pendingMessages.value[chatId]?.find(
+        (m) => m.id === optimisticMsg.id
+      );
+      if (msg) {
+        msg.isError = true;
+        msg.isUploading = false;
+      }
+    }
+  };
   // --- ACTION: Отправка файла с оптимистичным UI ---
   const sendFileOptimistic = async (
     chatId: number,
@@ -184,13 +296,13 @@ export const useMessagesStore = defineStore("messages", () => {
       is_read: false,
       created_at: new Date().toISOString(),
       updated_at: "", // TODO
-      message_type: "file" as any, // или импортируйте Enum
+      message_type: "file" as any,
 
       // Файловые данные
       filename: file.name,
       file_size: file.size,
       mimetype: file.type,
-      file_url: "#", // Пока нет URL
+      file_url: "#",
 
       // Локальные флаги
       isLocal: true,
@@ -258,5 +370,7 @@ export const useMessagesStore = defineStore("messages", () => {
     pendingMessages,
     getPendingMessages,
     sendFileOptimistic,
+    sendVoiceOptimistic,
+    sendVideoNoteOptimistic,
   };
 });

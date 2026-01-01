@@ -244,7 +244,6 @@
 
 <script setup lang="ts">
 import { nextTick, ref, watch } from "vue";
-import { messagesAPI } from "../../api/messages";
 import { useChat } from "../../composables/useChat";
 import { useVideoRecorder } from "../../composables/useVideoRecorder";
 import { useVoiceRecorder } from "../../composables/useVoiceRecorder";
@@ -332,7 +331,8 @@ const stopAndSendVoice = async () => {
   if (!chatId.value) return;
   try {
     const blob = await stopVoice();
-    await messagesAPI.sendVoice(chatId.value, blob, voiceDuration.value);
+    // await messagesAPI.sendVoice(chatId.value, blob, voiceDuration.value);
+    messagesStore.sendVoiceOptimistic(chatId.value, blob, voiceDuration.value);
   } catch (err) {
     console.error(err);
   }
@@ -342,7 +342,8 @@ const stopAndSendVideo = async () => {
   if (!chatId.value) return;
   try {
     const { blob, duration } = await stopVideo();
-    await messagesAPI.sendVideoNote(chatId.value, blob, duration);
+    // await messagesAPI.sendVideoNote(chatId.value, blob, duration);
+    messagesStore.sendVideoNoteOptimistic(chatId.value, blob, duration);
   } catch (err) {
     console.error("Failed to send video note", err);
   }
