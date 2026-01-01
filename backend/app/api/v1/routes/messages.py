@@ -16,13 +16,16 @@ from app.ws.globals import pubsub_manager
 
 # from app.ws.manager import ConnectionManager
 # from app.ws.pubsub import RedisPubSubManager
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
 VOICE_DIR = "uploads/voice"
 MAX_VOICE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+FILES_DIR = "uploads/files"
+VIDEO_NOTES_DIR = "uploads/video_notes"
 
 router = APIRouter(tags=["messages"])
 
@@ -138,6 +141,8 @@ async def upload_voice_message(
         file_url=message.file_url,
         file_size=message.file_size,
         duration=message.duration,
+        filename=message.filename,
+        mimetype=message.mimetype,
     )
     logger.info(
         f"[Voice] Publishing event to chat {chat_id}: message_id={message.id}, file_url={message.file_url}"
@@ -145,9 +150,6 @@ async def upload_voice_message(
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
     logger.info("[Voice] Event published successfully")
     return message
-
-
-VIDEO_NOTES_DIR = "uploads/video_notes"
 
 
 def fix_webm_container(filepath: str):
@@ -244,6 +246,75 @@ async def upload_video_note(
         file_url=message.file_url,
         file_size=message.file_size,
         duration=message.duration,
+        filename=message.filename,
+        mimetype=message.mimetype,
+    )
+
+    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    return message
+
+
+@router.post("/chats/{chat_id}/messages/file", response_model=MessageRead)
+async def upload_file_message(
+    chat_id: int,
+    file: UploadFile = File(...),
+    caption: str = Form(None),
+    current_user: User = Depends(get_current_user),
+    service: MessageService = Depends(get_message_service),
+):
+    # 1. Ранняя проверка доступа (до сохранения файла)
+    await service.repo.verify_chat_access(chat_id, current_user.id)
+
+    # 2. Подготовка путей
+    # Используем UUID для имени файла на диске, чтобы избежать коллизий
+    file_extension = file.filename.split(".")[-1] if "." in file.filename else "bin"
+    new_filename = f"{uuid.uuid4()}.{file_extension}"
+    chat_dir = f"{FILES_DIR}/{chat_id}"
+    os.makedirs(chat_dir, exist_ok=True)
+    file_path = f"{chat_dir}/{new_filename}"
+
+    # 3. Потоковое сохранение файла (Chunked upload)
+    # Читаем и пишем по 1МБ, чтобы не держать весь файл в RAM
+    file_size = 0
+    async with aiofiles.open(file_path, "wb") as f:
+        while chunk := await file.read(1024 * 1024):  # 1MB chunks
+            await f.write(chunk)
+            file_size += len(chunk)
+
+    # 4. Формирование публичной ссылки
+    # static смонтирован на папку uploads, поэтому путь начинается с static/files/...
+    public_url = f"/static/files/{chat_id}/{new_filename}"
+
+    # 5. Создание сообщения
+    msg_create = MessageCreate(
+        chat_id=chat_id,
+        content=caption or "",
+        message_type=MessageType.FILE,
+        file_url=public_url,
+        file_size=file_size,
+        duration=None,
+        filename=file.filename,
+        mimetype=file.content_type,
+    )
+
+    message = await service.send_message(chat_id, msg_create, current_user)
+
+    message_event = MessageCreatedEvent(
+        id=message.id,
+        chat_id=message.chat_id,
+        sender_id=message.sender_id,
+        sender_username=current_user.username,
+        sender_display_name=current_user.display_name,
+        avatar_url=current_user.avatar_url,
+        content=message.content,
+        created_at=message.created_at,
+        is_read=message.is_read,
+        message_type=message.message_type,
+        file_url=message.file_url,
+        file_size=message.file_size,
+        duration=message.duration,
+        filename=message.filename,
+        mimetype=message.mimetype,
     )
 
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())

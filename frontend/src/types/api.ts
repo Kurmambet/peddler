@@ -216,6 +216,8 @@ export interface MessageRead {
   file_url?: string | null;
   file_size?: number | null;
   duration?: number | null;
+  filename?: string | null;
+  mimetype?: string | null;
 }
 
 export interface MessageCreate {

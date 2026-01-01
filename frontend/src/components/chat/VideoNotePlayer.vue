@@ -1,3 +1,4 @@
+<!-- frontend\src\components\chat\VideoNotePlayer.vue -->
 <template>
   <div
     ref="containerRef"

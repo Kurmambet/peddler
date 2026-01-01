@@ -27,6 +27,7 @@ UPLOAD_DIR = "uploads"
 VOICE_DIR = f"{UPLOAD_DIR}/voice"
 AVATARS_DIR = f"{UPLOAD_DIR}/avatars"
 VIDEO_NOTES_DIR = f"{UPLOAD_DIR}/video_notes"
+FILES_DIR = f"{UPLOAD_DIR}/files"
 
 # Создаём родительскую папку
 if not os.path.exists(UPLOAD_DIR):
@@ -39,6 +40,8 @@ if not os.path.exists(AVATARS_DIR):
     os.makedirs(AVATARS_DIR, exist_ok=True)
 if not os.path.exists(VIDEO_NOTES_DIR):
     os.makedirs(VIDEO_NOTES_DIR, exist_ok=True)
+if not os.path.exists(FILES_DIR):
+    os.makedirs(FILES_DIR, exist_ok=True)
 
 
 @asynccontextmanager

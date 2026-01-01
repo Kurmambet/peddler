@@ -47,6 +47,7 @@ SKIP_CONTENT_FILES = {
     "tsconfig.node.json",
     "tsconfig.json",
     "tsconfig.app.json",
+    "tree.py",
     # "docker-compose.dev.yml",
     ".env.example",
 }
@@ -150,17 +151,49 @@ def get_file_extension(filename):
 
 
 def generate_tree(root_path="."):
-    tree_lines = []
-    for root, dirs, files in os.walk(root_path):
-        dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-        dirs.sort()
-        level = root.replace(root_path, "").count(os.sep)
-        indent = "    " * level
-        dirname = os.path.basename(root) or os.path.basename(os.getcwd())
-        tree_lines.append(f"{indent}{dirname}/")
-        for f in sorted(files):
-            tree_lines.append(f"{'    ' * (level + 1)}{f}")
-    return "\n".join(tree_lines)
+    """Генерирует красивое дерево проекта с использованием символов веток."""
+
+    def build_tree(current_dir, prefix=""):
+        lines = []
+        try:
+            # Получаем список всех элементов и фильтруем исключенные папки
+            items = os.listdir(current_dir)
+            dirs = sorted(
+                [
+                    d
+                    for d in items
+                    if os.path.isdir(os.path.join(current_dir, d))
+                    and d not in EXCLUDE_DIRS
+                ]
+            )
+            files = sorted(
+                [f for f in items if os.path.isfile(os.path.join(current_dir, f))]
+            )
+
+            all_entries = [(d, True) for d in dirs] + [(f, False) for f in files]
+            count = len(all_entries)
+
+            for i, (name, is_dir) in enumerate(all_entries):
+                is_last = i == count - 1
+                connector = "└── " if is_last else "├── "
+
+                # Добавляем строку для текущего элемента
+                lines.append(f"{prefix}{connector}{name}{'/' if is_dir else ''}")
+
+                # Если это директория, идем глубже
+                if is_dir:
+                    new_prefix = prefix + ("    " if is_last else "│   ")
+                    lines.extend(
+                        build_tree(os.path.join(current_dir, name), new_prefix)
+                    )
+        except PermissionError:
+            pass
+        return lines
+
+    root_name = (
+        "./" if root_path == "." else f"{os.path.basename(os.path.abspath(root_path))}/"
+    )
+    return "\n".join([root_name] + build_tree(root_path))
 
 
 def generate_file_contents(root_path="."):

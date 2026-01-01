@@ -60,6 +60,8 @@ class MessageService:
             file_url=msg_in.file_url,
             file_size=msg_in.file_size,
             duration=msg_in.duration,
+            filename=msg_in.filename,
+            mimetype=msg_in.mimetype,
         )
 
         await self.db.commit()
@@ -103,6 +105,8 @@ class MessageService:
                 file_url=msg.file_url,
                 file_size=msg.file_size,
                 duration=msg.duration,
+                filename=msg.filename,
+                mimetype=msg.mimetype,
             )
             for msg in messages
         ]

@@ -118,6 +118,9 @@ class MessageCreatedEvent(WSEvent):
     file_size: int | None = None
     duration: int | None = None
 
+    filename: str | None = None
+    mimetype: str | None = None
+
 
 class MessageReadEvent(WSEvent):
     """

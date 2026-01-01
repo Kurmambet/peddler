@@ -27,6 +27,9 @@ class MessageCreate(MessageBase):
     file_size: Optional[int] = None
     duration: Optional[int] = None
 
+    filename: Optional[str] = None
+    mimetype: Optional[str] = None
+
     @model_validator(mode="after")
     def validate_message(self):
         """
@@ -52,6 +55,9 @@ class MessageRead(MessageBase):
     file_url: Optional[str] = None
     file_size: Optional[int] = None
     duration: Optional[int] = None
+
+    filename: Optional[str] = None
+    mimetype: Optional[str] = None
 
     class Config:
         from_attributes = True

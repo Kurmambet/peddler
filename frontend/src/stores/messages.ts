@@ -105,11 +105,13 @@ export const useMessagesStore = defineStore("messages", () => {
       content: event.content,
       is_read: event.is_read,
       created_at: event.created_at,
-      updated_at: event.created_at,
+      updated_at: event.created_at as string, //TODO нормальный updated_at кода отредактировать сообщение можно будет
       message_type: event.message_type,
       file_url: event.file_url,
       file_size: event.file_size,
       duration: event.duration,
+      filename: event.filename,
+      mimetype: event.mimetype,
     };
 
     const newMessageTime = new Date(event.created_at).getTime();
