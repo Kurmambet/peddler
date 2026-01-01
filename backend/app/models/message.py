@@ -44,6 +44,9 @@ class Message(BaseModel):
     file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)  # байты
     duration: Mapped[int | None] = mapped_column(Integer, nullable=True)  # секунды
 
+    filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mimetype: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
     chat: Mapped["Chat"] = relationship(
         "Chat",
         back_populates="messages",
