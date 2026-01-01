@@ -248,9 +248,11 @@ import { messagesAPI } from "../../api/messages";
 import { useChat } from "../../composables/useChat";
 import { useVideoRecorder } from "../../composables/useVideoRecorder";
 import { useVoiceRecorder } from "../../composables/useVoiceRecorder";
+import { useMessagesStore } from "../../stores/messages";
 import Input from "../ui/Input.vue";
 
 const { newMessageContent, sendMessage, handleTyping, chatId } = useChat();
+const messagesStore = useMessagesStore();
 
 const {
   isRecording: isRecordingVoice,
@@ -282,7 +284,8 @@ const handleFileSelect = async (event: Event) => {
 
   for (const file of files) {
     try {
-      await messagesAPI.sendFile(chatId.value, file);
+      // await messagesAPI.sendFile(chatId.value, file);
+      messagesStore.sendFileOptimistic(chatId.value, file);
     } catch (err) {
       console.error(`Failed to send ${file.name}`, err);
     }

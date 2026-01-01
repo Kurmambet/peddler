@@ -94,7 +94,7 @@
 
             <!-- Message bubble -->
             <div
-              class="max-w-[85%] sm:max-w-md shadow-sm overflow-hidden"
+              class="max-w-[85%] sm:max-w-md shadow-sm overflow-hidden relative"
               :class="[
                 // Если это НЕ кружочек, добавляем отступы, скругление и фон
                 msg.message_type !== 'video_note' ? 'px-3 py-2 rounded-lg' : '',
@@ -105,137 +105,196 @@
                     ? 'bg-app-message-outgoing text-app-message-text-outgoing'
                     : 'bg-app-message-incoming text-app-message-text-incoming'
                   : 'bg-transparent shadow-none', // Для кружочков фон прозрачный
+                msg.isError ? 'opacity-50 grayscale' : '',
               ]"
             >
-              <!-- Sender name for group chats -->
-              <p
-                v-if="!isOwn(msg) && msg.message_type !== 'video_note'"
-                class="text-xs font-semibold mb-1 opacity-75 break-words cursor-pointer hover:underline"
-                @click="openProfile(msg.sender_id)"
-              >
-                {{ msg.sender_display_name || msg.sender_username }}
-              </p>
-
-              <!-- Message content -->
-              <!-- Голосовое сообщение -->
-              <div v-if="msg.message_type === 'voice'" class="my-1">
-                <VoicePlayer
-                  :url="msg.file_url!"
-                  :duration="msg.duration!"
-                  :message-id="msg.id"
-                  :is-own="isOwn(msg)"
-                />
-              </div>
-
-              <!-- ВИДЕОКРУЖОЧЕК -->
+              <!-- === ЛОКАЛЬНЫЙ ОВЕРЛЕЙ ЗАГРУЗКИ (фон-прогресс) === -->
               <div
-                v-else-if="msg.message_type === 'video_note'"
-                class="my-2 flex"
-                :class="{ 'justify-end': isOwn(msg) }"
-              >
-                <VideoNotePlayer
-                  :url="msg.file_url!"
-                  :message-id="msg.id"
-                  :duration="msg.duration!"
-                />
-              </div>
-
-              <!-- ФАЙЛ -->
-              <div v-else-if="msg.message_type === 'file'" class="my-1">
-                <a
-                  :href="msg.file_url || '#'"
-                  target="_blank"
-                  :download="msg.filename"
-                  class="flex items-center gap-3 p-3 rounded-lg transition-colors group/file"
-                  :class="
-                    isOwn(msg)
-                      ? 'bg-white/10 hover:bg-white/20'
-                      : 'bg-app-primary/5 hover:bg-app-primary/10'
-                  "
-                >
-                  <!-- Иконка файла -->
-                  <div
-                    class="p-2 rounded-full bg-app-surface text-app-primary shrink-0"
-                  >
-                    <svg
-                      class="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
-                      />
-                    </svg>
-                  </div>
-
-                  <div class="min-w-0 flex-1">
-                    <!-- Имя файла (или fallback) -->
-                    <div class="text-sm font-medium truncate max-w-[200px]">
-                      {{ msg.filename || "File" }}
-                    </div>
-                    <!-- Размер файла -->
-                    <div class="text-xs opacity-70">
-                      {{ formatFileSize(msg.file_size) }}
-                    </div>
-                  </div>
-
-                  <!-- Иконка загрузки (показывается при наведении) -->
-                  <div
-                    class="opacity-0 group-hover/file:opacity-100 transition-opacity"
-                  >
-                    <svg
-                      class="w-5 h-5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                        stroke-width="2"
-                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                      />
-                    </svg>
-                  </div>
-                </a>
-
-                <!-- Caption (если есть) -->
+                v-if="msg.isLocal && msg.isUploading"
+                class="absolute inset-0 bg-black/10 z-0 pointer-events-none transition-all duration-300"
+                :style="{ width: (msg.uploadProgress || 0) + '%' }"
+              ></div>
+              <div class="relative z-10">
+                <!-- Sender name for group chats -->
                 <p
-                  v-if="msg.content"
-                  class="mt-1 text-sm whitespace-pre-wrap break-words px-1"
+                  v-if="!isOwn(msg) && msg.message_type !== 'video_note'"
+                  class="text-xs font-semibold mb-1 opacity-75 break-words cursor-pointer hover:underline"
+                  @click="openProfile(msg.sender_id)"
+                >
+                  {{ msg.sender_display_name || msg.sender_username }}
+                </p>
+
+                <!-- Message content -->
+                <!-- Голосовое сообщение -->
+                <div v-if="msg.message_type === 'voice'" class="my-1">
+                  <VoicePlayer
+                    :url="msg.file_url!"
+                    :duration="msg.duration!"
+                    :message-id="msg.id"
+                    :is-own="isOwn(msg)"
+                  />
+                </div>
+
+                <!-- ВИДЕОКРУЖОЧЕК -->
+                <div
+                  v-else-if="msg.message_type === 'video_note'"
+                  class="my-2 flex"
+                  :class="{ 'justify-end': isOwn(msg) }"
+                >
+                  <VideoNotePlayer
+                    :url="msg.file_url!"
+                    :message-id="msg.id"
+                    :duration="msg.duration!"
+                  />
+                </div>
+
+                <!-- ФАЙЛ -->
+                <div v-else-if="msg.message_type === 'file'" class="my-1">
+                  <a
+                    :href="msg.isLocal ? '#' : msg.file_url || '#'"
+                    :target="msg.isLocal ? '' : '_blank'"
+                    :download="msg.filename"
+                    class="flex items-center gap-3 p-3 rounded-lg transition-colors group/file"
+                    :class="[
+                      isOwn(msg)
+                        ? 'bg-white/10 hover:bg-white/20'
+                        : 'bg-app-primary/5 hover:bg-app-primary/10',
+                      msg.isLocal ? 'cursor-default' : 'cursor-pointer',
+                    ]"
+                  >
+                    <!-- Иконка файла -->
+                    <!-- Иконка меняется на спиннер/паузу при загрузке -->
+                    <div
+                      class="p-2 rounded-full bg-app-surface text-app-primary shrink-0"
+                    >
+                      <!-- Если загрузка -->
+                      <svg
+                        v-if="msg.isLocal && msg.isUploading"
+                        class="w-6 h-6 animate-spin"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          class="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          stroke-width="4"
+                        ></circle>
+                        <path
+                          class="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      <!-- Если ошибка -->
+                      <svg
+                        v-else-if="msg.isError"
+                        class="w-6 h-6 text-red-500"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                      <!-- Обычная иконка -->
+                      <svg
+                        v-else
+                        class="w-6 h-6"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                        />
+                      </svg>
+                    </div>
+
+                    <div class="min-w-0 flex-1">
+                      <div class="text-sm font-medium truncate max-w-[200px]">
+                        {{ msg.filename || "File" }}
+                      </div>
+                      <div class="text-xs opacity-70">
+                        <!-- Показываем "Uploading 45%" или размер -->
+                        <span v-if="msg.isLocal && msg.isUploading">
+                          Uploading {{ msg.uploadProgress }}%
+                        </span>
+                        <span
+                          v-else-if="msg.isError"
+                          class="text-red-500 font-bold"
+                        >
+                          Upload Failed
+                        </span>
+                        <span v-else>
+                          {{ formatFileSize(msg.file_size) }}
+                        </span>
+                      </div>
+                    </div>
+
+                    <!-- Иконка загрузки (показывается при наведении) -->
+                    <div
+                      class="opacity-0 group-hover/file:opacity-100 transition-opacity"
+                    >
+                      <svg
+                        class="w-5 h-5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                        />
+                      </svg>
+                    </div>
+                  </a>
+
+                  <!-- Caption (если есть) -->
+                  <p
+                    v-if="msg.content"
+                    class="mt-1 text-sm whitespace-pre-wrap break-words px-1"
+                  >
+                    {{ msg.content }}
+                  </p>
+                </div>
+
+                <!-- Текст (дефолт) -->
+                <p
+                  v-else
+                  class="text-sm break-all whitespace-pre-wrap leading-relaxed"
                 >
                   {{ msg.content }}
                 </p>
-              </div>
 
-              <!-- Текст (дефолт) -->
-              <p
-                v-else
-                class="text-sm break-all whitespace-pre-wrap leading-relaxed"
-              >
-                {{ msg.content }}
-              </p>
-
-              <!-- Timestamp + Read status -->
-              <div
-                class="flex items-center gap-1 text-[10px] mt-1 opacity-70"
-                :class="{
-                  'justify-end': isOwn(msg),
-                  // Если это кружочек, приподнимаем время чуть выше или делаем его белым (опционально)
-                  'text-white drop-shadow-md':
-                    msg.message_type === 'video_note',
-                }"
-              >
-                <span>{{ formatTime(msg.created_at) }}</span>
-                <MessageStatusIcon
-                  v-if="isOwn(msg)"
-                  :is-read="msg.is_read"
-                  :is-own="isOwn(msg)"
-                />
+                <!-- Timestamp + Read status -->
+                <div
+                  class="flex items-center gap-1 text-[10px] mt-1 opacity-70"
+                  :class="{
+                    'justify-end': isOwn(msg),
+                    // Если это кружочек, приподнимаем время чуть выше или делаем его белым (опционально)
+                    'text-white drop-shadow-md':
+                      msg.message_type === 'video_note',
+                  }"
+                >
+                  <span>{{ formatTime(msg.created_at) }}</span>
+                  <MessageStatusIcon
+                    v-if="isOwn(msg)"
+                    :is-read="msg.is_read"
+                    :is-own="isOwn(msg)"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -296,12 +355,25 @@ const openProfile = (userId: number) => {
 const groupedMessages = computed(() => {
   const groups: Record<string, { label: string; messages: MessageRead[] }> = {};
 
-  const sortedMessages = [...currentMessages.value].sort(
+  // 1. Берем сообщения из хука (реальные)
+  const realMessages = [...currentMessages.value];
+
+  // 2. Берем pending сообщения из стора для текущего чата
+  const pending = chatId.value
+    ? messagesStore.getPendingMessages(chatId.value)
+    : [];
+
+  // 3. Объединяем
+  const allMessages = [...realMessages, ...pending];
+
+  // 4. Сортируем (pending обычно будут в конце, так как у них Date.now())
+  const sortedMessages = allMessages.sort(
     (a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
 
   sortedMessages.forEach((msg) => {
+    // Приводим created_at к строке/дате для корректной работы утилит
     const dateKey = getDateKey(msg.created_at);
     if (!groups[dateKey]) {
       groups[dateKey] = {

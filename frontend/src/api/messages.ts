@@ -17,11 +17,16 @@ export const messagesAPI = {
   markAsRead: (chatId: number, messageId: number) =>
     apiClient.patch<MessageRead>(`/chats/${chatId}/messages/${messageId}/read`),
 
-  sendFile(chatId: number, file: File, caption?: string) {
+  sendFile(
+    chatId: number,
+    file: File,
+    caption?: string,
+    onProgress?: (progress: number) => void // <--- Callback
+  ) {
     const formData = new FormData();
     formData.append("file", file);
     if (caption) {
-      formData.append("caption", caption);
+      formData.append("content", caption);
     }
     return apiClient.post<MessageRead>(
       `/chats/${chatId}/messages/file`,
@@ -30,7 +35,16 @@ export const messagesAPI = {
         headers: {
           "Content-Type": "multipart/form-data",
         },
-        timeout: 0,
+        // Axios progress event
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total && onProgress) {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(percent);
+          }
+        },
+        timeout: 0, // Бесконечный таймаут для больших файлов
       }
     );
   },

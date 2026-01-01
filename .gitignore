@@ -95,5 +95,7 @@ voice/
 uploads/voice/
 uploads/video_notes/
 video_notes/
+uploads/files/
+files/
 /1/
 *.webm

@@ -62,7 +62,7 @@ SELECT * FROM chats;
 
 # сообщения
 SELECT * FROM messages;
-SELECT content, message_type_enum, file_url, filename, mimetype FROM messages;
+SELECT content, message_type_enum, file_url, filename, file_size, mimetype FROM messages;
 
 # участники чатов
 SELECT * FROM chat_participants;
