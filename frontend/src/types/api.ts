@@ -216,6 +216,13 @@ export interface MessageRead {
   file_url?: string | null;
   file_size?: number | null;
   duration?: number | null;
+  filename?: string | null;
+  mimetype?: string | null;
+
+  isLocal?: boolean; // Флаг, что это локальное сообщение
+  isUploading?: boolean; // Флаг, что идет загрузка
+  uploadProgress?: number; // Прогресс 0-100
+  isError?: boolean; // Ошибка загрузки
 }
 
 export interface MessageCreate {

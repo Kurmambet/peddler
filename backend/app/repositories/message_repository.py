@@ -41,6 +41,8 @@ class MessageRepository:
         file_url: Optional[str] = None,
         file_size: Optional[int] = None,
         duration: Optional[int] = None,
+        filename: Optional[str] = None,
+        mimetype: Optional[str] = None,
     ) -> Message:
         message = Message(
             chat_id=chat_id,
@@ -50,6 +52,8 @@ class MessageRepository:
             file_url=file_url,
             file_size=file_size,
             duration=duration,
+            filename=filename,
+            mimetype=mimetype,
         )
         self.db.add(message)
         await self.db.flush()

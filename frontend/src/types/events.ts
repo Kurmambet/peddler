@@ -2,7 +2,6 @@
 import { MessageType } from "./api";
 
 export type WSEventType =
-  | "send_message"
   | "message_created"
   | "message_read"
   | "typing_start"
@@ -34,6 +33,9 @@ export interface MessageCreatedEvent extends BaseEvent {
   file_url?: string | null;
   file_size?: number | null;
   duration?: number | null;
+
+  filename?: string | null;
+  mimetype?: string | null;
 }
 
 export interface MessageReadEvent extends BaseEvent {

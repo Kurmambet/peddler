@@ -1,8 +1,8 @@
 """Initial migration
 
-Revision ID: a9268876d318
+Revision ID: 168fcdf03f2f
 Revises: 
-Create Date: 2025-12-28 19:30:33.171110
+Create Date: 2026-01-01 14:27:34.107270
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'a9268876d318'
+revision: str = '168fcdf03f2f'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -80,6 +80,8 @@ def upgrade() -> None:
     sa.Column('file_url', sa.String(length=500), nullable=True),
     sa.Column('file_size', sa.Integer(), nullable=True),
     sa.Column('duration', sa.Integer(), nullable=True),
+    sa.Column('filename', sa.String(length=255), nullable=True),
+    sa.Column('mimetype', sa.String(length=100), nullable=True),
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),

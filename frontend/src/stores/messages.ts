@@ -3,7 +3,9 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import { messagesAPI } from "../api/messages";
 import type { MessageRead } from "../types/api";
+import { MessageType } from "../types/api";
 import type { MessageCreatedEvent } from "../types/events";
+import { useAuthStore } from "./auth";
 
 export const useMessagesStore = defineStore("messages", () => {
   const messagesByChat = ref<Map<number, MessageRead[]>>(new Map());
@@ -11,6 +13,10 @@ export const useMessagesStore = defineStore("messages", () => {
   const isLoadingMore = ref(false);
   const hasMore = ref<Map<number, boolean>>(new Map());
   const error = ref<string | null>(null);
+
+  // Хранилище для "зависших" в загрузке сообщений
+  // Key: chatId, Value: Array of pending messages
+  const pendingMessages = ref<Record<number, MessageRead[]>>({});
 
   const getChatMessages = (chatId: number): MessageRead[] => {
     return messagesByChat.value.get(chatId) || [];
@@ -105,11 +111,13 @@ export const useMessagesStore = defineStore("messages", () => {
       content: event.content,
       is_read: event.is_read,
       created_at: event.created_at,
-      updated_at: event.created_at,
+      updated_at: event.created_at as string, //TODO нормальный updated_at кода отредактировать сообщение можно будет
       message_type: event.message_type,
       file_url: event.file_url,
       file_size: event.file_size,
       duration: event.duration,
+      filename: event.filename,
+      mimetype: event.mimetype,
     };
 
     const newMessageTime = new Date(event.created_at).getTime();
@@ -154,6 +162,199 @@ export const useMessagesStore = defineStore("messages", () => {
     console.warn(`[MessagesStore] ⚠️ Message ${messageId} not found`);
   };
 
+  // === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ СОЗДАНИЯ ОПТИМИСТИЧНЫХ СООБЩЕНИЙ ===
+  const createOptimisticMessage = (
+    chatId: number,
+    type: MessageType,
+    file: Blob | File,
+    duration: number = 0
+  ): MessageRead => {
+    const authStore = useAuthStore();
+    return {
+      id: -Date.now(), // Временный ID
+      chat_id: chatId,
+      sender_id: authStore.user?.id || 0,
+      sender_username: authStore.user?.username || "",
+      sender_display_name: authStore.user?.display_name || "",
+      avatar_url: authStore.user?.avatar_url || "",
+      content: "",
+      is_read: false,
+      created_at: new Date().toISOString(),
+      updated_at: "", //TODO
+      message_type: type,
+
+      // File Metadata
+      filename: (file as File).name || "voice.webm",
+      file_size: file.size,
+      mimetype: file.type,
+      file_url: URL.createObjectURL(file), // <--- Генерируем локальный URL для превью!
+      duration: duration,
+
+      // Local state
+      isLocal: true,
+      isUploading: true,
+      uploadProgress: 0,
+      isError: false,
+    };
+  };
+
+  // === VOICE ACTION ===
+  const sendVoiceOptimistic = async (
+    chatId: number,
+    blob: Blob,
+    duration: number
+  ) => {
+    const optimisticMsg = createOptimisticMessage(
+      chatId,
+      MessageType.VOICE,
+      blob,
+      duration
+    );
+
+    if (!pendingMessages.value[chatId]) pendingMessages.value[chatId] = [];
+    pendingMessages.value[chatId].push(optimisticMsg);
+
+    try {
+      await messagesAPI.sendVoice(chatId, blob, duration, (progress) => {
+        const msg = pendingMessages.value[chatId]?.find(
+          (m) => m.id === optimisticMsg.id
+        );
+        if (msg) msg.uploadProgress = progress;
+      });
+      // Удаляем, так как придет реальное сообщение через WS
+      removePendingMessage(chatId, optimisticMsg.id);
+      // Очищаем URL (освобождаем память)
+      if (optimisticMsg.file_url) URL.revokeObjectURL(optimisticMsg.file_url);
+    } catch (err) {
+      console.error("Voice upload failed", err);
+      const msg = pendingMessages.value[chatId]?.find(
+        (m) => m.id === optimisticMsg.id
+      );
+      if (msg) {
+        msg.isError = true;
+        msg.isUploading = false;
+      }
+    }
+  };
+
+  // === VIDEO NOTE ACTION ===
+  const sendVideoNoteOptimistic = async (
+    chatId: number,
+    blob: Blob,
+    duration: number
+  ) => {
+    const optimisticMsg = createOptimisticMessage(
+      chatId,
+      MessageType.VIDEO_NOTE,
+      blob,
+      duration
+    );
+
+    if (!pendingMessages.value[chatId]) pendingMessages.value[chatId] = [];
+    pendingMessages.value[chatId].push(optimisticMsg);
+
+    try {
+      await messagesAPI.sendVideoNote(chatId, blob, duration, (progress) => {
+        const msg = pendingMessages.value[chatId]?.find(
+          (m) => m.id === optimisticMsg.id
+        );
+        if (msg) msg.uploadProgress = progress;
+      });
+      removePendingMessage(chatId, optimisticMsg.id);
+      if (optimisticMsg.file_url) URL.revokeObjectURL(optimisticMsg.file_url);
+    } catch (err) {
+      console.error("Video note upload failed", err);
+      const msg = pendingMessages.value[chatId]?.find(
+        (m) => m.id === optimisticMsg.id
+      );
+      if (msg) {
+        msg.isError = true;
+        msg.isUploading = false;
+      }
+    }
+  };
+  // --- ACTION: Отправка файла с оптимистичным UI ---
+  const sendFileOptimistic = async (
+    chatId: number,
+    file: File,
+    caption: string = ""
+  ) => {
+    const authStore = useAuthStore();
+
+    // 1. Создаем временный ID (отрицательный, чтобы не конфликтовал с БД)
+    const tempId = -Date.now();
+
+    // 2. Создаем "Фейковое" сообщение
+    const optimisticMsg: MessageRead = {
+      id: tempId,
+      chat_id: chatId,
+      sender_id: authStore.user?.id || 0,
+      sender_username: authStore.user?.username || "",
+      sender_display_name: authStore.user?.display_name || "",
+      avatar_url: authStore.user?.avatar_url || "",
+      content: caption,
+      is_read: false,
+      created_at: new Date().toISOString(),
+      updated_at: "", // TODO
+      message_type: "file" as any,
+
+      // Файловые данные
+      filename: file.name,
+      file_size: file.size,
+      mimetype: file.type,
+      file_url: "#",
+
+      // Локальные флаги
+      isLocal: true,
+      isUploading: true,
+      uploadProgress: 0,
+      isError: false,
+    };
+
+    // 3. Добавляем в список pendingMessages
+    if (!pendingMessages.value[chatId]) {
+      pendingMessages.value[chatId] = [];
+    }
+    pendingMessages.value[chatId].push(optimisticMsg);
+
+    try {
+      // 4. Запускаем реальную отправку
+      await messagesAPI.sendFile(chatId, file, caption, (progress) => {
+        // Обновляем прогресс реактивно
+        const msg = pendingMessages.value[chatId]?.find((m) => m.id === tempId);
+        if (msg) {
+          msg.uploadProgress = progress;
+        }
+      });
+
+      // 5. Успех! Удаляем фейковое сообщение.
+      // Реальное сообщение придет через WebSocket (message.created)
+      // и добавится в основной список через useChat/store event handler.
+      removePendingMessage(chatId, tempId);
+    } catch (err) {
+      console.error("Upload failed", err);
+      // При ошибке: помечаем как error (можно добавить кнопку "повторить")
+      const msg = pendingMessages.value[chatId]?.find((m) => m.id === tempId);
+      if (msg) {
+        msg.isError = true;
+        msg.isUploading = false;
+      }
+      // Или удаляем через время:
+      // setTimeout(() => removePendingMessage(chatId, tempId), 5000);
+    }
+  };
+
+  const removePendingMessage = (chatId: number, tempId: number) => {
+    if (!pendingMessages.value[chatId]) return;
+    pendingMessages.value[chatId] = pendingMessages.value[chatId].filter(
+      (m) => m.id !== tempId
+    );
+  };
+
+  // Геттер для pending сообщений конкретного чата
+  const getPendingMessages = (chatId: number) =>
+    pendingMessages.value[chatId] || [];
+
   return {
     messagesByChat,
     isLoading,
@@ -166,5 +367,10 @@ export const useMessagesStore = defineStore("messages", () => {
     addMessage,
     sendMessage,
     markMessageAsRead,
+    pendingMessages,
+    getPendingMessages,
+    sendFileOptimistic,
+    sendVoiceOptimistic,
+    sendVideoNoteOptimistic,
   };
 });

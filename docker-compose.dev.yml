@@ -80,23 +80,26 @@ services:
     networks:
       - peddler-dev-network
 
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: peddler-frontend-dev
-  #   restart: unless-stopped
-  #   env_file:
-  #     - .env
-  #   environment:
-  #     VITE_API_URL: http://localhost:8000/api/v1
-  #   ports:
-  #     - "${FRONTEND_PORT}:5173"
-  #   volumes:
-  #     - ./frontend/src:/app/src:ro
-  #     - ./frontend/public:/app/public:ro
-  #   networks:
-  #     - peddler-dev-network
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: peddler-frontend-dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      VITE_API_URL: http://localhost:8000/api/v1
+    ports:
+      - "${FRONTEND_PORT}:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/index.html:/app/index.html
+      - /app/node_modules # АНОНИМНЫЙ VOLUME
+    networks:
+      - peddler-dev-network
 
 volumes:
   postgres_dev_data:

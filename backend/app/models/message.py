@@ -1,7 +1,7 @@
 # app/models/message.py
 from enum import Enum as PyEnum
 
-from sqlalchemy import Boolean, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -41,8 +41,11 @@ class Message(BaseModel):
         index=True,
     )
     file_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)  # байты
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # байты
     duration: Mapped[int | None] = mapped_column(Integer, nullable=True)  # секунды
+
+    filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    mimetype: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     chat: Mapped["Chat"] = relationship(
         "Chat",
