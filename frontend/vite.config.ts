@@ -15,14 +15,33 @@ export default defineConfig({
       "@": fileURLToPath(new URL("./src", import.meta.url)),
     },
   },
+  // server: {
+  //   port: 5173,
+  //   proxy: {
+  // "/static": {
+  //   target: "http://localhost:8000",
+  //   changeOrigin: true,
+  // },
+  //     "/api": {
+  //       target: "http://localhost:8000",
+  //       changeOrigin: true,
+  //     },
+  //   },
+  // },
   server: {
+    host: true, // заставляет слушать 0.0.0.0
     port: 5173,
+    strictPort: true,
+    watch: {
+      usePolling: true, // ВАЖНО для Docker на Windows/Mac, иначе изменения файлов не видны
+    },
+    // Proxy оставляем, если он нужен
     proxy: {
-      "/static": {
-        target: "http://localhost:8000",
+      "/api": {
+        target: "http://backend:8000",
         changeOrigin: true,
       },
-      "/api": {
+      "/static": {
         target: "http://localhost:8000",
         changeOrigin: true,
       },

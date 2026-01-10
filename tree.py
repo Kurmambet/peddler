@@ -16,6 +16,7 @@ EXCLUDE_DIRS = {
     "versions",
     "video_notes",
     "voice",
+    "files",
 }
 
 SKIP_CONTENT_DIRS = {
@@ -27,6 +28,7 @@ SKIP_CONTENT_DIRS = {
     "avatars",
     "video_notes",
     "voice",
+    "files",
     # "backend",
     # "api",
     # "stores",
