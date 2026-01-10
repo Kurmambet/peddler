@@ -14,8 +14,8 @@ export const messagesAPI = {
       content,
     }),
 
-  markAsRead: (chatId: number, messageId: number) =>
-    apiClient.patch<MessageRead>(`/chats/${chatId}/messages/${messageId}/read`),
+  // markAsRead: (chatId: number, messageId: number) =>
+  //   apiClient.patch<MessageRead>(`/chats/${chatId}/messages/${messageId}/read`),
 
   sendFile(
     chatId: number,

@@ -5,6 +5,7 @@ import { useAuthStore } from "../stores/auth";
 import { useChatsStore } from "../stores/chats";
 import { useMessagesStore } from "../stores/messages";
 import type {
+  ChatReadEvent,
   MessageCreatedEvent,
   TypingIndicatorEvent,
 } from "../types/events";
@@ -60,6 +61,24 @@ function createChatInstance() {
     });
 
     console.log(`[useChat] 📬 Marked ${messageIds.length} messages as read`);
+  };
+
+  const markChatAsRead = (lastMessageId: number) => {
+    if (!chatId.value || !ws.value?.isConnected) {
+      return;
+    }
+
+    // Оптимизация: не отправлять запрос, если этот ID уже был отправлен как прочитанный
+    // (можно хранить локально lastSentReadId)
+
+    ws.value.send({
+      type: "mark_chat_read", // Новый тип события
+      last_message_id: lastMessageId,
+    });
+
+    console.log(
+      `[useChat] 📬 Marked chat read until message #${lastMessageId}`
+    );
   };
 
   // WebSocket Connection
@@ -120,9 +139,24 @@ function createChatInstance() {
         }
       });
 
-      ws.value.onMessage("message_read", (event: any) => {
-        console.log("[useChat] ✓ message_read event:", event);
-        messagesStore.markMessageAsRead(event.message_id);
+      // ws.value.onMessage("message_read", (event: any) => {
+      //   console.log("[useChat] ✓ message_read event:", event);
+      //   messagesStore.markMessageAsRead(event.message_id);
+      // });
+
+      ws.value.onMessage("chat_read", (event: any) => {
+        const readEvent = event as ChatReadEvent;
+        console.log("[useChat] ✓ chat_read event:", readEvent);
+
+        // Обновляем стор сообщений
+        messagesStore.markMessagesReadUntil(
+          readEvent.last_read_message_id,
+          readEvent.user_id,
+          readEvent.chat_id
+        );
+
+        // Если прочитал собеседник - обновляем галочки
+        // Если прочитал Я (с другого устройства) - тоже обновляем галочки
       });
 
       ws.value.onMessage("error", (event: any) => {
@@ -308,7 +342,8 @@ function createChatInstance() {
     sendMessage, //отправить сообщение
     handleTyping, //обработать ввод
     typingText: typing.typingText, // кто-то печатает...
-    markMessagesAsRead,
+    markMessagesAsRead, //TODO удалить
+    markChatAsRead,
     cleanup, //для внутреннего использования
   };
 }

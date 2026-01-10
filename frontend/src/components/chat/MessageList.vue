@@ -333,7 +333,13 @@ import VoicePlayer from "./VoicePlayer.vue";
 
 const authStore = useAuthStore();
 const messagesStore = useMessagesStore();
-const { currentMessages, isLoading, chatId, markMessagesAsRead } = useChat();
+const {
+  currentMessages,
+  isLoading,
+  chatId,
+  markMessagesAsRead,
+  markChatAsRead,
+} = useChat();
 
 const scrollContainer = ref<HTMLElement | null>(null);
 const scrollAnchor = ref<HTMLElement | null>(null);
@@ -444,21 +450,37 @@ const handleScroll = () => {
   }
 };
 
-// Помечаем непрочитанные сообщения
-const markUnreadMessagesAsRead = () => {
-  if (!chatId.value) return;
+const checkAndMarkRead = () => {
+  if (!currentMessages.value.length) return;
 
-  const unreadMessages = currentMessages.value.filter(
-    (msg) => !msg.is_read && !isOwn(msg)
-  );
+  const lastMsg = currentMessages.value[currentMessages.value.length - 1];
 
-  if (unreadMessages.length > 0) {
-    console.log(
-      `[MessageList] Marking ${unreadMessages.length} messages as read`
-    );
-    markMessagesAsRead(unreadMessages.map((m) => m.id));
+  // Если последнее сообщение НЕ наше и оно еще НЕ прочитано
+  if (!isOwn(lastMsg) && !lastMsg.is_read) {
+    // Помечаем чат прочитанным до этого сообщения
+    markChatAsRead(lastMsg.id);
   }
+
+  // Дополнительная проверка: если мы скроллим вверх к старым непрочитанным,
+  // логика может быть сложнее (IntersectionObserver), но для старта
+  // пометка "по последнему" работает для 99% случаев.
 };
+
+// Помечаем непрочитанные сообщения
+// const markUnreadMessagesAsRead = () => {
+//   if (!chatId.value) return;
+
+//   const unreadMessages = currentMessages.value.filter(
+//     (msg) => !msg.is_read && !isOwn(msg)
+//   );
+
+//   if (unreadMessages.length > 0) {
+//     console.log(
+//       `[MessageList] Marking ${unreadMessages.length} messages as read`
+//     );
+//     markMessagesAsRead(unreadMessages.map((m) => m.id));
+//   }
+// };
 
 const formatFileSize = (bytes?: number | null) => {
   if (!bytes) return "0 B";
@@ -486,7 +508,8 @@ watch(
 
       // Помечаем новые непрочитанные как прочитанные
       nextTick(() => {
-        markUnreadMessagesAsRead();
+        // markUnreadMessagesAsRead();
+        checkAndMarkRead();
       });
     }
     previousMessageCount.value = newLength;
@@ -500,7 +523,8 @@ watch(
   () => {
     // Даём время на рендеринг
     nextTick(() => {
-      markUnreadMessagesAsRead();
+      // markUnreadMessagesAsRead();
+      checkAndMarkRead();
     });
   },
   { deep: true } // ← Глубокое наблюдение за изменениями
@@ -515,7 +539,8 @@ watch(
         scrollToBottom("auto");
         // Даём больше времени на загрузку через WebSocket
         setTimeout(() => {
-          markUnreadMessagesAsRead();
+          // markUnreadMessagesAsRead();
+          checkAndMarkRead();
         }, 300); // Небольшая задержка для гарантии
       });
     }

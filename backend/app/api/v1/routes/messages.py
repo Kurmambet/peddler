@@ -75,15 +75,15 @@ async def get_chat_messages(
     return await service.get_chat_messages(chat_id, current_user, limit, offset)
 
 
-@router.patch("/chats/{chat_id}/messages/{message_id}/read", response_model=MessageRead)
-async def mark_message_read(
-    chat_id: int,
-    message_id: int,
-    current_user: User = Depends(get_current_user),
-    service: MessageService = Depends(get_message_service),
-) -> Message:
-    """Пометить сообщение как прочитанное"""
-    return await service.mark_message_read(chat_id, message_id, current_user.id)
+# @router.patch("/chats/{chat_id}/messages/{message_id}/read", response_model=MessageRead)
+# async def mark_message_read(
+#     chat_id: int,
+#     message_id: int,
+#     current_user: User = Depends(get_current_user),
+#     service: MessageService = Depends(get_message_service),
+# ) -> Message:
+#     """Пометить сообщение как прочитанное"""
+#     return await service.mark_message_read(chat_id, message_id, current_user.id)
 
 
 @router.post("/chats/{chat_id}/messages/voice", response_model=MessageRead)
