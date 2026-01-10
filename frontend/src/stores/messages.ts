@@ -195,20 +195,6 @@ export const useMessagesStore = defineStore("messages", () => {
     }
   };
 
-  // Оставим для обратной совместимости или ручных вызовов, если нужно
-  // const markMessageAsRead = (messageId: number) => {
-  //   // Ищем сообщение во всех чатах
-  //   for (const [chatId, messages] of messagesByChat.value.entries()) {
-  //     const message = messages.find((m) => m.id === messageId);
-  //     if (message) {
-  //       message.is_read = true;
-  //       console.log(`[MessagesStore] ✓ Message ${messageId} marked as read`);
-  //       return;
-  //     }
-  //   }
-  //   console.warn(`[MessagesStore] ⚠️ Message ${messageId} not found`);
-  // };
-
   // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИЯ ДЛЯ ОПТИМИСТИЧНОГО UI ===
   const createOptimisticMessage = (
     chatId: number,
@@ -403,7 +389,6 @@ export const useMessagesStore = defineStore("messages", () => {
     loadMoreMessages,
     addMessage,
     sendMessage,
-    // markMessageAsRead,
     markMessagesReadUntil,
     pendingMessages,
     getPendingMessages,

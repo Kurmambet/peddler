@@ -466,22 +466,6 @@ const checkAndMarkRead = () => {
   // пометка "по последнему" работает для 99% случаев.
 };
 
-// Помечаем непрочитанные сообщения
-// const markUnreadMessagesAsRead = () => {
-//   if (!chatId.value) return;
-
-//   const unreadMessages = currentMessages.value.filter(
-//     (msg) => !msg.is_read && !isOwn(msg)
-//   );
-
-//   if (unreadMessages.length > 0) {
-//     console.log(
-//       `[MessageList] Marking ${unreadMessages.length} messages as read`
-//     );
-//     markMessagesAsRead(unreadMessages.map((m) => m.id));
-//   }
-// };
-
 const formatFileSize = (bytes?: number | null) => {
   if (!bytes) return "0 B";
   const k = 1024;

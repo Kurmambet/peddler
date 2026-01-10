@@ -95,13 +95,6 @@ class MessageRepository:
         )
         return result.scalar_one_or_none()
 
-    # async def mark_message_read(self, message: Message) -> Message:
-    #     """Пометить сообщение как прочитанное"""
-    #     message.is_read = True
-    #     await self.db.commit()
-    #     await self.db.refresh(message)
-    #     return message
-
     async def mark_messages_read_until(
         self, chat_id: int, user_id: int, last_message_id: int
     ) -> int:

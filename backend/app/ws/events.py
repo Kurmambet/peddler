@@ -79,18 +79,6 @@ class TypingStopEvent(WSEvent):
     type: EventType = EventType.TYPING_STOP
 
 
-class MarkReadEvent(WSEvent):
-    """
-    Клиент помечает сообщение как прочитанное.
-    Пример: {"type": "mark_read", "message_id": 42}
-
-    Обновит Message.is_read = True через MessageService.mark_message_read()
-    """
-
-    type: EventType = EventType.MARK_READ
-    message_id: int = Field(..., ge=1)
-
-
 class MarkChatReadEvent(WSEvent):
     """Клиент отправляет это, когда прочитал чат"""
 
@@ -138,20 +126,6 @@ class MessageCreatedEvent(WSEvent):
 
     filename: str | None = None
     mimetype: str | None = None
-
-
-# class MessageReadEvent(WSEvent):
-#     """
-#     Кто-то прочитал сообщение.
-#     после MarkReadEvent -> сервер обновляет БД и broadcast это событие всем в чате
-
-#     Пример: {"type": "message_read", "message_id": 123, "reader_id": 7, "reader_username": "bob"}
-#     """
-
-#     type: EventType = EventType.MESSAGE_READ
-#     message_id: int
-#     reader_id: int
-#     reader_username: str
 
 
 class TypingIndicatorEvent(WSEvent):

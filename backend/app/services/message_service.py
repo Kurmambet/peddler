@@ -114,17 +114,6 @@ class MessageService:
             messages=message_reads, has_more=has_more, next_offset=offset + len(messages)
         )
 
-    # async def mark_message_read(self, chat_id: int, message_id: int, user_id: int) -> Message:
-    #     """Пометить сообщение как прочитанное"""
-    #     # 1. Получаем сообщение с проверкой доступа
-    #     message = await self.repo.get_message_by_id(chat_id, message_id, user_id)
-
-    #     if not message:
-    #         raise HTTPException(status_code=404, detail="Message not found")
-
-    #     # 2. Помечаем прочитанным
-    #     return await self.repo.mark_message_read(message)
-
     async def mark_chat_read(self, chat_id: int, user_id: int, last_message_id: int) -> int:
         """
         Обрабатывает событие прочтения чата.

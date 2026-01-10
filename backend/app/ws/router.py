@@ -151,8 +151,8 @@ async def handle_client_event(
             await handle_mark_chat_read(data, websocket, user, chat_id, db)
 
         else:
-            logger.warning(f"Unknown or deprecated event type: {event_type}")
-            # raise ValueError(f"Unknown event type: {event_type}")
+            # logger.warning(f"Unknown or deprecated event type: {event_type}")
+            raise ValueError(f"Unknown event type: {event_type}")
 
     except json.JSONDecodeError as e:
         logger.error(f"Invalid JSON from user {user.id}: {e}")
@@ -203,7 +203,7 @@ async def handle_mark_chat_read(
     db: Any,
 ):
     """
-    Новый обработчик вместо handle_mark_read: помечает прочитанным диапазон сообщений.
+    помечает прочитанным диапазон сообщений.
     """
     try:
         # Валидируем входные данные
@@ -230,35 +230,6 @@ async def handle_mark_chat_read(
         logger.error(f"Failed to mark chat read: {e}")
         error_event = ErrorEvent(code="MARK_READ_FAILED", message=str(e))
         await manager.send_personal_message(error_event.model_dump_json(), websocket)
-
-
-# async def handle_mark_read(
-#     data: Dict[str, Any],
-#     websocket: WebSocket,
-#     user: User,
-#     chat_id: int,
-#     db: Any,  # AsyncSession
-# ):
-#     """
-#     Обрабатывает пометку сообщения как прочитанного.
-#     """
-#     event = MarkReadEvent(**data)
-#     service = MessageService(db)
-#     try:
-#         message = await service.mark_message_read(
-#             chat_id=chat_id, message_id=event.message_id, user_id=user.id
-#         )
-#     except Exception as e:
-#         logger.error(f"Failed to mark message {event.message_id} as read: {e}")
-#         error_event = ErrorEvent(code="MARK_READ_FAILED", message=str(e))
-#         await manager.send_personal_message(error_event.model_dump_json(), websocket)
-#         return
-
-#     read_event = MessageReadEvent(
-#         message_id=message.id, reader_id=user.id, reader_username=user.username
-#     )
-#     await pubsub_manager.publish_to_chat(chat_id, read_event.model_dump_json())
-#     logger.info(f"Message {message.id} marked as read by user {user.id}")
 
 
 @router.websocket("/status")

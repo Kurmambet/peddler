@@ -3,7 +3,6 @@ import { MessageType } from "./api";
 
 export type WSEventType =
   | "message_created"
-  // | "message_read"
   | "typing_start"
   | "typing_stop"
   | "typing_indicator"
@@ -47,13 +46,6 @@ export interface ChatReadEvent extends BaseEvent {
   last_read_message_id: number;
   // reader_username можно оставить если нужно для UI
 }
-
-// export interface MessageReadEvent extends BaseEvent {
-//   type: "message_read";
-//   message_id: number;
-//   reader_id: number;
-//   reader_username: string;
-// } // TODO устарел. как отлажу новый метод это удалить полностью
 
 export interface TypingIndicatorEvent extends BaseEvent {
   type: "typing_indicator";

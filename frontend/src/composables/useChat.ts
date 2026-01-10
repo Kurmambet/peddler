@@ -139,11 +139,6 @@ function createChatInstance() {
         }
       });
 
-      // ws.value.onMessage("message_read", (event: any) => {
-      //   console.log("[useChat] ✓ message_read event:", event);
-      //   messagesStore.markMessageAsRead(event.message_id);
-      // });
-
       ws.value.onMessage("chat_read", (event: any) => {
         const readEvent = event as ChatReadEvent;
         console.log("[useChat] ✓ chat_read event:", readEvent);
