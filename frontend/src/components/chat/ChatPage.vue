@@ -173,21 +173,32 @@ const showCreateDirect = ref(false);
 const showCreateGroup = ref(false);
 const selectedChatId = ref<number | null>(null);
 
-// Следим за роутом
+// Единая логика установки чата
+const initializeChat = async (idStr: string | string[]) => {
+  const id = Number(idStr);
+  if (!isNaN(id)) {
+    selectedChatId.value = id;
+
+    // Если чатов нет - грузим
+    if (chatsStore.chats.length === 0) {
+      await chatsStore.loadChats();
+    }
+
+    // Устанавливаем текущий чат в сторе
+    chatsStore.setCurrentChat(id);
+  } else {
+    selectedChatId.value = null;
+    chatsStore.resetCurrentChat();
+  }
+};
+
+// Следим за роутом (реагируем на навигацию)
 watch(
   () => route.params.id,
-  (newId) => {
-    if (newId) {
-      const id = Number(newId);
-      selectedChatId.value = id;
-      // ВАЖНО: Сразу ставим в стор, чтобы компоненты знали, какой чат активен
-      chatsStore.setCurrentChat(id);
-    } else {
-      selectedChatId.value = null;
-      chatsStore.resetCurrentChat();
-    }
+  async (newId) => {
+    if (newId) await initializeChat(newId);
   },
-  { immediate: true }
+  { immediate: true } // Сработает и при маунте
 );
 
 // Обработчики
@@ -211,20 +222,10 @@ const openCreateGroup = () => {
   showCreateGroup.value = true;
 };
 
+// Дополнительная страховка при маунте (для F5)
 onMounted(async () => {
-  // Проверяем, есть ли ID в роуте при загрузке
-  const id = Number(route.params.id);
-
-  // Грузим чаты, если их нет
-  if (chatsStore.chats.length === 0) {
-    await chatsStore.loadChats();
-  }
-
-  if (!isNaN(id)) {
-    // Принудительно ставим ID, даже если watch уже сработал
-    // (watch мог сработать до загрузки чатов, и setCurrentChat внутри него мог не найти чат в пустом массиве)
-    selectedChatId.value = id;
-    chatsStore.setCurrentChat(id);
+  if (route.params.id) {
+    await initializeChat(route.params.id);
   }
 });
 </script>

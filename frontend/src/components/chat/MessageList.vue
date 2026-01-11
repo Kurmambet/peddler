@@ -117,7 +117,11 @@
               <div class="relative z-10">
                 <!-- Sender name for group chats -->
                 <p
-                  v-if="!isOwn(msg) && msg.message_type !== 'video_note'"
+                  v-if="
+                    !isOwn(msg) &&
+                    msg.message_type !== 'video_note' &&
+                    isGroupChat
+                  "
                   class="text-xs font-semibold mb-1 opacity-75 break-words cursor-pointer hover:underline"
                   @click="openProfile(msg.sender_id)"
                 >
@@ -317,6 +321,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useChat } from "../../composables/useChat";
 import { useAuthStore } from "../../stores/auth";
+import { useChatsStore } from "../../stores/chats";
 import { useMessagesStore } from "../../stores/messages";
 import type { MessageRead } from "../../types/api";
 import {
@@ -331,6 +336,7 @@ import MessageStatusIcon from "./MessageStatusIcon.vue";
 import VideoNotePlayer from "./VideoNotePlayer.vue";
 import VoicePlayer from "./VoicePlayer.vue";
 
+const chatsStore = useChatsStore();
 const authStore = useAuthStore();
 const messagesStore = useMessagesStore();
 const { currentMessages, isLoading, chatId, markChatAsRead } = useChat();
@@ -345,6 +351,12 @@ const previousMessageCount = ref(0);
 
 const showUserProfile = ref(false);
 const selectedUserId = ref<number | null>(null);
+
+const isGroupChat = computed(() => {
+  // Находим текущий чат в списке загруженных
+  const chat = chatsStore.chats.find((c) => c.id === chatId.value);
+  return chat?.type === "group";
+});
 
 const openProfile = (userId: number) => {
   selectedUserId.value = userId;
