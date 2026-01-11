@@ -149,7 +149,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { useChatsStore } from "@/stores/chats";
+import { onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useChat } from "../../composables/useChat";
 import ChatFolderTabs from "./ChatFolderTabs.vue";
@@ -160,6 +161,7 @@ import CreateGroupChat from "./CreateGroupChat.vue";
 import MessageInput from "./MessageInput.vue";
 import MessageList from "./MessageList.vue";
 import SidebarDrawer from "./SidebarDrawer.vue";
+const chatsStore = useChatsStore();
 
 const route = useRoute();
 const router = useRouter();
@@ -171,13 +173,32 @@ const showCreateDirect = ref(false);
 const showCreateGroup = ref(false);
 const selectedChatId = ref<number | null>(null);
 
-// Следим за роутом
+// Единая логика установки чата
+const initializeChat = async (idStr: string | string[]) => {
+  const id = Number(idStr);
+  if (!isNaN(id)) {
+    selectedChatId.value = id;
+
+    // Если чатов нет - грузим
+    if (chatsStore.chats.length === 0) {
+      await chatsStore.loadChats();
+    }
+
+    // Устанавливаем текущий чат в сторе
+    chatsStore.setCurrentChat(id);
+  } else {
+    selectedChatId.value = null;
+    chatsStore.resetCurrentChat();
+  }
+};
+
+// Следим за роутом (реагируем на навигацию)
 watch(
-  () => route.params.chatId,
-  (chatId) => {
-    selectedChatId.value = chatId ? Number(chatId) : null;
+  () => route.params.id,
+  async (newId) => {
+    if (newId) await initializeChat(newId);
   },
-  { immediate: true }
+  { immediate: true } // Сработает и при маунте
 );
 
 // Обработчики
@@ -200,4 +221,11 @@ const openCreateGroup = () => {
   isSidebarOpen.value = false;
   showCreateGroup.value = true;
 };
+
+// Дополнительная страховка при маунте (для F5)
+onMounted(async () => {
+  if (route.params.id) {
+    await initializeChat(route.params.id);
+  }
+});
 </script>

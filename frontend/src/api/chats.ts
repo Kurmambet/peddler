@@ -3,6 +3,7 @@
 import type {
   AddParticipantsResponse,
   ChangeRoleResponse,
+  ChatCounter,
   ChatParticipantRole,
   ChatRead,
   DirectChatRead,
@@ -29,6 +30,11 @@ export const chatsAPI = {
     const { data } = await apiClient.get<ChatRead[]>("/chats", {
       params: { limit, offset },
     });
+    return data;
+  },
+
+  async getCounters(): Promise<ChatCounter[]> {
+    const { data } = await apiClient.get<ChatCounter[]>("/chats/counters");
     return data;
   },
 

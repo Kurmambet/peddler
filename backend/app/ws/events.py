@@ -20,14 +20,14 @@ class EventType(str, Enum):
     # Client -> Server
     TYPING_START = "typing_start"
     TYPING_STOP = "typing_stop"
-    MARK_READ = "mark_read"
+    MARK_CHAT_READ = "mark_chat_read"
 
     # Server -> Client
     MESSAGE_CREATED = "message_created"  # новое сообщение появилось в чате
     MESSAGE_READ = "message_read"
     TYPING_INDICATOR = "typing_indicator"
     ERROR = "error"
-    CONNECTED = "connected"  # Подтверждение успешного подключения
+    CONNECTED = "connected"
     USER_STATUS_CHANGED = "user_status_changed"
     USER_JOINED = "user_joined"
     USER_LEFT = "user_left"
@@ -78,21 +78,26 @@ class TypingStopEvent(WSEvent):
     type: EventType = EventType.TYPING_STOP
 
 
-class MarkReadEvent(WSEvent):
-    """
-    Клиент помечает сообщение как прочитанное.
-    Пример: {"type": "mark_read", "message_id": 42}
+class MarkChatReadEvent(WSEvent):
+    """Клиент отправляет это, когда прочитал чат"""
 
-    Обновит Message.is_read = True через MessageService.mark_message_read()
-    """
-
-    type: EventType = EventType.MARK_READ
-    message_id: int = Field(..., ge=1)
+    type: EventType = EventType.MARK_CHAT_READ
+    last_message_id: int = Field(..., description="ID последнего прочитанного сообщения")
 
 
 # ============================================================================
 # Server -> Client Events
 # ============================================================================
+class ChatReadEvent(WSEvent):
+    """Сервер отправляет это всем участникам (чтобы обновить галочки и счетчики)"""
+
+    type: EventType = EventType.MESSAGE_READ
+    chat_id: int
+    user_id: int  # Кто прочитал
+    last_read_message_id: int  # До какого сообщения прочитал
+    unread_count: Optional[int] = None  # Для самого юзера - сколько осталось (опционально)
+
+
 class MessageCreatedEvent(WSEvent):
     """
     Сервер уведомляет всех участников чата о новом сообщении.
@@ -120,20 +125,6 @@ class MessageCreatedEvent(WSEvent):
 
     filename: str | None = None
     mimetype: str | None = None
-
-
-class MessageReadEvent(WSEvent):
-    """
-    Кто-то прочитал сообщение.
-    после MarkReadEvent -> сервер обновляет БД и broadcast это событие всем в чате
-
-    Пример: {"type": "message_read", "message_id": 123, "reader_id": 7, "reader_username": "bob"}
-    """
-
-    type: EventType = EventType.MESSAGE_READ
-    message_id: int
-    reader_id: int
-    reader_username: str
 
 
 class TypingIndicatorEvent(WSEvent):

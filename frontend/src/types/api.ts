@@ -27,6 +27,11 @@ export interface Token {
   token_type?: string;
 }
 
+export interface ChatCounter {
+  chat_id: number;
+  unread_count: number;
+}
+
 export interface OtherUserProfile {
   id: number;
   username: string;

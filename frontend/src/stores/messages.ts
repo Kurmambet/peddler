@@ -149,20 +149,53 @@ export const useMessagesStore = defineStore("messages", () => {
     }
   };
 
-  const markMessageAsRead = (messageId: number) => {
-    // Ищем сообщение во всех чатах
-    for (const [chatId, messages] of messagesByChat.value.entries()) {
-      const message = messages.find((m) => m.id === messageId);
-      if (message) {
-        message.is_read = true;
-        console.log(`[MessagesStore] ✓ Message ${messageId} marked as read`);
-        return;
+  const markMessagesReadUntil = (
+    lastMessageId: number,
+    readerId: number,
+    chatId: number
+  ) => {
+    const authStore = useAuthStore();
+    const myUserId = authStore.user?.id;
+
+    // Получаем сообщения конкретного чата
+    const chatMsgs = messagesByChat.value.get(chatId);
+
+    if (!chatMsgs || !myUserId) return;
+
+    let updatedCount = 0;
+
+    chatMsgs.forEach((msg) => {
+      // Проверяем условия:
+      // 1. ID меньше или равен последнему прочитанному
+      // 2. Сообщение еще не помечено как прочитанное
+      if (msg.id <= lastMessageId && !msg.is_read) {
+        // Логика обновления статуса:
+
+        // А) Это МОЕ сообщение, и его прочитал КТО-ТО ДРУГОЙ (readerId != me)
+        // Значит, мой собеседник увидел сообщение -> ставим галочки
+        const isMyMessageReadByOther =
+          msg.sender_id === myUserId && readerId !== myUserId;
+
+        // Б) Это ЧУЖОЕ сообщение, и его прочитал Я (readerId == me)
+        // (например, я прочитал с телефона, а веб-версия обновилась)
+        const isOtherMessageReadByMe =
+          msg.sender_id !== myUserId && readerId === myUserId;
+
+        if (isMyMessageReadByOther || isOtherMessageReadByMe) {
+          msg.is_read = true;
+          updatedCount++;
+        }
       }
+    });
+
+    if (updatedCount > 0) {
+      console.log(
+        `[MessagesStore] Updated read status for ${updatedCount} messages in chat ${chatId}`
+      );
     }
-    console.warn(`[MessagesStore] ⚠️ Message ${messageId} not found`);
   };
 
-  // === ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ДЛЯ СОЗДАНИЯ ОПТИМИСТИЧНЫХ СООБЩЕНИЙ ===
+  // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИЯ ДЛЯ ОПТИМИСТИЧНОГО UI ===
   const createOptimisticMessage = (
     chatId: number,
     type: MessageType,
@@ -280,11 +313,8 @@ export const useMessagesStore = defineStore("messages", () => {
     caption: string = ""
   ) => {
     const authStore = useAuthStore();
-
-    // 1. Создаем временный ID (отрицательный, чтобы не конфликтовал с БД)
     const tempId = -Date.now();
 
-    // 2. Создаем "Фейковое" сообщение
     const optimisticMsg: MessageRead = {
       id: tempId,
       chat_id: chatId,
@@ -326,21 +356,14 @@ export const useMessagesStore = defineStore("messages", () => {
           msg.uploadProgress = progress;
         }
       });
-
-      // 5. Успех! Удаляем фейковое сообщение.
-      // Реальное сообщение придет через WebSocket (message.created)
-      // и добавится в основной список через useChat/store event handler.
       removePendingMessage(chatId, tempId);
     } catch (err) {
       console.error("Upload failed", err);
-      // При ошибке: помечаем как error (можно добавить кнопку "повторить")
       const msg = pendingMessages.value[chatId]?.find((m) => m.id === tempId);
       if (msg) {
         msg.isError = true;
         msg.isUploading = false;
       }
-      // Или удаляем через время:
-      // setTimeout(() => removePendingMessage(chatId, tempId), 5000);
     }
   };
 
@@ -366,7 +389,7 @@ export const useMessagesStore = defineStore("messages", () => {
     loadMoreMessages,
     addMessage,
     sendMessage,
-    markMessageAsRead,
+    markMessagesReadUntil,
     pendingMessages,
     getPendingMessages,
     sendFileOptimistic,

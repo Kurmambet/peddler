@@ -3,14 +3,14 @@ import { MessageType } from "./api";
 
 export type WSEventType =
   | "message_created"
-  | "message_read"
   | "typing_start"
   | "typing_stop"
   | "typing_indicator"
-  | "mark_read"
   | "user_status_changed"
   | "connected"
-  | "error";
+  | "error"
+  | "mark_chat_read" // Клиент -> Сервер
+  | "chat_read"; // Сервер -> Клиент (Broadast)
 
 export interface BaseEvent {
   type: WSEventType;
@@ -38,11 +38,12 @@ export interface MessageCreatedEvent extends BaseEvent {
   mimetype?: string | null;
 }
 
-export interface MessageReadEvent extends BaseEvent {
-  type: "message_read";
-  message_id: number;
-  reader_id: number;
-  reader_username: string;
+export interface ChatReadEvent extends BaseEvent {
+  type: "chat_read";
+  chat_id: number;
+  user_id: number;
+  last_read_message_id: number;
+  // reader_username можно оставить если нужно для UI
 }
 
 export interface TypingIndicatorEvent extends BaseEvent {

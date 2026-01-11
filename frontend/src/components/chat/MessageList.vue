@@ -117,7 +117,11 @@
               <div class="relative z-10">
                 <!-- Sender name for group chats -->
                 <p
-                  v-if="!isOwn(msg) && msg.message_type !== 'video_note'"
+                  v-if="
+                    !isOwn(msg) &&
+                    msg.message_type !== 'video_note' &&
+                    isGroupChat
+                  "
                   class="text-xs font-semibold mb-1 opacity-75 break-words cursor-pointer hover:underline"
                   @click="openProfile(msg.sender_id)"
                 >
@@ -317,6 +321,7 @@
 import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { useChat } from "../../composables/useChat";
 import { useAuthStore } from "../../stores/auth";
+import { useChatsStore } from "../../stores/chats";
 import { useMessagesStore } from "../../stores/messages";
 import type { MessageRead } from "../../types/api";
 import {
@@ -331,9 +336,10 @@ import MessageStatusIcon from "./MessageStatusIcon.vue";
 import VideoNotePlayer from "./VideoNotePlayer.vue";
 import VoicePlayer from "./VoicePlayer.vue";
 
+const chatsStore = useChatsStore();
 const authStore = useAuthStore();
 const messagesStore = useMessagesStore();
-const { currentMessages, isLoading, chatId, markMessagesAsRead } = useChat();
+const { currentMessages, isLoading, chatId, markChatAsRead } = useChat();
 
 const scrollContainer = ref<HTMLElement | null>(null);
 const scrollAnchor = ref<HTMLElement | null>(null);
@@ -345,6 +351,12 @@ const previousMessageCount = ref(0);
 
 const showUserProfile = ref(false);
 const selectedUserId = ref<number | null>(null);
+
+const isGroupChat = computed(() => {
+  // Находим текущий чат в списке загруженных
+  const chat = chatsStore.chats.find((c) => c.id === chatId.value);
+  return chat?.type === "group";
+});
 
 const openProfile = (userId: number) => {
   selectedUserId.value = userId;
@@ -444,20 +456,20 @@ const handleScroll = () => {
   }
 };
 
-// Помечаем непрочитанные сообщения
-const markUnreadMessagesAsRead = () => {
-  if (!chatId.value) return;
+const checkAndMarkRead = () => {
+  if (!currentMessages.value.length) return;
 
-  const unreadMessages = currentMessages.value.filter(
-    (msg) => !msg.is_read && !isOwn(msg)
-  );
+  const lastMsg = currentMessages.value[currentMessages.value.length - 1];
 
-  if (unreadMessages.length > 0) {
-    console.log(
-      `[MessageList] Marking ${unreadMessages.length} messages as read`
-    );
-    markMessagesAsRead(unreadMessages.map((m) => m.id));
+  // Если последнее сообщение НЕ наше и оно еще НЕ прочитано
+  if (!isOwn(lastMsg) && !lastMsg.is_read) {
+    // Помечаем чат прочитанным до этого сообщения
+    markChatAsRead(lastMsg.id);
   }
+
+  // Дополнительная проверка: если мы скроллим вверх к старым непрочитанным,
+  // логика может быть сложнее (IntersectionObserver), но для старта
+  // пометка "по последнему" работает для 99% случаев.
 };
 
 const formatFileSize = (bytes?: number | null) => {
@@ -486,7 +498,7 @@ watch(
 
       // Помечаем новые непрочитанные как прочитанные
       nextTick(() => {
-        markUnreadMessagesAsRead();
+        checkAndMarkRead();
       });
     }
     previousMessageCount.value = newLength;
@@ -497,13 +509,17 @@ watch(
 // Это срабатывает когда загружаются старые сообщения при смене чата
 watch(
   currentMessages,
-  () => {
-    // Даём время на рендеринг
+  (newMessages) => {
+    // Ждем nextTick, чтобы DOM обновился
     nextTick(() => {
-      markUnreadMessagesAsRead();
+      // Пытаемся пометить как прочитанное
+      // Важно: если сообщений > 0, и мы видим последнее
+      if (newMessages.length > 0) {
+        checkAndMarkRead();
+      }
     });
   },
-  { deep: true } // ← Глубокое наблюдение за изменениями
+  { deep: true, immediate: true }
 );
 
 // Scroll to bottom on chat change + mark as read
@@ -515,13 +531,24 @@ watch(
         scrollToBottom("auto");
         // Даём больше времени на загрузку через WebSocket
         setTimeout(() => {
-          markUnreadMessagesAsRead();
+          checkAndMarkRead();
         }, 300); // Небольшая задержка для гарантии
       });
     }
   },
   { immediate: true }
 );
+
+// при обновлении страницы
+watch(isLoading, (newIsLoading) => {
+  if (newIsLoading === false && currentMessages.value.length > 0) {
+    // Как только загрузка закончилась - сразу помечаем и скроллим
+    nextTick(() => {
+      scrollToBottom("auto");
+      setTimeout(() => checkAndMarkRead(), 500); // Чуть больше задержка
+    });
+  }
+});
 
 // Монтирование - только скролл
 onMounted(() => {

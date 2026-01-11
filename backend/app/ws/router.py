@@ -13,11 +13,11 @@ from app.models.user import User
 from app.services.message_service import MessageService
 from app.ws.auth import authenticate_websocket, reject_websocket, verify_chat_access
 from app.ws.events import (
+    ChatReadEvent,
     ConnectedEvent,
     ErrorEvent,
     EventType,
-    MarkReadEvent,
-    MessageReadEvent,
+    MarkChatReadEvent,
     TypingIndicatorEvent,
     UserStatusChangedEvent,
 )
@@ -147,10 +147,11 @@ async def handle_client_event(
         elif event_type == EventType.TYPING_STOP:
             await handle_typing_stop(user, chat_id, websocket)
 
-        elif event_type == EventType.MARK_READ:
-            await handle_mark_read(data, websocket, user, chat_id, db)
+        elif event_type == EventType.MARK_CHAT_READ:
+            await handle_mark_chat_read(data, websocket, user, chat_id, db)
 
         else:
+            # logger.warning(f"Unknown or deprecated event type: {event_type}")
             raise ValueError(f"Unknown event type: {event_type}")
 
     except json.JSONDecodeError as e:
@@ -194,33 +195,41 @@ async def handle_typing_stop(user: User, chat_id: int, websocket: WebSocket):
     logger.debug(f"User {user.id} stopped typing in chat {chat_id}")
 
 
-async def handle_mark_read(
+async def handle_mark_chat_read(
     data: Dict[str, Any],
     websocket: WebSocket,
     user: User,
     chat_id: int,
-    db: Any,  # AsyncSession
+    db: Any,
 ):
     """
-    Обрабатывает пометку сообщения как прочитанного.
+    помечает прочитанным диапазон сообщений.
     """
-    event = MarkReadEvent(**data)
-    service = MessageService(db)
     try:
-        message = await service.mark_message_read(
-            chat_id=chat_id, message_id=event.message_id, user_id=user.id
+        # Валидируем входные данные
+        event = MarkChatReadEvent(**data)
+        service = MessageService(db)
+
+        # Выполняем обновление в БД
+        updated_count = await service.mark_chat_read(
+            chat_id=chat_id, user_id=user.id, last_message_id=event.last_message_id
         )
+
+        if updated_count > 0:
+            logger.info(f"User {user.id} marked {updated_count} messages as read in chat {chat_id}")
+
+            # Формируем событие для рассылки ВСЕМ участникам (чтобы у собеседника появились галочки)
+            # И самому себе (чтобы сбросить счетчик на других устройствах)
+            broadcast_event = ChatReadEvent(
+                chat_id=chat_id, user_id=user.id, last_read_message_id=event.last_message_id
+            )
+
+            await pubsub_manager.publish_to_chat(chat_id, broadcast_event.model_dump_json())
+
     except Exception as e:
-        logger.error(f"Failed to mark message {event.message_id} as read: {e}")
+        logger.error(f"Failed to mark chat read: {e}")
         error_event = ErrorEvent(code="MARK_READ_FAILED", message=str(e))
         await manager.send_personal_message(error_event.model_dump_json(), websocket)
-        return
-
-    read_event = MessageReadEvent(
-        message_id=message.id, reader_id=user.id, reader_username=user.username
-    )
-    await pubsub_manager.publish_to_chat(chat_id, read_event.model_dump_json())
-    logger.info(f"Message {message.id} marked as read by user {user.id}")
 
 
 @router.websocket("/status")

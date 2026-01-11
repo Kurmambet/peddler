@@ -45,10 +45,6 @@ export const useChatsStore = defineStore("chats", () => {
     () => currentChat.value?.type === "direct"
   );
 
-  // ============================================================
-  // LOAD CHATS
-  // ============================================================
-
   const loadChats = async () => {
     isLoading.value = true;
     error.value = null;
@@ -83,9 +79,27 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
-  // ============================================================
-  // SET CURRENT CHAT
-  // ============================================================
+  const syncCounters = async () => {
+    // Не включаем глобальный isLoading, чтобы не мигал интерфейс
+    try {
+      console.log("[ChatsStore] 🔄 Syncing unread counters...");
+      const counters = await chatsAPI.getCounters();
+
+      counters.forEach(({ chat_id, unread_count }) => {
+        const chat = chats.value.find((c) => c.id === chat_id);
+        if (chat) {
+          if (chat.unread_count !== unread_count) {
+            console.log(
+              `[ChatsStore] 📥 Updated chat ${chat_id} unread: ${chat.unread_count} -> ${unread_count}`
+            );
+            chat.unread_count = unread_count;
+          }
+        }
+      });
+    } catch (err) {
+      console.error("[ChatsStore] ❌ Failed to sync counters:", err);
+    }
+  };
 
   const setCurrentChat = (chatId: number) => {
     currentChatId.value = chatId;
@@ -138,9 +152,7 @@ export const useChatsStore = defineStore("chats", () => {
   // DIRECT CHAT MANAGEMENT
   // ============================================================
 
-  /**
-   * Создать или получить существующий direct чат
-   */
+  // Создать или получить существующий direct чат
   const createDirectChat = async (
     otherUsername: string
   ): Promise<DirectChatRead> => {
@@ -174,9 +186,7 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
-  /**
-   * Удалить чат (только для Direct пока что)
-   */
+  // Удалить чат (только для Direct пока что)
   const deleteChat = async (chatId: number) => {
     isLoading.value = true;
     error.value = null;
@@ -205,9 +215,7 @@ export const useChatsStore = defineStore("chats", () => {
   // GROUP CHAT MANAGEMENT
   // ============================================================
 
-  /**
-   * Создать новый групповой чат
-   */
+  // Создать новый групповой чат
   const createGroupChat = async (
     title: string,
     participantUsernames: string[]
@@ -234,9 +242,8 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
-  /**
-   * Получить полную информацию о групповом чате (с участниками)
-   */
+  // Получить полную информацию о групповом чате (с участниками)
+
   const loadGroupDetails = async (
     chatId: number
   ): Promise<GroupChatDetailRead> => {
@@ -261,9 +268,7 @@ export const useChatsStore = defineStore("chats", () => {
   // GROUP PARTICIPANTS MANAGEMENT
   // ============================================================
 
-  /**
-   * Добавить участников в группу
-   */
+  // Добавить участников в группу
   const addParticipants = async (
     chatId: number,
     usernames: string[]
@@ -284,9 +289,7 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
-  /**
-   * Удалить участника из группы
-   */
+  // Удалить участника из группы
   const removeParticipant = async (
     chatId: number,
     userId: number
@@ -308,9 +311,7 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
-  /**
-   * Изменить роль участника
-   */
+  // Изменить роль участника
   const changeParticipantRole = async (
     chatId: number,
     userId: number,
@@ -332,9 +333,7 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
-  /**
-   * Обновить настройки группы (название, описание)
-   */
+  // Обновить настройки группы (название, описание)
   const updateGroupSettings = async (
     chatId: number,
     updates: { title?: string; description?: string }
@@ -364,9 +363,7 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
-  /**
-   * Передать владение группой
-   */
+  //  Передать владение группой
   const transferOwnership = async (
     chatId: number,
     newOwnerId: number
@@ -388,9 +385,7 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
-  /**
-   * Покинуть группу
-   */
+  // Покинуть группу
   const leaveGroup = async (chatId: number): Promise<LeaveGroupResponse> => {
     error.value = null;
     try {
@@ -417,9 +412,7 @@ export const useChatsStore = defineStore("chats", () => {
   // USER STATUS MANAGEMENT
   // ============================================================
 
-  /**
-   * Обновить статус пользователя (вызывается из WebSocket)
-   */
+  // Обновить статус пользователя (вызывается из WebSocket)
   const updateUserStatus = (
     userId: number,
     isOnline: boolean,
@@ -446,16 +439,10 @@ export const useChatsStore = defineStore("chats", () => {
     }
   };
 
-  /**
-   * Получить статус пользователя
-   */
+  // Получить статус пользователя
   const getUserStatus = (userId: number) => {
     return userStatuses.value[userId];
   };
-
-  // ============================================================
-  // RETURN
-  // ============================================================
 
   return {
     // State
@@ -468,6 +455,7 @@ export const useChatsStore = defineStore("chats", () => {
     incrementUnreadCount,
     decrementUnreadCount,
     setUnreadCount,
+
     // Computed
     currentChat,
     isCurrentChatGroup,
@@ -476,6 +464,7 @@ export const useChatsStore = defineStore("chats", () => {
     // Methods - Load
     loadChats,
     loadGroupDetails,
+    syncCounters,
 
     // Methods - Navigation
     setCurrentChat,

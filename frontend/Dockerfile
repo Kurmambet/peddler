@@ -34,18 +34,18 @@
 
 
 
-FROM node:20-alpine
+# FROM node:20-alpine
 
-WORKDIR /app
+# WORKDIR /app
 
-# Копируем только package.json для кэширования слоев
-COPY package*.json ./
-RUN npm install
-COPY . .
+# # Копируем только package.json для кэширования слоев
+# COPY package*.json ./
+# RUN npm install
+# COPY . .
 
-# Открываем порт Vite
-EXPOSE 5173
+# # Открываем порт Vite
+# EXPOSE 5173
 
-# Запускаем в режиме разработки с флагом --host, 
-# чтобы Vite был доступен извне контейнера
-CMD ["npm", "run", "dev", "--", "--host"]
+# # Запускаем в режиме разработки с флагом --host, 
+# # чтобы Vite был доступен извне контейнера
+# CMD ["npm", "run", "dev", "--", "--host"]

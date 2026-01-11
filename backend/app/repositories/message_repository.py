@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.core.exceptions import ChatAccessDenied
 from app.models.chat import Chat, ChatParticipant
 from app.models.message import Message, MessageType
-from sqlalchemy import and_, select
+from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -95,9 +95,39 @@ class MessageRepository:
         )
         return result.scalar_one_or_none()
 
-    async def mark_message_read(self, message: Message) -> Message:
-        """Пометить сообщение как прочитанное"""
-        message.is_read = True
+    async def mark_messages_read_until(
+        self, chat_id: int, user_id: int, last_message_id: int
+    ) -> int:
+        """
+        Помечает прочитанными все сообщения в чате до last_message_id включительно,
+        которые еще не прочитаны и не отправлены самим пользователем (если is_read храним на сообщении).
+
+        Возвращает количество обновленных сообщений.
+        """
+        # Важно: если is_read хранится в таблице Message, это работает только для 1-on-1 чатов или
+        # если мы считаем сообщение прочитанным, когда его увидел ХОТЯ БЫ ОДИН (плохая практика для групп).
+        #
+        # ПРАВИЛЬНЫЙ ПОДХОД ДЛЯ ГРУПП (на будущее):
+        # Обновлять last_read_message_id в таблице ChatParticipant.
+        #
+        # ТЕКУЩИЙ ПОДХОД (совместимый с твоей схемой, где is_read в Message):
+        # Работает корректно для Direct Chat. Для групп будет помечаться "прочитано",
+        # когда первый человек прочитает.
+
+        stmt = (
+            update(Message)
+            .where(
+                and_(
+                    Message.chat_id == chat_id,
+                    Message.id <= last_message_id,
+                    Message.is_read == False,
+                    Message.sender_id
+                    != user_id,  # Не помечаем свои сообщения (хотя они и так read=True обычно)
+                )
+            )
+            .values(is_read=True)
+        )
+
+        result = await self.db.execute(stmt)
         await self.db.commit()
-        await self.db.refresh(message)
-        return message
+        return result.rowcount

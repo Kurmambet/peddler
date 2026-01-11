@@ -45,7 +45,19 @@ export class WebSocketClient {
 
         this.ws.onopen = () => {
           console.log("[WebSocketClient] 🎉 onopen fired!");
-          this.connected = true; // ПРОСТОЕ ПРИСВОЕНИЕ
+          this.connected = true;
+
+          // ЕСЛИ это реконнект (reconnectAttempts > 0) или просто коннект
+          // Можно эмитить событие, чтобы подписчики знали, что мы живы
+          // Имитируем событие типа WSEvent, чтобы обработать его через общий механизм
+          this.handleMessage({
+            type: "connected",
+            timestamp: new Date().toISOString(),
+            user_id: 0, // заглушки
+            chat_id: 0,
+            message: "Connection restored",
+          } as any);
+
           this.reconnectAttempts = 0;
           console.log(
             "[WebSocketClient] ✅ Connected, flushing message queue..."
