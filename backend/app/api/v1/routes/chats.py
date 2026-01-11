@@ -10,6 +10,7 @@ from app.schemas.chat import (
     AddParticipantsResponse,
     ChangeRoleRequest,
     ChangeRoleResponse,
+    ChatCounters,
     ChatRead,
     DirectChatCreate,
     DirectChatRead,
@@ -52,6 +53,15 @@ async def create_group_chat(
 ) -> Chat:
     """Создаёт новый групповой чат"""
     return await service.create_group_chat(current_user, request)
+
+
+@router.get("/counters", response_model=List[ChatCounters])
+async def get_chat_counters(
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+) -> List[ChatCounters]:
+    """Возвращает только ID чатов и количество непрочитанных (для быстрой синхронизации)"""
+    return await service.get_chat_counters(current_user.id)
 
 
 @router.get("", response_model=List[ChatRead])

@@ -40,6 +40,7 @@ export function useGlobalStatus() {
       // 2. СРАЗУ регистрируем обработчики (ДО connect!)
       ws.value.onMessage("connected", (event: any) => {
         console.log("[useGlobalStatus] 🎉 Status WebSocket connected:", event);
+        chatsStore.syncCounters();
       });
 
       ws.value.onMessage("user_status_changed", (event: any) => {

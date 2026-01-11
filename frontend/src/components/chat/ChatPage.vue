@@ -149,7 +149,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { useChatsStore } from "@/stores/chats";
+import { onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useChat } from "../../composables/useChat";
 import ChatFolderTabs from "./ChatFolderTabs.vue";
@@ -160,6 +161,7 @@ import CreateGroupChat from "./CreateGroupChat.vue";
 import MessageInput from "./MessageInput.vue";
 import MessageList from "./MessageList.vue";
 import SidebarDrawer from "./SidebarDrawer.vue";
+const chatsStore = useChatsStore();
 
 const route = useRoute();
 const router = useRouter();
@@ -173,9 +175,17 @@ const selectedChatId = ref<number | null>(null);
 
 // Следим за роутом
 watch(
-  () => route.params.chatId,
-  (chatId) => {
-    selectedChatId.value = chatId ? Number(chatId) : null;
+  () => route.params.id,
+  (newId) => {
+    if (newId) {
+      const id = Number(newId);
+      selectedChatId.value = id;
+      // ВАЖНО: Сразу ставим в стор, чтобы компоненты знали, какой чат активен
+      chatsStore.setCurrentChat(id);
+    } else {
+      selectedChatId.value = null;
+      chatsStore.resetCurrentChat();
+    }
   },
   { immediate: true }
 );
@@ -200,4 +210,21 @@ const openCreateGroup = () => {
   isSidebarOpen.value = false;
   showCreateGroup.value = true;
 };
+
+onMounted(async () => {
+  // Проверяем, есть ли ID в роуте при загрузке
+  const id = Number(route.params.id);
+
+  // Грузим чаты, если их нет
+  if (chatsStore.chats.length === 0) {
+    await chatsStore.loadChats();
+  }
+
+  if (!isNaN(id)) {
+    // Принудительно ставим ID, даже если watch уже сработал
+    // (watch мог сработать до загрузки чатов, и setCurrentChat внутри него мог не найти чат в пустом массиве)
+    selectedChatId.value = id;
+    chatsStore.setCurrentChat(id);
+  }
+});
 </script>

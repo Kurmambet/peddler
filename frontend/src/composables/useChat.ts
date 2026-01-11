@@ -47,6 +47,13 @@ function createChatInstance() {
   const isLoading = computed(() => messagesStore.isLoading);
 
   const markChatAsRead = (lastMessageId: number) => {
+    // if (!ws.value?.isConnected) {
+    //   console.warn("Socket not connected, queueing read receipt...");
+    //   // Можно добавить в очередь, если очень надо,
+    //   // но проще дождаться connected события
+    //   return;
+    // }
+
     if (!chatId.value || !ws.value?.isConnected) {
       return;
     }

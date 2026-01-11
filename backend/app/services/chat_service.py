@@ -1,6 +1,6 @@
 # app/services/chat_service.py
 import logging
-from typing import List
+from typing import Dict, List
 
 from app.models.chat import Chat, ChatParticipantRole, ChatType
 from app.models.user import User
@@ -646,3 +646,17 @@ class ChatService:
             await self.repo.delete_chat(chat_id)
 
         await self.db.commit()
+
+    async def get_chat_counters(self, user_id: int) -> List[Dict]:
+        # Получаем все ID чатов пользователя (можно оптимизировать репозиторий, чтобы тянул только ID)
+        chats = await self.repo.get_user_chats(user_id, limit=1000)
+        chat_ids = [c.id for c in chats]
+
+        if not chat_ids:
+            return []
+
+        unread_map = await self.repo.get_unread_counts_batch(chat_ids, user_id)
+
+        return [
+            {"chat_id": chat_id, "unread_count": count} for chat_id, count in unread_map.items()
+        ]

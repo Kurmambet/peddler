@@ -497,13 +497,17 @@ watch(
 // Это срабатывает когда загружаются старые сообщения при смене чата
 watch(
   currentMessages,
-  () => {
-    // Даём время на рендеринг
+  (newMessages) => {
+    // Ждем nextTick, чтобы DOM обновился
     nextTick(() => {
-      checkAndMarkRead();
+      // Пытаемся пометить как прочитанное
+      // Важно: если сообщений > 0, и мы видим последнее
+      if (newMessages.length > 0) {
+        checkAndMarkRead();
+      }
     });
   },
-  { deep: true } // Глубокое наблюдение за изменениями
+  { deep: true, immediate: true }
 );
 
 // Scroll to bottom on chat change + mark as read
@@ -522,6 +526,17 @@ watch(
   },
   { immediate: true }
 );
+
+// при обновлении страницы
+watch(isLoading, (newIsLoading) => {
+  if (newIsLoading === false && currentMessages.value.length > 0) {
+    // Как только загрузка закончилась - сразу помечаем и скроллим
+    nextTick(() => {
+      scrollToBottom("auto");
+      setTimeout(() => checkAndMarkRead(), 500); // Чуть больше задержка
+    });
+  }
+});
 
 // Монтирование - только скролл
 onMounted(() => {

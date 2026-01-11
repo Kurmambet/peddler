@@ -17,6 +17,11 @@ class ChatParticipantRole(str, PyEnum):
     OWNER = "owner"
 
 
+class ChatCounters(BaseModel):
+    chat_id: int
+    unread_count: int
+
+
 class ChatParticipantBase(BaseModel):
     user_id: int = Field(..., ge=1)
     role: ChatParticipantRole = ChatParticipantRole.MEMBER
