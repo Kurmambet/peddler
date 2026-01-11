@@ -46,23 +46,6 @@ function createChatInstance() {
 
   const isLoading = computed(() => messagesStore.isLoading);
 
-  // Функция для отметки сообщений как прочитанных
-  const markMessagesAsRead = (messageIds: number[]) => {
-    if (!chatId.value || !ws.value?.isConnected) {
-      console.warn("[useChat] Cannot mark as read: no chat or WS disconnected");
-      return;
-    }
-
-    messageIds.forEach((messageId) => {
-      ws.value!.send({
-        type: "mark_read",
-        message_id: messageId,
-      });
-    });
-
-    console.log(`[useChat] 📬 Marked ${messageIds.length} messages as read`);
-  };
-
   const markChatAsRead = (lastMessageId: number) => {
     if (!chatId.value || !ws.value?.isConnected) {
       return;
@@ -72,7 +55,7 @@ function createChatInstance() {
     // (можно хранить локально lastSentReadId)
 
     ws.value.send({
-      type: "mark_chat_read", // Новый тип события
+      type: "mark_chat_read",
       last_message_id: lastMessageId,
     });
 
@@ -337,7 +320,7 @@ function createChatInstance() {
     sendMessage, //отправить сообщение
     handleTyping, //обработать ввод
     typingText: typing.typingText, // кто-то печатает...
-    markMessagesAsRead, //TODO удалить
+
     markChatAsRead,
     cleanup, //для внутреннего использования
   };

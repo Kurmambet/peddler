@@ -20,7 +20,6 @@ class EventType(str, Enum):
     # Client -> Server
     TYPING_START = "typing_start"
     TYPING_STOP = "typing_stop"
-    MARK_READ = "mark_read"
     MARK_CHAT_READ = "mark_chat_read"
 
     # Server -> Client

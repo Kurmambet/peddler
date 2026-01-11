@@ -333,13 +333,7 @@ import VoicePlayer from "./VoicePlayer.vue";
 
 const authStore = useAuthStore();
 const messagesStore = useMessagesStore();
-const {
-  currentMessages,
-  isLoading,
-  chatId,
-  markMessagesAsRead,
-  markChatAsRead,
-} = useChat();
+const { currentMessages, isLoading, chatId, markChatAsRead } = useChat();
 
 const scrollContainer = ref<HTMLElement | null>(null);
 const scrollAnchor = ref<HTMLElement | null>(null);
@@ -492,7 +486,6 @@ watch(
 
       // Помечаем новые непрочитанные как прочитанные
       nextTick(() => {
-        // markUnreadMessagesAsRead();
         checkAndMarkRead();
       });
     }
@@ -507,11 +500,10 @@ watch(
   () => {
     // Даём время на рендеринг
     nextTick(() => {
-      // markUnreadMessagesAsRead();
       checkAndMarkRead();
     });
   },
-  { deep: true } // ← Глубокое наблюдение за изменениями
+  { deep: true } // Глубокое наблюдение за изменениями
 );
 
 // Scroll to bottom on chat change + mark as read
@@ -523,7 +515,6 @@ watch(
         scrollToBottom("auto");
         // Даём больше времени на загрузку через WebSocket
         setTimeout(() => {
-          // markUnreadMessagesAsRead();
           checkAndMarkRead();
         }, 300); // Небольшая задержка для гарантии
       });

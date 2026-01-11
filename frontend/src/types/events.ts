@@ -6,7 +6,6 @@ export type WSEventType =
   | "typing_start"
   | "typing_stop"
   | "typing_indicator"
-  | "mark_read"
   | "user_status_changed"
   | "connected"
   | "error"
