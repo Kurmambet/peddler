@@ -126,3 +126,6 @@ class MessageService:
         # await self.chat_repo.reset_unread_count(chat_id, user_id)
 
         return updated_count
+
+    async def search_messages(self, user_id: int, query: str, limit: int, offset: int):
+        return await self.repo.search_messages(user_id, query, limit, offset)

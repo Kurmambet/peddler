@@ -1,7 +1,8 @@
 # app/models/message.py
 from enum import Enum as PyEnum
 
-from sqlalchemy import BigInteger, Boolean, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import BigInteger, Boolean, Enum, ForeignKey, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -47,6 +48,12 @@ class Message(BaseModel):
     filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mimetype: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
+    # TSVECTOR не поддерживается "автоматически" на уровне ORM для генерации значений в Python,
+    # но оно нужно для схемы БД.
+    # Мы помечаем его как Deferred (ленивая загрузка), так как оно нужно только для поиска,
+    # и при обычном SELECT * его тащить не обязательно (хотя для tsvector это не критично).
+    search_vector = mapped_column(TSVECTOR)
+
     chat: Mapped["Chat"] = relationship(
         "Chat",
         back_populates="messages",
@@ -56,6 +63,11 @@ class Message(BaseModel):
         "User",
         back_populates="sent_messages",
         foreign_keys=[sender_id],
+    )
+
+    __table_args__ = (
+        # Создаем GIN индекс на колонку search_vector
+        Index("ix_messages_search_vector", "search_vector", postgresql_using="gin"),
     )
 
     def __repr__(self) -> str:

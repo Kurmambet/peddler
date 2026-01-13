@@ -29,7 +29,7 @@ taskkill /PID 8200 /F
 ```bash
 # Автогенерация миграции на основе моделей
 alembic revision --autogenerate -m "Initial migration"
-alembic revision --autogenerate -m "message_type_change"
+alembic revision --autogenerate -m "add_full_text_search"
 
 # Применить миграцию
 alembic upgrade head
@@ -63,6 +63,7 @@ SELECT * FROM chats;
 # сообщения
 SELECT * FROM messages;
 SELECT content, message_type_enum, file_url, filename, file_size, mimetype FROM messages;
+SELECT content, search_vector FROM messages;
 
 # участники чатов
 SELECT * FROM chat_participants;

@@ -3,6 +3,7 @@ import logging
 import os
 import subprocess
 import uuid
+from typing import List
 
 import aiofiles
 from app.api.dependencies import get_current_user
@@ -308,3 +309,22 @@ async def upload_file_message(
 
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
     return message
+
+
+@router.get("/search", response_model=List[MessageRead])
+async def search_messages_endpoint(
+    q: str = Query(..., min_length=1, description="Текст для поиска"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+    service: MessageService = Depends(get_message_service),
+):
+    """
+    Полнотекстовый поиск по всем сообщениям пользователя.
+    """
+    offset = (page - 1) * limit
+
+    messages = await service.search_messages(
+        user_id=current_user.id, query=q, limit=limit, offset=offset
+    )
+    return messages

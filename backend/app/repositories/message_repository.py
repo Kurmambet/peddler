@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.core.exceptions import ChatAccessDenied
 from app.models.chat import Chat, ChatParticipant
 from app.models.message import Message, MessageType
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -131,3 +131,41 @@ class MessageRepository:
         result = await self.db.execute(stmt)
         await self.db.commit()
         return result.rowcount
+
+    async def search_messages(
+        self, user_id: int, query_str: str, limit: int = 20, offset: int = 0
+    ) -> list[Message]:
+        """
+        Поиск сообщений во всех чатах, где состоит пользователь.
+        Использует websearch_to_tsquery для обработки запроса.
+        """
+
+        # 1. Формируем tsquery для двух языков
+        # websearch_to_tsquery — безопасная функция, она сама выкинет спецсимволы,
+        # обработает кавычки и т.д.
+        # Мы ищем: (query в русском) ИЛИ (query в английском)
+        search_query = func.websearch_to_tsquery("russian", query_str).op("||")(
+            func.websearch_to_tsquery("english", query_str)
+        )
+        # оператор | для tsquery означает OR.
+
+        stmt = (
+            select(Message)
+            .join(Message.chat)  # Если нужно подгрузить данные чата
+            .join(ChatParticipant, Message.chat_id == ChatParticipant.chat_id)  # Проверка прав
+            .where(
+                ChatParticipant.user_id == user_id,  # Только чаты юзера
+                Message.is_deleted.is_(False),
+                # Условие поиска: вектор @@ запрос
+                Message.search_vector.op("@@")(search_query),
+            )
+            # Ранжирование: сначала самые релевантные, потом новые
+            .order_by(
+                func.ts_rank(Message.search_vector, search_query).desc(), Message.created_at.desc()
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
