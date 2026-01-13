@@ -1,4 +1,3 @@
-// frontend/src/composables/useGlobalStatus.ts
 import { onMounted, onUnmounted, ref } from "vue";
 import { useRoute } from "vue-router";
 import { useAuthStore } from "../stores/auth";
@@ -16,9 +15,35 @@ export function useGlobalStatus() {
   const ws = ref<WebSocketClient | null>(null);
   const isConnected = ref(false);
 
+  // Храним ID таймера, чтобы очищать его при разрыве соединения
+  let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
   const lastUserStatuses = ref<
     Map<number, { isOnline: boolean; timestamp: number }>
   >(new Map());
+
+  // Функция запуска Heartbeat
+  const startHeartbeat = () => {
+    stopHeartbeat();
+
+    heartbeatInterval = setInterval(() => {
+      // Проверяем, что клиент существует и подключен
+      if (ws.value && ws.value.isConnected) {
+        ws.value.sendRaw("heartbeat");
+      }
+    }, 30000); // 30 секунд
+
+    console.log("[useGlobalStatus] 💓 Heartbeat started");
+  };
+
+  // Остановка Heartbeat
+  const stopHeartbeat = () => {
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+      console.log("[useGlobalStatus] 💔 Heartbeat stopped");
+    }
+  };
 
   const connect = async () => {
     if (!authStore.token) {
@@ -34,10 +59,8 @@ export function useGlobalStatus() {
     try {
       console.log("[useGlobalStatus] 🔗 Connecting to status WebSocket...");
 
-      // 1. Создаём клиент (НЕ подключаемся)
       ws.value = new WebSocketClient(0, authStore.token);
 
-      // 2. СРАЗУ регистрируем обработчики (ДО connect!)
       ws.value.onMessage("connected", (event: any) => {
         console.log("[useGlobalStatus] 🎉 Status WebSocket connected:", event);
         chatsStore.syncCounters();
@@ -48,15 +71,12 @@ export function useGlobalStatus() {
         const now = Date.now();
         const lastStatus = lastUserStatuses.value.get(statusEvent.user_id);
 
-        // Дедупликация
+        // Дедупликация (оставляем вашу логику, она полезна)
         if (lastStatus) {
           const isSameStatus = lastStatus.isOnline === statusEvent.is_online;
           const isRecent = now - lastStatus.timestamp < 3000;
 
           if (isSameStatus && isRecent) {
-            console.log(
-              `[useGlobalStatus] 🔄 Duplicate status (user ${statusEvent.user_id}), ignoring`
-            );
             return;
           }
         }
@@ -66,12 +86,6 @@ export function useGlobalStatus() {
           timestamp: now,
         });
 
-        console.log(
-          `[useGlobalStatus] 👤 Status update: User ${statusEvent.user_id} → ${
-            statusEvent.is_online ? "ONLINE" : "OFFLINE"
-          }`
-        );
-
         chatsStore.updateUserStatus(
           statusEvent.user_id,
           statusEvent.is_online,
@@ -79,41 +93,39 @@ export function useGlobalStatus() {
         );
       });
 
-      // Обработка новых сообщений для обновления счётчика
       ws.value.onMessage("message_created", (event: any) => {
         const msgEvent = event as MessageCreatedEvent;
-
         if (msgEvent.sender_id !== authStore.user?.id) {
-          // Проверяем:
-          // 1. ID чата в сторе
-          // 2. ИЛИ мы вообще не на странице чата (на всякий случай)
           const isChatOpen =
             chatsStore.currentChatId === msgEvent.chat_id &&
-            route.name !== "Home"; // или проверка пути, если нужно
+            route.name !== "Home";
 
           if (!isChatOpen) {
-            console.log(
-              `[useGlobalStatus] 🔔 Incrementing unread for chat ${msgEvent.chat_id}`
-            );
             chatsStore.incrementUnreadCount(msgEvent.chat_id);
           }
         }
       });
+
       ws.value.onMessage("new_chat", (event: any) => {
-        console.log("[useGlobalStatus] 🆕 New chat received:", event.chat);
-        // Добавляем в начало списка
         chatsStore.chats.unshift(event.chat);
       });
+
       await ws.value.connect();
       isConnected.value = true;
       console.log("[useGlobalStatus] ✅ Connected to status WebSocket");
+
+      // !!! ЗАПУСКАЕМ HEARTBEAT ПОСЛЕ УСПЕШНОГО ПОДКЛЮЧЕНИЯ
+      startHeartbeat();
     } catch (err) {
       console.error("[useGlobalStatus] ❌ Connection failed:", err);
       isConnected.value = false;
+      stopHeartbeat(); // Останавливаем при ошибке
     }
   };
 
   const disconnect = () => {
+    stopHeartbeat(); // !!! ВАЖНО: Остановить таймер при отключении
+
     if (ws.value) {
       console.log("[useGlobalStatus] 🔌 Disconnecting from status WebSocket");
       ws.value.disconnect();

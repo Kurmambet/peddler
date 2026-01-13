@@ -72,9 +72,11 @@
 </template>
 
 <script setup lang="ts">
+import { useNow } from "@vueuse/core";
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useChat } from "../../composables/useChat";
+import { useUserStatus } from "../../composables/useUserStatus";
 import { useChatsStore } from "../../stores/chats";
 import Avatar from "../ui/Avatar.vue";
 import UserProfileModal from "../user/UserProfileModal.vue";
@@ -101,6 +103,8 @@ defineEmits<{
 const router = useRouter();
 const { chatId } = useChat();
 const chatsStore = useChatsStore();
+const { formatLastSeen } = useUserStatus();
+const now = useNow({ interval: 60000 });
 
 const currentChat = computed(() => {
   if (!chatId.value) return null;
@@ -120,13 +124,22 @@ const chatTitle = computed(() => {
 });
 
 const statusText = computed(() => {
+  // Просто обращение к now.value заставит computed пересчитаться,
+  // даже если мы не используем его в аргументах функции formatLastSeen
+  const _tick = now.value;
+
   if (!currentChat.value) return "";
 
   if (currentChat.value.type === "direct") {
     if (currentChat.value.other_user_is_online) return "Online";
-    // Можно добавить форматирование last seen
+
+    if (currentChat.value.other_user_last_seen) {
+      return formatLastSeen(currentChat.value.other_user_last_seen);
+    }
+
     return "Offline";
   } else {
+    // Для групп
     const count = currentChat.value.participant_count || 0;
     return `${count} member${count !== 1 ? "s" : ""}`;
   }
