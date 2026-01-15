@@ -1,5 +1,5 @@
 # app/services/message_service.py
-from app.models.message import Message, MessageType
+from app.models.message import MessageType
 from app.models.user import User
 from app.repositories.message_repository import MessageRepository
 from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
@@ -20,7 +20,7 @@ class MessageService:
 
     async def send_message(
         self, chat_id: int, msg_in: MessageCreate, current_user: User
-    ) -> Message:
+    ) -> MessageRead:
         """
         Отправить сообщение в чат.
         """

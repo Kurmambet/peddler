@@ -85,7 +85,7 @@
       </aside>
 
       <!-- RIGHT PANEL - выбранный чат или placeholder -->
-      <main class="flex-1 flex flex-col min-h-0 bg-app-bg">
+      <main class="flex-1 flex flex-col min-h-0 bg-app-bg h-full">
         <!-- Если чат выбран -->
         <template v-if="selectedChatId">
           <!-- HEADER -->
@@ -98,8 +98,8 @@
           </div>
 
           <!-- MESSAGES -->
-          <div class="flex-1 overflow-y-auto min-h-0">
-            <MessageList />
+          <div class="flex-1 min-h-0 relative overflow-hidden flex flex-col">
+            <MessageList class="flex-1 h-full" />
           </div>
 
           <!-- INPUT -->

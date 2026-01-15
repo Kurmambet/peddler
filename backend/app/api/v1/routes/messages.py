@@ -8,7 +8,7 @@ from typing import List
 import aiofiles
 from app.api.dependencies import get_current_user
 from app.database import get_db
-from app.models.message import Message, MessageType
+from app.models.message import MessageType
 from app.models.user import User
 from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
 from app.services.message_service import MessageService
@@ -42,7 +42,7 @@ async def send_message(
     msg_in: MessageCreate,
     current_user: User = Depends(get_current_user),
     service: MessageService = Depends(get_message_service),
-) -> Message:
+) -> MessageRead:
     """Отправляет текстовое сообщение в чат"""
     # return await service.send_message(chat_id, msg_in, current_user)
     message = await service.send_message(chat_id, msg_in, current_user)
@@ -58,10 +58,22 @@ async def send_message(
         is_read=message.is_read,
         message_type=message.message_type,
     )
+    message_resp = MessageRead(
+        id=message.id,
+        chat_id=message.chat_id,
+        sender_id=message.sender_id,
+        sender_username=current_user.username,
+        sender_display_name=current_user.display_name,
+        avatar_url=current_user.avatar_url,
+        content=message.content,
+        created_at=message.created_at,
+        is_read=message.is_read,
+        message_type=message.message_type,
+    )
 
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
     logger.info("[Text] Event published successfully")
-    return message
+    return message_resp
 
 
 @router.get("/chats/{chat_id}/messages", response_model=MessageListResponse)

@@ -29,8 +29,9 @@ export const useMessagesStore = defineStore("messages", () => {
   const loadMessages = async (chatId: number, limit = 50) => {
     isLoading.value = true;
     error.value = null;
+    const offset = 0;
     try {
-      const { data } = await messagesAPI.list(chatId, limit, 0);
+      const { data } = await messagesAPI.list(chatId, limit, offset);
       messagesByChat.value.set(chatId, data.messages);
       hasMore.value.set(chatId, data.has_more);
       console.log(
