@@ -151,15 +151,20 @@ class MessageRepository:
 
         stmt = (
             select(Message)
-            .join(Message.chat)  # Если нужно подгрузить данные чата
-            .join(ChatParticipant, Message.chat_id == ChatParticipant.chat_id)  # Проверка прав
+            # !!! 1. Подгружаем связанные сущности (Eager Loading) !!!
+            .options(
+                selectinload(Message.sender),  # Чтобы получить username, display_name
+                selectinload(Message.chat),  # Чтобы получить title
+            )
+            # .join(Message.chat) - этот join уже не обязателен для выборки данных,
+            # но может быть нужен для фильтрации, если бы фильтровали по свойствам чата.
+            # В данном случае join с ChatParticipant достаточен для безопасности.
+            .join(ChatParticipant, Message.chat_id == ChatParticipant.chat_id)
             .where(
-                ChatParticipant.user_id == user_id,  # Только чаты юзера
+                ChatParticipant.user_id == user_id,
                 Message.is_deleted.is_(False),
-                # Условие поиска: вектор @@ запрос
                 Message.search_vector.op("@@")(search_query),
             )
-            # Ранжирование: сначала самые релевантные, потом новые
             .order_by(
                 func.ts_rank(Message.search_vector, search_query).desc(), Message.created_at.desc()
             )

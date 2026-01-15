@@ -1,6 +1,7 @@
+<!-- src/components/chat/GlobalSearchDrawer.vue -->
 <template>
   <div>
-    <!-- Backdrop -->
+    <!-- Backdrop для самой Search панели -->
     <div
       v-if="isOpen"
       class="fixed inset-0 bg-black/50 z-40 transition-opacity"
@@ -98,6 +99,7 @@
 
           <!-- MESSAGES SECTION -->
           <div v-if="messages.length > 0">
+            <!-- Messages layout -->
             <div
               class="px-4 py-2 bg-app-bg text-xs font-semibold text-app-text-secondary uppercase tracking-wider"
             >
@@ -126,37 +128,53 @@
 
               <div class="mt-1 text-xs text-primary flex items-center gap-1">
                 <span class="opacity-70">in</span>
-                msg.chat?.title || 'Direct Chat'
+                {{
+                  msg.chat_title ||
+                  msg.sender_display_name ||
+                  msg.sender_username
+                }}
               </div>
             </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- User Profile Modal -->
+    <!-- Важно: Используем v-if для пересоздания компонента при смене userId -->
+    <UserProfileModal
+      v-if="showProfileModal && selectedUserId"
+      :user-id="selectedUserId"
+      @close="showProfileModal = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { authAPI } from "@/api/auth";
 import { messagesAPI } from "@/api/messages";
-import { useChatsStore } from "@/stores/chats";
 import type { MessageRead, UserRead } from "@/types/api";
 import { useDebounceFn } from "@vueuse/core";
 import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import Avatar from "../ui/Avatar.vue";
+import UserProfileModal from "../user/UserProfileModal.vue";
 
 const props = defineProps<{ isOpen: boolean }>();
 const emit = defineEmits(["close"]);
 
 const router = useRouter();
-const chatsStore = useChatsStore();
+// const chatsStore = useChatsStore();
 const searchInput = ref<HTMLInputElement | null>(null);
 
 const query = ref("");
 const isLoading = ref(false);
 const users = ref<UserRead[]>([]);
 const messages = ref<MessageRead[]>([]);
+
+// State for Profile Modal
+const showProfileModal = ref(false);
+const selectedUserId = ref<number | null>(null);
 
 const hasResults = computed(
   () => users.value.length > 0 || messages.value.length > 0
@@ -186,9 +204,8 @@ const search = useDebounceFn(async () => {
 
   isLoading.value = true;
   try {
-    // Запускаем параллельно
     const [usersRes, messagesRes] = await Promise.allSettled([
-      authAPI.searchUsers(query.value), // Нужно добавить этот метод в API если нет
+      authAPI.searchUsers(query.value),
       messagesAPI.search(query.value),
     ]);
 
@@ -205,15 +222,12 @@ const handleInput = () => {
   search();
 };
 
-const handleUserClick = async (user: any) => {
-  try {
-    // Логика перехода к диалогу с юзером
-    const chat = await chatsStore.createDirectChat(user.username);
-    router.push(`/chat/${chat.id}`);
-    emit("close");
-  } catch (e) {
-    console.error(e);
-  }
+const handleUserClick = (user: any) => {
+  selectedUserId.value = user.id;
+  showProfileModal.value = true;
+  // Мы НЕ закрываем поиск (emit('close')), чтобы юзер мог вернуться,
+  // если передумает писать сообщение.
+  // Модалка откроется поверх Drawer'а (убедитесь, что z-index модалки выше)
 };
 
 const handleMessageClick = (msg: MessageRead) => {

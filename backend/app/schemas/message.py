@@ -45,6 +45,7 @@ class MessageCreate(MessageBase):
 class MessageRead(MessageBase):
     id: int
     chat_id: int
+    chat_title: Optional[str] = None
     sender_id: int
     is_read: bool
     created_at: datetime
@@ -61,6 +62,42 @@ class MessageRead(MessageBase):
 
     class Config:
         from_attributes = True
+
+
+# class MessageRead(MessageBase):
+#     id: int
+#     chat_id: int
+#     sender_id: int
+#     is_read: bool
+#     created_at: datetime
+
+#     @computed_field
+#     def sender_username(self) -> str | None:
+#         if self.sender:
+#             return self.sender.username
+#         return None
+
+#     @computed_field
+#     def sender_display_name(self) -> str | None:
+#         if self.sender:
+#             return self.sender.display_name
+#         return None
+
+#     @computed_field
+#     def avatar_url(self) -> str | None:
+#         if self.sender:
+#             return self.sender.avatar_url
+#         return None
+
+#     @computed_field
+#     def chat_title(self) -> str | None:
+#         # для групп возвращаем title, для direct - null
+#         if self.chat:
+#             return self.chat.title
+#         return None
+
+#     class Config:
+#         from_attributes = True
 
 
 class MessageListResponse(BaseModel):

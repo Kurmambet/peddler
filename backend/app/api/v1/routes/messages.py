@@ -324,7 +324,45 @@ async def search_messages_endpoint(
     """
     offset = (page - 1) * limit
 
+    # Получаем сырые объекты SQLAlchemy с подгруженными связями
     messages = await service.search_messages(
         user_id=current_user.id, query=q, limit=limit, offset=offset
     )
-    return messages
+
+    # Ручной маппинг
+    message_reads = []
+    for msg in messages:
+        # Логика определения названия чата
+        chat_title = None
+        if msg.chat:
+            if msg.chat.type == "group":
+                chat_title = msg.chat.title
+            elif msg.chat.type == "direct":
+                # Для direct чата сложнее: нужно понять, кто "other user".
+                # Но msg.chat не содержит инфо о current_user.
+                # Можно пока просто вернуть None или "Direct Chat"
+                # Если очень нужно имя собеседника, то придется подгружать участников.
+                pass
+
+        message_reads.append(
+            MessageRead(
+                id=msg.id,
+                chat_id=msg.chat_id,
+                chat_title=chat_title,
+                sender_id=msg.sender_id,
+                sender_username=msg.sender.username if msg.sender else None,
+                sender_display_name=msg.sender.display_name if msg.sender else None,
+                avatar_url=msg.sender.avatar_url if msg.sender else None,
+                content=msg.content,
+                is_read=msg.is_read,
+                created_at=msg.created_at,
+                message_type=msg.message_type,
+                file_url=msg.file_url,
+                file_size=msg.file_size,
+                duration=msg.duration,
+                filename=msg.filename,
+                mimetype=msg.mimetype,
+            )
+        )
+
+    return message_reads
