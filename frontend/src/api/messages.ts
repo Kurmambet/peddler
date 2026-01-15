@@ -99,4 +99,11 @@ export const messagesAPI = {
       }
     );
   },
+
+  async search(query: string, limit = 50): Promise<MessageRead[]> {
+    const { data } = await apiClient.get<MessageRead[]>("/search", {
+      params: { q: query, limit },
+    });
+    return data;
+  },
 };

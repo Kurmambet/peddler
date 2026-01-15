@@ -56,9 +56,9 @@
 
           <!-- Search button -->
           <button
-            class="p-2 -mr-2 rounded-lg hover:bg-app-hover transition-colors opacity-50 cursor-not-allowed"
+            @click="showSearch = true"
+            class="p-2 -mr-2 rounded-lg hover:bg-app-hover transition-colors text-app-text-secondary hover:text-app-text"
             aria-label="Search"
-            disabled
           >
             <svg
               class="w-5 h-5 text-app-text-secondary"
@@ -75,6 +75,7 @@
             </svg>
           </button>
         </div>
+        <GlobalSearchDrawer :is-open="showSearch" @close="showSearch = false" />
 
         <!-- ТАБЫ для фильтрации -->
         <ChatFolderTabs v-model="activeFolder" :horizontal="false" />
@@ -158,11 +159,13 @@ import ChatHeader from "./ChatHeader.vue";
 import ChatList from "./ChatList.vue";
 import CreateDirectChat from "./CreateDirectChat.vue";
 import CreateGroupChat from "./CreateGroupChat.vue";
+import GlobalSearchDrawer from "./GlobalSearchDrawer.vue";
 import MessageInput from "./MessageInput.vue";
 import MessageList from "./MessageList.vue";
 import SidebarDrawer from "./SidebarDrawer.vue";
 const chatsStore = useChatsStore();
 
+const showSearch = ref(false);
 const route = useRoute();
 const router = useRouter();
 const { typingText } = useChat();
