@@ -72,7 +72,6 @@ async def send_message(
     )
 
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
-    logger.info("[Text] Event published successfully")
     return message_resp
 
 
@@ -86,6 +85,17 @@ async def get_chat_messages(
 ) -> MessageListResponse:
     """Возвращает сообщения из чата"""
     return await service.get_chat_messages(chat_id, current_user, limit, offset)
+
+
+@router.get("/chats/{chat_id}/messages/around", response_model=MessageListResponse)
+async def get_messages_around(
+    chat_id: int,
+    message_id: int,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    service: MessageService = Depends(get_message_service),
+):
+    return await service.get_messages_around(chat_id, message_id, limit, current_user.id)
 
 
 @router.post("/chats/{chat_id}/messages/voice", response_model=MessageRead)

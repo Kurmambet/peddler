@@ -4,7 +4,6 @@
     <div
       ref="scrollContainer"
       class="flex-1 overflow-y-auto overflow-x-hidden w-full"
-      style="overflow-anchor: none; border: 2px solid red"
       @scroll="handleScroll"
     >
       <!-- Loading More Indicator -->
@@ -81,8 +80,12 @@
             <div
               v-for="msg in group.messages"
               :key="msg.id"
-              class="flex animate-slide-up w-full"
-              :class="{ 'justify-end': isOwn(msg) }"
+              :id="`msg-${msg.id}`"
+              class="flex animate-slide-up w-full transition-colors duration-500"
+              :class="{
+                'justify-end': isOwn(msg),
+                'bg-yellow-100/20': msg.id === highlightMessageId,
+              }"
             >
               <!-- Avatar for incoming messages -->
               <Avatar
@@ -363,6 +366,11 @@ const isGroupChat = computed(() => {
   return chat?.type === "group";
 });
 
+// для подсветки ID
+const props = defineProps<{
+  highlightMessageId?: number | null;
+}>();
+
 const openProfile = (userId: number) => {
   selectedUserId.value = userId;
   showUserProfile.value = true;
@@ -428,6 +436,20 @@ const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
   });
 };
 
+// Функция для скролла к конкретному сообщению (если оно уже загружено)
+const scrollToMessage = (messageId: number) => {
+  nextTick(() => {
+    // Ищем элемент в DOM (нужно добавить :id или :data-id к сообщению в шаблоне)
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Можно добавить класс для анимации мигания
+      el.classList.add("animate-flash");
+      setTimeout(() => el.classList.remove("animate-flash"), 2000);
+    }
+  });
+};
+
 // Load older messages
 const loadOlderMessages = async () => {
   console.log("[DEBUG] loadOlderMessages called", {
@@ -446,16 +468,6 @@ const loadOlderMessages = async () => {
 
   const loadedCount = await messagesStore.loadMoreMessages(chatId.value);
 
-  // if (loadedCount && loadedCount > 0) {
-  //   // Сохраняем позицию скролла после загрузки
-  //   nextTick(() => {
-  //     if (scrollContainer.value) {
-  //       const newScrollHeight = scrollContainer.value.scrollHeight;
-  //       const diff = newScrollHeight - scrollHeight;
-  //       scrollContainer.value.scrollTop = scrollTop + diff;
-  //     }
-  //   });
-  // }
   if (loadedCount && loadedCount > 0) {
     // Используем nextTick, чтобы Vue успел отрисовать новые элементы
     await nextTick();
@@ -510,6 +522,13 @@ const formatFileSize = (bytes?: number | null) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 };
+
+watch(
+  () => props.highlightMessageId,
+  (newId) => {
+    if (newId) scrollToMessage(newId);
+  }
+);
 
 // Auto-scroll on new message
 watch(

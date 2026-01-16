@@ -174,3 +174,49 @@ class MessageRepository:
 
         result = await self.db.execute(stmt)
         return result.scalars().all()
+
+    async def get_messages_around(
+        self, chat_id: int, message_id: int, limit: int = 50
+    ) -> list[Message]:
+        """
+        Возвращает сообщения вокруг указанного ID.
+        Примерно limit/2 до и limit/2 после.
+        """
+        half_limit = limit // 2
+
+        # 1. Сообщения "старее или само сообщение" (включая self)
+        stmt_older = (
+            select(Message)
+            .options(selectinload(Message.sender))
+            .where(
+                Message.chat_id == chat_id,
+                Message.id <= message_id,
+                Message.is_deleted.is_(False),
+            )
+            .order_by(Message.id.desc())
+            .limit(half_limit + 1)  # +1 на всякий случай для центровки
+        )
+
+        # 2. Сообщения "новее"
+        stmt_newer = (
+            select(Message)
+            .options(selectinload(Message.sender))
+            .where(
+                Message.chat_id == chat_id, Message.id > message_id, Message.is_deleted.is_(False)
+            )
+            .order_by(Message.id.asc())
+            .limit(half_limit)
+        )
+
+        # Выполняем
+        res_older = await self.db.execute(stmt_older)
+        res_newer = await self.db.execute(stmt_newer)
+
+        older_msgs = res_older.scalars().all()  # [target, target-1, target-2...]
+        newer_msgs = res_newer.scalars().all()  # [target+1, target+2...]
+
+        # Объединяем и сортируем правильно (от старых к новым)
+        # older_msgs нужно перевернуть, т.к. они были DESC
+        all_messages = sorted(list(older_msgs) + list(newer_msgs), key=lambda x: x.id)
+
+        return all_messages
