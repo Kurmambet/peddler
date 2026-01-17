@@ -489,13 +489,21 @@ const loadOlderMessages = async () => {
 
 const handleScroll = () => {
   const container = scrollContainer.value;
-  if (!container) return;
-  if (isLoadingMore.value || !hasMore.value) return;
+  if (!container || isLoadingMore.value) return; // Убрал !hasMore.value отсюда, т.к. может быть hasMoreNewer
 
-  // Порог, когда считаем, что пользователь «у самого верха»
   const threshold = 150;
-  if (container.scrollTop <= threshold) {
+
+  // Скролл ВВЕРХ (в прошлое)
+  if (container.scrollTop <= threshold && hasMore.value) {
+    // hasMore = hasMoreOlder
     loadOlderMessages();
+  }
+
+  // Скролл ВНИЗ (в будущее)
+  const scrollBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight;
+  if (scrollBottom <= threshold && messagesStore.hasMoreNewer && chatId.value) {
+    messagesStore.loadNewerMessages(chatId.value);
   }
 };
 

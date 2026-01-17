@@ -106,4 +106,18 @@ export const messagesAPI = {
     });
     return data;
   },
+
+  async listAround(
+    chatId: number,
+    messageId: number,
+    limit = 50
+  ): Promise<MessageListResponse> {
+    const { data } = await apiClient.get<MessageListResponse>(
+      `/chats/${chatId}/messages/around`,
+      {
+        params: { message_id: messageId, limit },
+      }
+    );
+    return data;
+  },
 };
