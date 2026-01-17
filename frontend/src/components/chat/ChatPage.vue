@@ -107,7 +107,7 @@
 
           <!-- INPUT -->
           <div class="flex-shrink-0">
-            <MessageInput />
+            <MessageInput @send="handleSendMessage" />
           </div>
         </template>
 
@@ -154,7 +154,8 @@
 
 <script setup lang="ts">
 import { useChatsStore } from "@/stores/chats";
-import { onMounted, ref, watch } from "vue";
+import { useMessagesStore } from "@/stores/messages";
+import { nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useChat } from "../../composables/useChat";
 import ChatFolderTabs from "./ChatFolderTabs.vue";
@@ -167,6 +168,7 @@ import MessageInput from "./MessageInput.vue";
 import MessageList from "./MessageList.vue";
 import SidebarDrawer from "./SidebarDrawer.vue";
 const chatsStore = useChatsStore();
+const messagesStore = useMessagesStore();
 
 const showSearch = ref(false);
 const route = useRoute();
@@ -196,6 +198,33 @@ const initializeChat = async (idStr: string | string[]) => {
     selectedChatId.value = null;
     chatsStore.resetCurrentChat();
   }
+};
+
+// src/components/chat/ChatPage.vue
+
+const handleSendMessage = async (content: string) => {
+  if (!selectedChatId.value) return;
+
+  // 1. Сбрасываем highlight ПЕРЕД отправкой.
+  // Это критично, чтобы MessageList перестал блокировать автоскролл.
+  if (route.query.highlight) {
+    await router.replace({
+      path: `/chat/${String(selectedChatId.value)}`,
+      query: {}, // Удаляем query
+    });
+    // Ждем тик, чтобы проп highlightMessageId в MessageList стал undefined
+    await nextTick();
+  }
+
+  // 2. Отправляем сообщение
+  // messagesStore сам поймет, что мы "в прошлом", и перезагрузит чат на "live"
+  await messagesStore.sendMessage(selectedChatId.value, content);
+
+  // 3. Форсируем скролл вниз, так как мы только что отправили сообщение
+  // и перешли в live-режим.
+  // Можно вызвать метод компонента MessageList, если есть ref,
+  // но проще положиться на watch внутри MessageList, который теперь
+  // не заблокирован highlightMessageId.
 };
 
 // Следим за роутом (реагируем на навигацию)

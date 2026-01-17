@@ -81,10 +81,10 @@
               v-for="msg in group.messages"
               :key="msg.id"
               :id="`msg-${msg.id}`"
-              class="flex animate-slide-up w-full transition-colors duration-500"
+              class="flex animate-slide-up w-full transition-colors duration-500 rounded-lg"
               :class="{
                 'justify-end': isOwn(msg),
-                'bg-yellow-100/20': msg.id === highlightMessageId,
+                'bg-gray-800': msg.id === highlightMessageId,
               }"
             >
               <!-- Avatar for incoming messages -->
@@ -344,62 +344,64 @@ import MessageStatusIcon from "./MessageStatusIcon.vue";
 import VideoNotePlayer from "./VideoNotePlayer.vue";
 import VoicePlayer from "./VoicePlayer.vue";
 
+// === Stores & Composables ===
 const chatsStore = useChatsStore();
 const authStore = useAuthStore();
 const messagesStore = useMessagesStore();
 const { currentMessages, isLoading, chatId, markChatAsRead } = useChat();
+
+// Деструктурируем методы стора для удобства
 const { loadMoreMessages, loadNewerMessages } = messagesStore;
 
-const scrollContainer = ref<HTMLElement | null>(null);
-const scrollAnchor = ref<HTMLElement | null>(null);
-const isLoadingMore = computed(() => messagesStore.isLoadingMore);
-const hasMore = computed(() =>
-  chatId.value ? messagesStore.getHasMore(chatId.value) : false
-);
-const previousMessageCount = ref(0);
-
-const showUserProfile = ref(false);
-const selectedUserId = ref<number | null>(null);
-
-const isGroupChat = computed(() => {
-  // Находим текущий чат в списке загруженных
-  const chat = chatsStore.chats.find((c) => c.id === chatId.value);
-  return chat?.type === "group";
-});
-
-// для подсветки ID
+// === Props ===
 const props = defineProps<{
   highlightMessageId?: number | null;
 }>();
 
-const openProfile = (userId: number) => {
-  selectedUserId.value = userId;
-  showUserProfile.value = true;
-};
+// === Refs ===
+const scrollContainer = ref<HTMLElement | null>(null);
+const scrollAnchor = ref<HTMLElement | null>(null);
+const previousMessageCount = ref(0);
+const showUserProfile = ref(false);
+const selectedUserId = ref<number | null>(null);
 
-// Group messages by date
+// === Computed ===
+const isLoadingMore = computed(() => messagesStore.isLoadingMore);
+
+// Используем новые флаги пагинации из стора
+const hasMoreOlder = computed(() =>
+  chatId.value ? messagesStore.getHasMore(chatId.value) : false
+);
+const hasMoreNewer = computed(() =>
+  chatId.value ? messagesStore.getHasMoreNewer(chatId.value) : false
+);
+
+const isGroupChat = computed(() => {
+  const chat = chatsStore.chats.find((c) => c.id === chatId.value);
+  return chat?.type === "group";
+});
+
+// Группировка сообщений по дате
 const groupedMessages = computed(() => {
   const groups: Record<string, { label: string; messages: MessageRead[] }> = {};
 
-  // 1. Берем сообщения из хука (реальные)
+  // 1. Реальные сообщения
   const realMessages = [...currentMessages.value];
 
-  // 2. Берем pending сообщения из стора для текущего чата
+  // 2. Pending (отправляющиеся)
   const pending = chatId.value
     ? messagesStore.getPendingMessages(chatId.value)
     : [];
 
-  // 3. Объединяем
   const allMessages = [...realMessages, ...pending];
 
-  // 4. Сортируем (pending обычно будут в конце, так как у них Date.now())
+  // 3. Сортировка (старые -> новые)
   const sortedMessages = allMessages.sort(
     (a, b) =>
       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
 
   sortedMessages.forEach((msg) => {
-    // Приводим created_at к строке/дате для корректной работы утилит
     const dateKey = getDateKey(msg.created_at);
     if (!groups[dateKey]) {
       groups[dateKey] = {
@@ -413,120 +415,10 @@ const groupedMessages = computed(() => {
   return groups;
 });
 
+// === Helper Functions ===
+
 const isOwn = (msg: MessageRead) => {
   return msg.sender_id === authStore.user?.id;
-};
-
-// Check if user is near bottom
-const isNearBottom = (): boolean => {
-  const container = scrollContainer.value;
-  if (!container) return true;
-
-  const threshold = 150;
-  const scrollBottom =
-    container.scrollHeight - container.scrollTop - container.clientHeight;
-  return scrollBottom < threshold;
-};
-
-// Scroll to bottom
-const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
-  nextTick(() => {
-    if (scrollAnchor.value) {
-      scrollAnchor.value.scrollIntoView({ behavior, block: "end" });
-    }
-  });
-};
-
-// Функция для скролла к конкретному сообщению (если оно уже загружено)
-const scrollToMessage = (messageId: number) => {
-  nextTick(() => {
-    // Ищем элемент в DOM (нужно добавить :id или :data-id к сообщению в шаблоне)
-    const el = document.getElementById(`msg-${messageId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      // Можно добавить класс для анимации мигания
-      el.classList.add("animate-flash");
-      setTimeout(() => el.classList.remove("animate-flash"), 2000);
-    }
-  });
-};
-
-// Load older messages
-const loadOlderMessages = async () => {
-  console.log("[DEBUG] loadOlderMessages called", {
-    chatId: chatId.value,
-    isLoading: isLoadingMore.value,
-    hasMore: hasMore.value,
-    scrollTop: scrollContainer.value?.scrollTop,
-  });
-
-  if (!chatId.value || isLoadingMore.value || !hasMore.value) {
-    console.log("[DEBUG] loadOlderMessages ABORTED");
-    return;
-  }
-  const scrollHeight = scrollContainer.value?.scrollHeight || 0;
-  const scrollTop = scrollContainer.value?.scrollTop || 0;
-
-  const loadedCount = await loadMoreMessages(chatId.value);
-
-  if (loadedCount && loadedCount > 0) {
-    // Используем nextTick, чтобы Vue успел отрисовать новые элементы
-    await nextTick();
-
-    if (scrollContainer.value) {
-      const newScrollHeight = scrollContainer.value.scrollHeight;
-      const diff = newScrollHeight - scrollHeight;
-
-      // Важно: если scrollTop был 0, то мы ставим его ровно на высоту добавленного
-      // Если пользователь был на 50px, то на 50 + diff.
-      scrollContainer.value.scrollTop = scrollTop + diff;
-
-      console.log(
-        `[Scroll] Restored position: oldH=${scrollHeight}, newH=${newScrollHeight}, diff=${diff}, newTop=${scrollContainer.value.scrollTop}`
-      );
-    }
-  }
-};
-
-const handleScroll = () => {
-  const container = scrollContainer.value;
-  if (!container || isLoadingMore.value || !chatId.value) return;
-
-  const threshold = 150;
-
-  // 1. Вверх (в прошлое)
-  if (container.scrollTop <= threshold && hasMore.value) {
-    // hasMore = Older
-    loadOlderMessages();
-  }
-
-  // 2. Вниз (в будущее)
-  const scrollBottom =
-    container.scrollHeight - container.scrollTop - container.clientHeight;
-
-  // scrollBottom может быть 0 или отрицательным из-за дробных пикселей, проверяем < threshold
-  if (
-    scrollBottom <= threshold &&
-    messagesStore.getHasMoreNewer(chatId.value)
-  ) {
-    loadNewerMessages(chatId.value);
-  }
-};
-
-const checkAndMarkRead = () => {
-  if (!currentMessages.value.length) return;
-
-  const lastMsg = currentMessages.value[currentMessages.value.length - 1];
-
-  // Если последнее сообщение НЕ наше и оно еще НЕ прочитано
-  if (!isOwn(lastMsg) && !lastMsg.is_read) {
-    // Помечаем чат прочитанным до этого сообщения
-    markChatAsRead(lastMsg.id);
-  }
-
-  // Дополнительная проверка: если мы скроллим вверх к старым непрочитанным,
-  // логика может быть сложнее (IntersectionObserver), но для старта
-  // пометка "по последнему" работает для 99% случаев.
 };
 
 const formatFileSize = (bytes?: number | null) => {
@@ -537,110 +429,218 @@ const formatFileSize = (bytes?: number | null) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 };
 
-// Функция скролла
-const tryScrollToHighlight = () => {
-  if (!props.highlightMessageId) return;
-  scrollToMessage(props.highlightMessageId);
+const openProfile = (userId: number) => {
+  selectedUserId.value = userId;
+  showUserProfile.value = true;
 };
 
-// Следим за обновлением списка сообщений (после Jump)
-watch(currentMessages, () => {
-  nextTick(() => {
-    tryScrollToHighlight();
-  });
-});
+// Проверка: находится ли юзер внизу чата
+const isNearBottom = (): boolean => {
+  const container = scrollContainer.value;
+  if (!container) return true;
 
-// Следим за пропом (если он поменялся уже после загрузки)
-watch(
-  () => props.highlightMessageId,
-  () => {
+  const threshold = 150;
+  const scrollBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight;
+  return scrollBottom < threshold;
+};
+
+// Скролл в самый низ
+const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+  nextTick(() => {
+    if (scrollAnchor.value) {
+      scrollAnchor.value.scrollIntoView({ behavior, block: "end" });
+    }
+  });
+};
+
+// Скролл к конкретному сообщению по ID
+const scrollToMessage = (messageId: number) => {
+  nextTick(() => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("animate-flash");
+      setTimeout(() => el.classList.remove("animate-flash"), 2000);
+    } else {
+      console.warn(
+        `[MessageList] Element msg-${messageId} not found in DOM. Fallback to bottom.`
+      );
+      // Если сообщение не найдено (например, список обновился),
+      // и мы не в режиме загрузки истории (hasMoreNewer = false),
+      // то логично скроллить вниз.
+      if (!hasMoreNewer.value) {
+        scrollToBottom("auto");
+      }
+    }
+  });
+};
+// Маркировка прочитанных
+const checkAndMarkRead = () => {
+  if (!currentMessages.value.length) return;
+  const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+
+  // Если последнее сообщение чужое и не прочитано -> читаем
+  if (!isOwn(lastMsg) && !lastMsg.is_read) {
+    markChatAsRead(lastMsg.id);
+  }
+};
+
+// Главная функция определения позиции скролла при входе/обновлении
+const initializeScrollPosition = () => {
+  // ФИКС: Проверяем, есть ли такое сообщение вообще в текущем списке
+  const isHighlightPresent =
+    props.highlightMessageId &&
+    currentMessages.value.some((m) => m.id === props.highlightMessageId);
+
+  if (props.highlightMessageId && isHighlightPresent) {
+    console.log(
+      "[Scroll] Initializing to highlight:",
+      props.highlightMessageId
+    );
+    scrollToMessage(props.highlightMessageId);
+  } else {
+    // Если ID есть в пропсах, но нет в списке — значит мы "улетели" в другое место (например в конец)
+    console.log(
+      "[Scroll] Initializing to bottom (Highlight absent or not set)"
+    );
+    scrollToBottom("auto");
+  }
+};
+
+// === Data Loading Logic ===
+
+// Загрузка старых (вверх)
+const loadOlderMessagesWrapper = async () => {
+  if (!chatId.value || isLoadingMore.value || !hasMoreOlder.value) return;
+
+  const container = scrollContainer.value;
+  const scrollHeight = container?.scrollHeight || 0;
+  const scrollTop = container?.scrollTop || 0;
+
+  console.log("[Scroll] Loading older messages...");
+  const loadedCount = await loadMoreMessages(chatId.value);
+
+  if (loadedCount > 0) {
+    await nextTick();
+    if (container) {
+      // Восстанавливаем позицию
+      const newScrollHeight = container.scrollHeight;
+      const diff = newScrollHeight - scrollHeight;
+      container.scrollTop = scrollTop + diff;
+      console.log(`[Scroll] Restored position. Diff: ${diff}px`);
+    }
+  }
+};
+
+// Обработчик скролла
+const handleScroll = () => {
+  const container = scrollContainer.value;
+  if (!container || isLoadingMore.value || !chatId.value) return;
+
+  const threshold = 150;
+
+  // 1. Вверх (в прошлое)
+  if (container.scrollTop <= threshold && hasMoreOlder.value) {
+    loadOlderMessagesWrapper();
+  }
+
+  // 2. Вниз (в будущее)
+  const scrollBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight;
+
+  // ВАЖНО: scrollBottom может быть дробным, проверяем с допуском
+  if (scrollBottom <= threshold && hasMoreNewer.value) {
+    console.log("[Scroll] Loading newer messages...");
+    loadNewerMessages(chatId.value);
+    // Для loadNewer не нужно восстанавливать скролл, браузер сам добавляет вниз
+  }
+};
+
+// === Watchers ===
+
+// 1. Основной инициализатор: когда загрузка завершилась
+watch(isLoading, (newIsLoading) => {
+  if (newIsLoading === false && currentMessages.value.length > 0) {
     nextTick(() => {
-      tryScrollToHighlight();
+      initializeScrollPosition();
+      setTimeout(() => checkAndMarkRead(), 500);
     });
   }
-);
+});
 
+// 2. Смена чата: если данные уже есть (закэшированы), скроллим сразу
+watch(chatId, (newChatId) => {
+  if (newChatId && !isLoading.value && currentMessages.value.length > 0) {
+    nextTick(() => initializeScrollPosition());
+  }
+});
+
+// 3. Изменение highlight ID на лету
 watch(
   () => props.highlightMessageId,
-  (newId) => {
-    if (newId) scrollToMessage(newId);
+  (newId, oldId) => {
+    if (newId) {
+      setTimeout(() => scrollToMessage(newId), 100);
+    } else if (oldId && !newId) {
+      // Highlight был снят.
+      // Если мы видим, что мы не в прошлом (hasMoreNewer == false),
+      // значит мы скорее всего вернулись в Live режим.
+      // Безопасно скроллим вниз.
+      if (!hasMoreNewer.value) {
+        scrollToBottom("smooth");
+      }
+    }
   }
 );
 
-// Auto-scroll on new message
+// 4. Live Updates (новые сообщения в реальном времени)
 watch(
   () => currentMessages.value.length,
   (newLength, oldLength) => {
-    // Если добавилось новое сообщение
+    // Игнорируем первую загрузку (она обрабатывается в watch(isLoading))
+    if (oldLength === 0) {
+      previousMessageCount.value = newLength;
+      return;
+    }
+
+    const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+    if (!lastMsg) return;
+
+    const isMyMessage = isOwn(lastMsg);
+
+    const isJustCreated =
+      Date.now() - new Date(lastMsg.created_at).getTime() < 5000;
+    if ((isMyMessage || isNearBottom()) && !props.highlightMessageId) {
+      scrollToBottom("smooth");
+    }
+
     if (newLength > oldLength) {
       const newMessages = currentMessages.value.slice(oldLength);
+
+      // Логика автоскролла для новых сообщений
       const hasOwnMessage = newMessages.some((msg) => isOwn(msg));
 
-      // Если это НАШЕ сообщение - скроллим ВСЕГДА
-      if (hasOwnMessage) {
-        scrollToBottom("smooth");
-      } else if (isNearBottom()) {
+      // Скроллим вниз только если:
+      // А) Это наше сообщение
+      // Б) Мы уже были внизу
+      // В) У нас НЕТ активного highlight (чтобы не сбивать просмотр истории)
+      const shouldScroll =
+        (hasOwnMessage || isNearBottom()) && !props.highlightMessageId;
+
+      if (shouldScroll) {
         scrollToBottom("smooth");
       }
 
-      // Помечаем новые непрочитанные как прочитанные
-      nextTick(() => {
-        checkAndMarkRead();
-      });
+      nextTick(() => checkAndMarkRead());
     }
     previousMessageCount.value = newLength;
   }
 );
-
-// Отдельный watch на изменение списка сообщений
-// Это срабатывает когда загружаются старые сообщения при смене чата
-watch(
-  currentMessages,
-  (newMessages) => {
-    // Ждем nextTick, чтобы DOM обновился
-    nextTick(() => {
-      // Пытаемся пометить как прочитанное
-      // Важно: если сообщений > 0, и мы видим последнее
-      if (newMessages.length > 0) {
-        checkAndMarkRead();
-      }
-    });
-  },
-  { deep: true, immediate: true }
-);
-
-// Scroll to bottom on chat change + mark as read
-watch(
-  chatId,
-  (newChatId) => {
-    if (newChatId) {
-      nextTick(() => {
-        scrollToBottom("auto");
-        // Даём больше времени на загрузку через WebSocket
-        setTimeout(() => {
-          checkAndMarkRead();
-        }, 300); // Небольшая задержка для гарантии
-      });
-    }
-  },
-  { immediate: true }
-);
-
-// при обновлении страницы
-watch(isLoading, (newIsLoading) => {
-  if (newIsLoading === false && currentMessages.value.length > 0) {
-    // Как только загрузка закончилась - сразу помечаем и скроллим
-    nextTick(() => {
-      scrollToBottom("auto");
-      setTimeout(() => checkAndMarkRead(), 500); // Чуть больше задержка
-    });
-  }
-});
-
-// Монтирование - только скролл
+// === Lifecycle ===
 onMounted(() => {
-  nextTick(() => {
-    scrollToBottom("auto");
-  });
+  if (!isLoading.value && currentMessages.value.length > 0) {
+    initializeScrollPosition();
+  }
 });
 </script>

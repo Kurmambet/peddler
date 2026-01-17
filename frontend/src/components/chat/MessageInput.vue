@@ -242,8 +242,9 @@ import { useVoiceRecorder } from "../../composables/useVoiceRecorder";
 import { useMessagesStore } from "../../stores/messages";
 import Input from "../ui/Input.vue";
 
-const { newMessageContent, sendMessage, handleTyping, chatId } = useChat();
+const { newMessageContent, handleTyping, chatId } = useChat();
 const messagesStore = useMessagesStore();
+const emit = defineEmits(["send"]);
 
 const {
   isRecording: isRecordingVoice,
@@ -276,9 +277,24 @@ const fileInput = ref<HTMLInputElement | null>(null);
 
 // === Handlers ===
 
+// const handleSendText = async () => {
+//   if (newMessageContent.value.trim()) {
+//     await sendMessage();
+//   }
+// };
 const handleSendText = async () => {
-  if (newMessageContent.value.trim()) {
-    await sendMessage();
+  const text = newMessageContent.value.trim();
+  if (text) {
+    // 1. Эмитим событие родителю (ChatPage)
+    // Родитель (ChatPage) разберется с роутером и вызовет store.sendMessage
+    emit("send", text);
+
+    // 2. Очищаем поле (можно оставить тут или в useChat,
+    // но раз мы не зовем useChat.sendMessage, чистим сами)
+    newMessageContent.value = "";
+
+    // 3. Сбрасываем тайпинг
+    // handleTyping(); // если нужно
   }
 };
 
