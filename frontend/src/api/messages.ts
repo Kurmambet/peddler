@@ -3,9 +3,17 @@ import type { MessageListResponse, MessageRead } from "../types/api";
 import { apiClient } from "./client";
 
 export const messagesAPI = {
-  list: (chatId: number, limit: number = 50, offset: number = 0) =>
+  list: (
+    chatId: number,
+    limit: number = 50,
+    cursor?: { before_id?: number; after_id?: number }
+  ) =>
     apiClient.get<MessageListResponse>(`/chats/${chatId}/messages`, {
-      params: { limit, offset },
+      params: {
+        limit,
+        before_id: cursor?.before_id,
+        after_id: cursor?.after_id,
+      },
     }),
 
   send: (chatId: number, content: string) =>

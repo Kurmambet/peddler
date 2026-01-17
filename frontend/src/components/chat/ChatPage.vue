@@ -99,7 +99,10 @@
 
           <!-- MESSAGES -->
           <div class="flex-1 min-h-0 relative overflow-hidden flex flex-col">
-            <MessageList class="flex-1 h-full" />
+            <MessageList
+              class="flex-1 h-full"
+              :highlight-message-id="route.query.highlight ? parseInt(route.query.highlight as string) : undefined"
+            />
           </div>
 
           <!-- INPUT -->

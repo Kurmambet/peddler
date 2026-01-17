@@ -60,25 +60,51 @@ class MessageRepository:
         return message
 
     async def get_chat_messages(
-        self, chat_id: int, limit: int = 50, offset: int = 0
+        self,
+        chat_id: int,
+        limit: int = 50,
+        before_id: Optional[int] = None,  # ID < before_id (СТАРЕЕ)
+        after_id: Optional[int] = None,  # ID > after_id (НОВЕЕ)
     ) -> List[Message]:
-        """Получить сообщения чата с пагинацией"""
+        # Базовый запрос
         stmt = (
             select(Message)
             .options(selectinload(Message.sender))
             .where(
-                and_(
-                    Message.chat_id == chat_id,
-                    Message.is_deleted == False,
-                )
+                Message.chat_id == chat_id,
+                Message.is_deleted.is_(False),
             )
-            .order_by(Message.created_at.desc())
-            .limit(limit + 1)  # +1 для проверки has_more
-            .offset(offset)
         )
 
+        # 1. Скролл вверх (в прошлое) ИЛИ первая загрузка
+        if before_id:
+            stmt = stmt.where(Message.id < before_id).order_by(Message.id.desc())
+
+        # 2. Скролл вниз (в будущее)
+        elif after_id:
+            stmt = stmt.where(Message.id > after_id).order_by(Message.id.asc())
+
+        # 3. Дефолт (самые новые, если нет курсоров)
+        else:
+            stmt = stmt.order_by(Message.id.desc())
+
+        # Лимит (+1 чтобы проверить has_more)
+        stmt = stmt.limit(limit + 1)
+
         result = await self.db.execute(stmt)
-        return list(result.scalars().all())
+        messages = list(result.scalars().all())
+
+        # Если был запрос "after_id" (в будущее), мы получили их ASC (101, 102...).
+        # Но фронтенд ждет сортировку всегда от старых к новым (или наоборот, как договорились).
+        # Обычно API возвращает список отсортированный по времени.
+        # В вашем текущем коде вы возвращаете DESC (новые первые) для первой страницы,
+        # и фронт их переворачивает (или нет).
+
+        # Давайте договоримся: Репозиторий возвращает как есть,
+        # но для консистентности "after_id" (ASC) лучше не трогать,
+        # а "before_id" (DESC) - это естественный порядок "от конца".
+
+        return messages
 
     async def get_message_by_id(
         self, chat_id: int, message_id: int, user_id: int

@@ -348,6 +348,7 @@ const chatsStore = useChatsStore();
 const authStore = useAuthStore();
 const messagesStore = useMessagesStore();
 const { currentMessages, isLoading, chatId, markChatAsRead } = useChat();
+const { loadMoreMessages, loadNewerMessages } = messagesStore;
 
 const scrollContainer = ref<HTMLElement | null>(null);
 const scrollAnchor = ref<HTMLElement | null>(null);
@@ -466,7 +467,7 @@ const loadOlderMessages = async () => {
   const scrollHeight = scrollContainer.value?.scrollHeight || 0;
   const scrollTop = scrollContainer.value?.scrollTop || 0;
 
-  const loadedCount = await messagesStore.loadMoreMessages(chatId.value);
+  const loadedCount = await loadMoreMessages(chatId.value);
 
   if (loadedCount && loadedCount > 0) {
     // Используем nextTick, чтобы Vue успел отрисовать новые элементы
@@ -489,21 +490,26 @@ const loadOlderMessages = async () => {
 
 const handleScroll = () => {
   const container = scrollContainer.value;
-  if (!container || isLoadingMore.value) return; // Убрал !hasMore.value отсюда, т.к. может быть hasMoreNewer
+  if (!container || isLoadingMore.value || !chatId.value) return;
 
   const threshold = 150;
 
-  // Скролл ВВЕРХ (в прошлое)
+  // 1. Вверх (в прошлое)
   if (container.scrollTop <= threshold && hasMore.value) {
-    // hasMore = hasMoreOlder
+    // hasMore = Older
     loadOlderMessages();
   }
 
-  // Скролл ВНИЗ (в будущее)
+  // 2. Вниз (в будущее)
   const scrollBottom =
     container.scrollHeight - container.scrollTop - container.clientHeight;
-  if (scrollBottom <= threshold && messagesStore.hasMoreNewer && chatId.value) {
-    messagesStore.loadNewerMessages(chatId.value);
+
+  // scrollBottom может быть 0 или отрицательным из-за дробных пикселей, проверяем < threshold
+  if (
+    scrollBottom <= threshold &&
+    messagesStore.getHasMoreNewer(chatId.value)
+  ) {
+    loadNewerMessages(chatId.value);
   }
 };
 
@@ -530,6 +536,29 @@ const formatFileSize = (bytes?: number | null) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 };
+
+// Функция скролла
+const tryScrollToHighlight = () => {
+  if (!props.highlightMessageId) return;
+  scrollToMessage(props.highlightMessageId);
+};
+
+// Следим за обновлением списка сообщений (после Jump)
+watch(currentMessages, () => {
+  nextTick(() => {
+    tryScrollToHighlight();
+  });
+});
+
+// Следим за пропом (если он поменялся уже после загрузки)
+watch(
+  () => props.highlightMessageId,
+  () => {
+    nextTick(() => {
+      tryScrollToHighlight();
+    });
+  }
+);
 
 watch(
   () => props.highlightMessageId,

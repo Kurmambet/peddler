@@ -38,25 +38,26 @@ export const useMessagesStore = defineStore("messages", () => {
   };
 
   // ==========================================
-  // 1. ОБЫЧНЫЙ ВХОД В ЧАТ (последние сообщения)
+  // ОБЫЧНЫЙ ВХОД В ЧАТ (последние сообщения)
   // ==========================================
   const loadMessages = async (chatId: number, limit = 50) => {
     isLoading.value = true;
     error.value = null;
-    const offset = 0;
+
+    // Сбрасываем флаги (мы начинаем с "самых новых")
+    hasMoreOlder.value.set(chatId, true);
+    hasMoreNewer.value.set(chatId, false); // В будущем сообщений нет
+
     try {
-      const { data } = await messagesAPI.list(chatId, limit, offset);
+      // Запрос БЕЗ курсоров = дай самые последние
+      const { data } = await messagesAPI.list(chatId, limit);
+
       messagesByChat.value.set(chatId, data.messages);
 
-      // При обычной загрузке мы в самом низу, значит:
-      // Вверх скроллить можно (если has_more=true)
+      // has_more от API здесь означает "есть ли еще СТАРЕЕ"
       hasMoreOlder.value.set(chatId, data.has_more);
-      // Вниз скроллить нельзя (мы в настоящем)
-      hasMoreNewer.value.set(chatId, false);
 
-      console.log(
-        `[MessagesStore] Loaded ${data.messages.length} messages for chat ${chatId}`
-      );
+      console.log(`[MessagesStore] Loaded ${data.messages.length} messages`);
     } catch (err: any) {
       error.value = err.response?.data?.detail || "Failed to load messages";
       console.error("Load messages error:", err);
@@ -66,7 +67,7 @@ export const useMessagesStore = defineStore("messages", () => {
   };
 
   // ==========================================
-  // 2. JUMP TO MESSAGE (Прыжок в историю)
+  // JUMP TO MESSAGE (Прыжок в историю)
   // ==========================================
   const jumpToMessage = async (
     chatId: number,
@@ -76,16 +77,15 @@ export const useMessagesStore = defineStore("messages", () => {
     isLoading.value = true;
     error.value = null;
     try {
-      // 1. Очищаем текущие (чтобы не было дырок)
+      // Очищаем текущие (чтобы не было дырок)
       messagesByChat.value.set(chatId, []);
 
-      // 2. Делаем запрос (нужен новый метод в API)
       const data = await messagesAPI.listAround(chatId, messageId, limit);
 
-      // 3. Устанавливаем сообщения
+      // Устанавливаем сообщения
       messagesByChat.value.set(chatId, data.messages);
 
-      // 4. Устанавливаем флаги (тут нужна логика)
+      // Устанавливаем флаги (тут нужна логика)
       // Если API возвращает has_more_older / has_more_newer - используем их.
       // Если API ленивый и возвращает просто has_more (как мы делали в MVP),
       // то считаем, что можно скроллить в обе стороны, если вернулся полный список.
@@ -107,41 +107,28 @@ export const useMessagesStore = defineStore("messages", () => {
   };
 
   // ==========================================
-  // 3. SCROLL UP (В прошлое) - Бывший loadMoreMessages
+  // SCROLL UP (В прошлое)
   // ==========================================
   const loadMoreMessages = async (chatId: number, limit = 50) => {
-    if (!getHasMore(chatId)) return 0; // Используем getHasMore (alias for older)
+    if (!getHasMore(chatId)) return 0; // alias getHasMoreOlder
 
     isLoadingMore.value = true;
     try {
       const currentMessages = getChatMessages(chatId);
+      if (currentMessages.length === 0) return 0;
 
-      // Нам нужно самое старое сообщение (первое в массиве, т.к. сортировка по дате)
-      // ВАЖНО: Мы больше не можем использовать offset, так как у нас могут быть "дырки"
-      // или мы в середине истории.
-      // Лучше всего использовать "before_id" в API.
-      // Но если мы используем offset API, то он работает только от "конца" (самых новых).
+      // Берем ID самого СТАРОГО сообщения (первое в массиве)
+      const oldestMsg = currentMessages[0];
 
-      // ПРОБЛЕМА: Старый API (offset) не совместим с "Jump".
-      // Если мы прыгнули в 2024 год, offset=50 вернет 2026 год.
-      // РЕШЕНИЕ: Нам нужен API пагинации по ID (cursor pagination).
-      // GET /messages?before_id=123&limit=50
+      // Запрашиваем: дай сообщения СТАРЕЕ чем oldestMsg.id
+      const { data } = await messagesAPI.list(chatId, limit, {
+        before_id: oldestMsg.id,
+      });
 
-      // Пока оставим offset (но он сломается после jump).
-      // Давайте считать, что после jump loadMoreMessages пока не работает идеально
-      // без переделки API на cursor-based.
-
-      const offset = currentMessages.length; // Это сломается при Jump
-
-      // ВРЕМЕННЫЙ КОСТЫЛЬ: Если мы после Jump, лучше запретить offset-пагинацию
-      // или переключить API на cursor.
-
-      // Предполагаем, что у нас есть API listBefore(chatId, beforeMessageId)
-      // Если нет, используем старый offset на свой страх и риск
-      const { data } = await messagesAPI.list(chatId, limit, offset);
-
+      // Добавляем новые (старые) в начало списка
       const allMessages = [...data.messages, ...currentMessages];
       messagesByChat.value.set(chatId, allMessages);
+
       hasMoreOlder.value.set(chatId, data.has_more);
 
       return data.messages.length;
@@ -153,18 +140,43 @@ export const useMessagesStore = defineStore("messages", () => {
     }
   };
 
-  // ==========================================
-  // 4. SCROLL DOWN (В будущее)
-  // ==========================================
+  // ============================
+  // SCROLL DOWN (В БУДУЩЕЕ)
+  // ============================
   const loadNewerMessages = async (chatId: number, limit = 50) => {
+    // Внимание: hasMoreNewer выставляется в true ТОЛЬКО после jumpToMessage
     if (!getHasMoreNewer(chatId)) return 0;
 
-    // Тут точно нужен cursor-based API: get messages where id > last_msg_id
-    // const lastMsg = messages[messages.length - 1];
-    // await api.listAfter(chatId, lastMsg.id);
+    // Тут нужен отдельный loading state, чтобы не конфликтовать,
+    // но пока используем isLoadingMore или локальный
+    isLoadingMore.value = true;
 
-    console.warn("loadNewerMessages not implemented fully without cursor API");
-    return 0;
+    try {
+      const currentMessages = getChatMessages(chatId);
+      if (currentMessages.length === 0) return 0;
+
+      // Берем ID самого НОВОГО сообщения (последнее в массиве)
+      const newestMsg = currentMessages[currentMessages.length - 1];
+
+      // Запрашиваем: дай сообщения НОВЕЕ чем newestMsg.id
+      const { data } = await messagesAPI.list(chatId, limit, {
+        after_id: newestMsg.id,
+      });
+
+      // Добавляем новые (будущие) в КОНЕЦ списка
+      const allMessages = [...currentMessages, ...data.messages];
+      messagesByChat.value.set(chatId, allMessages);
+
+      // has_more от API здесь означает "есть ли еще НОВЕЕ"
+      hasMoreNewer.value.set(chatId, data.has_more);
+
+      return data.messages.length;
+    } catch (err: any) {
+      console.error(err);
+      return 0;
+    } finally {
+      isLoadingMore.value = false;
+    }
   };
 
   const addMessage = (event: MessageCreatedEvent) => {

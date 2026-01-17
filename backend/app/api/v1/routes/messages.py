@@ -3,7 +3,7 @@ import logging
 import os
 import subprocess
 import uuid
-from typing import List
+from typing import List, Optional
 
 import aiofiles
 from app.api.dependencies import get_current_user
@@ -79,12 +79,61 @@ async def send_message(
 async def get_chat_messages(
     chat_id: int,
     limit: int = 50,
-    offset: int = 0,
+    before_id: Optional[int] = None,
+    after_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     service: MessageService = Depends(get_message_service),
 ) -> MessageListResponse:
-    """Возвращает сообщения из чата"""
-    return await service.get_chat_messages(chat_id, current_user, limit, offset)
+    await service.repo.verify_chat_access(chat_id, current_user.id)
+    # 1. Получаем сообщения (+1 для проверки has_more)
+    messages = await service.repo.get_chat_messages(
+        chat_id, limit=limit, before_id=before_id, after_id=after_id
+    )
+
+    has_more = len(messages) > limit
+    if has_more:
+        messages = messages[:limit]  # Обрезаем лишнее
+
+    # Если запрашивали по after_id (в будущее, ASC), то порядок уже правильный (старые -> новые).
+    # Если запрашивали по before_id или без всего (в прошлое, DESC), то они идут (новые -> старые).
+    # Фронт обычно ожидает массив [старое ... новое].
+    # В вашем коде сервиса было messages[::-1] для offset.
+
+    # ЛОГИКА СОРТИРОВКИ ДЛЯ ОТВЕТА:
+    if not after_id:
+        # Это был запрос "самые новые" или "еще старее". Они пришли DESC.
+        # Переворачиваем, чтобы отдать [старое ... новое]
+        messages = messages[::-1]
+
+    # Маппинг в Pydantic
+    message_reads = [
+        MessageRead(
+            id=msg.id,
+            chat_id=msg.chat_id,
+            sender_id=msg.sender_id,
+            sender_username=msg.sender.username,
+            sender_display_name=msg.sender.display_name,
+            avatar_url=msg.sender.avatar_url,
+            content=msg.content,
+            is_read=msg.is_read,
+            created_at=msg.created_at,
+            message_type=msg.message_type,
+            file_url=msg.file_url,
+            file_size=msg.file_size,
+            duration=msg.duration,
+            filename=msg.filename,
+            mimetype=msg.mimetype,
+        )
+        for msg in messages
+    ]
+
+    return MessageListResponse(
+        messages=message_reads,
+        has_more=has_more,
+        offset=0,  # Deprecated, можно слать 0
+        limit=limit,
+        total=0,  # Можно не считать count(*), дорого
+    )
 
 
 @router.get("/chats/{chat_id}/messages/around", response_model=MessageListResponse)

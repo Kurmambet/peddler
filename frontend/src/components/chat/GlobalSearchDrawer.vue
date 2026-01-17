@@ -153,12 +153,17 @@
 <script setup lang="ts">
 import { authAPI } from "@/api/auth";
 import { messagesAPI } from "@/api/messages";
+import { useChatsStore } from "@/stores/chats";
+import { useMessagesStore } from "@/stores/messages";
 import type { MessageRead, UserRead } from "@/types/api";
 import { useDebounceFn } from "@vueuse/core";
 import { computed, nextTick, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import Avatar from "../ui/Avatar.vue";
 import UserProfileModal from "../user/UserProfileModal.vue";
+
+const chatsStore = useChatsStore();
+const messagesStore = useMessagesStore();
 
 const props = defineProps<{ isOpen: boolean }>();
 const emit = defineEmits(["close"]);
@@ -225,14 +230,25 @@ const handleInput = () => {
 const handleUserClick = (user: any) => {
   selectedUserId.value = user.id;
   showProfileModal.value = true;
-  // Мы НЕ закрываем поиск (emit('close')), чтобы юзер мог вернуться,
-  // если передумает писать сообщение.
-  // Модалка откроется поверх Drawer'а (убедитесь, что z-index модалки выше)
 };
 
-const handleMessageClick = (msg: MessageRead) => {
+const handleMessageClick = async (msg: MessageRead) => {
+  // 1. Выбираем чат (чтобы UI переключился)
   router.push(`/chat/${msg.chat_id}`);
+
+  // 2. Выполняем прыжок (загрузку сообщений вокруг)
+  // Мы делаем это здесь, чтобы данные начали грузиться еще до анимации закрытия шторки
+  await messagesStore.jumpToMessage(msg.chat_id, msg.id);
+
+  // 3. Закрываем поиск
   emit("close");
+
+  // 4. Переходим на страницу (если мы не там) с параметром highlight
+  // Мы передаем highlight в query, чтобы ChatPage передал его пропом в MessageList
+  router.push({
+    path: `/chat/${msg.chat_id}`,
+    query: { highlight: msg.id },
+  });
 };
 
 const formatDate = (date: string) => new Date(date).toLocaleDateString();
