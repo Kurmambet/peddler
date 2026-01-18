@@ -3,7 +3,7 @@
   <span class="inline-flex items-center ml-1">
     <!-- Одна галочка - отправлено -->
     <svg
-      v-if="status === 'sent'"
+      v-if="!isRead"
       class="w-3.5 h-3.5"
       :class="isOwn ? 'text-white/70' : 'text-gray-400'"
       fill="none"
@@ -20,7 +20,7 @@
 
     <!-- Две галочки - прочитано -->
     <svg
-      v-else-if="status === 'read'"
+      v-else-if="isRead"
       class="w-3.5 h-3.5"
       :class="isOwn ? 'text-white' : 'text-blue-500'"
       fill="none"
@@ -47,11 +47,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-const props = defineProps<{
+defineProps<{
   isRead: boolean;
-  isOwn?: boolean; // Добавляем проп, чтобы знать контекст
+  isOwn?: boolean;
 }>();
-
-const status = computed(() => (props.isRead ? "read" : "sent"));
 </script>

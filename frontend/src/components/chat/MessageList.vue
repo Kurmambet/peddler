@@ -363,6 +363,7 @@ const scrollAnchor = ref<HTMLElement | null>(null);
 const previousMessageCount = ref(0);
 const showUserProfile = ref(false);
 const selectedUserId = ref<number | null>(null);
+const markedAsReadMessages = ref(new Set<number>());
 
 // === Computed ===
 const isLoadingMore = computed(() => messagesStore.isLoadingMore);
@@ -442,14 +443,24 @@ const checkAndMarkRead = () => {
 
   const lastMsg = currentMessages.value[currentMessages.value.length - 1];
 
-  // Mark read if:
-  // 1. Message is not ours
-  // 2. It's unread
-  // 3. We are at the bottom of the list (viewing it)
-  if (!isOwn(lastMsg) && !lastMsg.is_read && isNearBottom()) {
+  if (
+    !isOwn(lastMsg) &&
+    !lastMsg.is_read &&
+    isNearBottom() &&
+    !markedAsReadMessages.value.has(lastMsg.id)
+  ) {
+    console.log(`[MessageList] Sending read mark for ${lastMsg.id}`);
+
+    // Сразу запоминаем, что мы отправили запрос для этого ID
+    markedAsReadMessages.value.add(lastMsg.id);
+
     markChatAsRead(lastMsg.id);
   }
 };
+
+watch(chatId, () => {
+  markedAsReadMessages.value.clear();
+});
 
 watch(isConnected, (connected) => {
   if (connected) {

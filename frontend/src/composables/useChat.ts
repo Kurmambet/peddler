@@ -93,6 +93,7 @@ function createChatInstance() {
 
       ws.value.onMessage("chat_read", (event: any) => {
         const readEvent = event as ChatReadEvent;
+        console.log("[useChat] 📩 Received chat_read event:", readEvent);
         messagesStore.markMessagesReadUntil(
           readEvent.last_read_message_id,
           readEvent.user_id,
