@@ -184,62 +184,73 @@ const selectedChatId = ref<number | null>(null);
 // Единая логика установки чата
 const initializeChat = async (idStr: string | string[]) => {
   const id = Number(idStr);
-  if (!isNaN(id)) {
-    selectedChatId.value = id;
-
-    // Если чатов нет - грузим
-    if (chatsStore.chats.length === 0) {
-      await chatsStore.loadChats();
-    }
-
-    // Устанавливаем текущий чат в сторе
-    chatsStore.setCurrentChat(id);
-  } else {
+  if (isNaN(id)) {
     selectedChatId.value = null;
     chatsStore.resetCurrentChat();
+    return;
+  }
+
+  selectedChatId.value = id;
+  chatsStore.setCurrentChat(id);
+
+  // If we don't have chat list yet, load it for the sidebar
+  if (chatsStore.chats.length === 0) {
+    await chatsStore.loadChats();
+  }
+
+  // DATA LOADING STRATEGY
+  if (route.query.highlight) {
+    const msgId = Number(route.query.highlight);
+    console.log(`[ChatPage] 🎯 Initializing with Jump to ${msgId}`);
+    await messagesStore.jumpToMessage(id, msgId);
+  } else {
+    // Standard load: latest messages
+    console.log(`[ChatPage] 📥 Initializing with Latest messages`);
+    await messagesStore.loadMessages(id);
   }
 };
-
-// src/components/chat/ChatPage.vue
 
 const handleSendMessage = async (content: string) => {
   if (!selectedChatId.value) return;
 
-  // 1. Сбрасываем highlight ПЕРЕД отправкой.
-  // Это критично, чтобы MessageList перестал блокировать автоскролл.
   if (route.query.highlight) {
     await router.replace({
-      path: `/chat/${String(selectedChatId.value)}`,
-      query: {}, // Удаляем query
+      path: `/chat/${selectedChatId.value}`,
+      query: {},
     });
-    // Ждем тик, чтобы проп highlightMessageId в MessageList стал undefined
     await nextTick();
   }
-
-  // 2. Отправляем сообщение
-  // messagesStore сам поймет, что мы "в прошлом", и перезагрузит чат на "live"
   await messagesStore.sendMessage(selectedChatId.value, content);
-
-  // 3. Форсируем скролл вниз, так как мы только что отправили сообщение
-  // и перешли в live-режим.
-  // Можно вызвать метод компонента MessageList, если есть ref,
-  // но проще положиться на watch внутри MessageList, который теперь
-  // не заблокирован highlightMessageId.
 };
 
 // Следим за роутом (реагируем на навигацию)
 watch(
-  () => route.params.id,
-  async (newId) => {
-    if (newId) await initializeChat(newId);
+  () => ({ id: route.params.id, highlight: route.query.highlight }),
+  async (newVal, oldVal) => {
+    const newId = newVal.id;
+    const oldId = oldVal?.id;
+    const newHighlight = newVal.highlight;
+    const oldHighlight = oldVal?.highlight;
+
+    // If ID changed, full init
+    if (newId !== oldId) {
+      if (newId) await initializeChat(newId as string);
+    }
+    // If only highlight changed (e.g. clicked search result for same chat)
+    else if (newHighlight !== oldHighlight && newId) {
+      if (newHighlight) {
+        await messagesStore.jumpToMessage(Number(newId), Number(newHighlight));
+      } else {
+        // Highlight removed (user manually cleared URL?) -> Optional logic
+        // For now, we do nothing to avoid unnecessary reloads
+      }
+    }
   },
-  { immediate: true } // Сработает и при маунте
+  { immediate: true }
 );
 
-// Обработчики
 const handleChatSelected = (chatId: number) => {
   selectedChatId.value = chatId;
-  // На mobile закрываем список чатов
 };
 
 const handleBackToList = () => {

@@ -348,15 +348,14 @@ import VoicePlayer from "./VoicePlayer.vue";
 const chatsStore = useChatsStore();
 const authStore = useAuthStore();
 const messagesStore = useMessagesStore();
-const { currentMessages, isLoading, chatId, markChatAsRead } = useChat();
+const { currentMessages, isLoading, chatId, markChatAsRead, isConnected } =
+  useChat();
 
 // Деструктурируем методы стора для удобства
 const { loadMoreMessages, loadNewerMessages } = messagesStore;
 
 // === Props ===
-const props = defineProps<{
-  highlightMessageId?: number | null;
-}>();
+const props = defineProps<{ highlightMessageId?: number }>();
 
 // === Refs ===
 const scrollContainer = ref<HTMLElement | null>(null);
@@ -434,6 +433,30 @@ const openProfile = (userId: number) => {
   showUserProfile.value = true;
 };
 
+// Маркировка прочитанных
+const checkAndMarkRead = () => {
+  if (!currentMessages.value.length || !chatId.value) return;
+
+  // We should only mark read if we are actually connected
+  if (!isConnected.value) return;
+
+  const lastMsg = currentMessages.value[currentMessages.value.length - 1];
+
+  // Mark read if:
+  // 1. Message is not ours
+  // 2. It's unread
+  // 3. We are at the bottom of the list (viewing it)
+  if (!isOwn(lastMsg) && !lastMsg.is_read && isNearBottom()) {
+    markChatAsRead(lastMsg.id);
+  }
+};
+
+watch(isConnected, (connected) => {
+  if (connected) {
+    checkAndMarkRead();
+  }
+});
+
 // Проверка: находится ли юзер внизу чата
 const isNearBottom = (): boolean => {
   const container = scrollContainer.value;
@@ -445,70 +468,78 @@ const isNearBottom = (): boolean => {
   return scrollBottom < threshold;
 };
 
+// Главная функция определения позиции скролла при входе/обновлении
+const initializeScrollPosition = async () => {
+  await nextTick();
+
+  // FIX: If highlight is requested, NEVER scroll to bottom automatically.
+  // Wait for the message to appear or do nothing.
+  if (props.highlightMessageId) {
+    console.log(
+      `[Scroll] Initializing with highlight ${props.highlightMessageId}`
+    );
+    // Check if message exists in current list
+    const exists = currentMessages.value.some(
+      (m) => m.id === props.highlightMessageId
+    );
+
+    if (exists) {
+      scrollToMessage(props.highlightMessageId);
+    } else {
+      console.warn(
+        "[Scroll] Highlight ID not found in current messages. Waiting..."
+      );
+      // Optional: You could retry or show a toast here, but don't jump to bottom
+    }
+  } else {
+    // Standard behavior: Scroll to bottom
+    console.log("[Scroll] Initializing to bottom (No highlight)");
+    if (!hasMoreNewer.value) {
+      scrollToBottom("auto");
+    }
+  }
+};
+
 // Скролл в самый низ
 const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
   nextTick(() => {
-    if (scrollAnchor.value) {
-      scrollAnchor.value.scrollIntoView({ behavior, block: "end" });
-    }
+    scrollAnchor.value?.scrollIntoView({ behavior, block: "end" });
   });
 };
 
-// Скролл к конкретному сообщению по ID
-const scrollToMessage = (messageId: number) => {
-  nextTick(() => {
-    const el = document.getElementById(`msg-${messageId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.classList.add("animate-flash");
-      setTimeout(() => el.classList.remove("animate-flash"), 2000);
-    } else {
-      console.warn(
-        `[MessageList] Element msg-${messageId} not found in DOM. Fallback to bottom.`
-      );
-      // Если сообщение не найдено (например, список обновился),
-      // и мы не в режиме загрузки истории (hasMoreNewer = false),
-      // то логично скроллить вниз.
-      if (!hasMoreNewer.value) {
-        scrollToBottom("auto");
-      }
-    }
+// Функция ожидания появления элемента в DOM
+const waitForElement = (
+  id: string,
+  attempts = 0
+): Promise<HTMLElement | null> => {
+  return new Promise((resolve) => {
+    const el = document.getElementById(id);
+    if (el) return resolve(el);
+    if (attempts > 10) return resolve(null); // Timeout после ~1 сек
+
+    setTimeout(() => {
+      waitForElement(id, attempts + 1).then(resolve);
+    }, 100);
   });
 };
-// Маркировка прочитанных
-const checkAndMarkRead = () => {
-  if (!currentMessages.value.length) return;
-  const lastMsg = currentMessages.value[currentMessages.value.length - 1];
 
-  // Если последнее сообщение чужое и не прочитано -> читаем
-  if (!isOwn(lastMsg) && !lastMsg.is_read) {
-    markChatAsRead(lastMsg.id);
-  }
-};
+const scrollToMessage = async (messageId: number) => {
+  await nextTick();
+  const el = await waitForElement(`msg-${messageId}`);
 
-// Главная функция определения позиции скролла при входе/обновлении
-const initializeScrollPosition = () => {
-  // ФИКС: Проверяем, есть ли такое сообщение вообще в текущем списке
-  const isHighlightPresent =
-    props.highlightMessageId &&
-    currentMessages.value.some((m) => m.id === props.highlightMessageId);
-
-  if (props.highlightMessageId && isHighlightPresent) {
-    console.log(
-      "[Scroll] Initializing to highlight:",
-      props.highlightMessageId
-    );
-    scrollToMessage(props.highlightMessageId);
+  if (el) {
+    console.log(`[Scroll] Scrolling to message ${messageId}`);
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    el.classList.add("animate-pulse"); // Visual cue
+    setTimeout(() => el.classList.remove("animate-pulse"), 2000);
   } else {
-    // Если ID есть в пропсах, но нет в списке — значит мы "улетели" в другое место (например в конец)
-    console.log(
-      "[Scroll] Initializing to bottom (Highlight absent or not set)"
-    );
-    scrollToBottom("auto");
+    console.warn(`[Scroll] Target msg-${messageId} not found.`);
+    // Fallback: только если мы должны быть внизу
+    if (!hasMoreNewer.value) {
+      scrollToBottom("auto");
+    }
   }
 };
-
-// === Data Loading Logic ===
 
 // Загрузка старых (вверх)
 const loadOlderMessagesWrapper = async () => {
@@ -540,6 +571,10 @@ const handleScroll = () => {
 
   const threshold = 150;
 
+  if (isNearBottom()) {
+    checkAndMarkRead();
+  }
+
   // 1. Вверх (в прошлое)
   if (container.scrollTop <= threshold && hasMoreOlder.value) {
     loadOlderMessagesWrapper();
@@ -549,56 +584,42 @@ const handleScroll = () => {
   const scrollBottom =
     container.scrollHeight - container.scrollTop - container.clientHeight;
 
-  // ВАЖНО: scrollBottom может быть дробным, проверяем с допуском
   if (scrollBottom <= threshold && hasMoreNewer.value) {
-    console.log("[Scroll] Loading newer messages...");
+    // Prevent spamming if we are literally at the pixel bottom
+    if (scrollBottom < 1) return;
     loadNewerMessages(chatId.value);
-    // Для loadNewer не нужно восстанавливать скролл, браузер сам добавляет вниз
   }
 };
 
 // === Watchers ===
 
-// 1. Основной инициализатор: когда загрузка завершилась
-watch(isLoading, (newIsLoading) => {
-  if (newIsLoading === false && currentMessages.value.length > 0) {
-    nextTick(() => {
-      initializeScrollPosition();
-      setTimeout(() => checkAndMarkRead(), 500);
-    });
+// 1. Инициализация при завершении загрузки
+watch(isLoading, async (loading) => {
+  if (!loading && currentMessages.value.length) {
+    await initializeScrollPosition();
   }
 });
 
-// 2. Смена чата: если данные уже есть (закэшированы), скроллим сразу
-watch(chatId, (newChatId) => {
-  if (newChatId && !isLoading.value && currentMessages.value.length > 0) {
-    nextTick(() => initializeScrollPosition());
-  }
-});
-
-// 3. Изменение highlight ID на лету
+// 2. Изменение highlight ID на лету (навигация из поиска)
 watch(
   () => props.highlightMessageId,
-  (newId, oldId) => {
+  async (newId) => {
     if (newId) {
-      setTimeout(() => scrollToMessage(newId), 100);
-    } else if (oldId && !newId) {
-      // Highlight был снят.
-      // Если мы видим, что мы не в прошлом (hasMoreNewer == false),
-      // значит мы скорее всего вернулись в Live режим.
-      // Безопасно скроллим вниз.
-      if (!hasMoreNewer.value) {
-        scrollToBottom("smooth");
-      }
+      await nextTick();
+      scrollToMessage(newId);
+    } else {
+      // Highlight сняли (например, отправили сообщение) -> если мы в конце, скроллим вниз
+      if (!hasMoreNewer.value) scrollToBottom("smooth");
     }
-  }
+  },
+  { immediate: true }
 );
 
-// 4. Live Updates (новые сообщения в реальном времени)
+// 3. Live Updates (новые сообщения в реальном времени)
 watch(
   () => currentMessages.value.length,
   (newLength, oldLength) => {
-    // Игнорируем первую загрузку (она обрабатывается в watch(isLoading))
+    // Игнорируем первую инициализацию (она в watch(isLoading))
     if (oldLength === 0) {
       previousMessageCount.value = newLength;
       return;
@@ -607,38 +628,37 @@ watch(
     const lastMsg = currentMessages.value[currentMessages.value.length - 1];
     if (!lastMsg) return;
 
+    // Автоскролл работает, только если мы не в режиме просмотра истории (hasMoreNewer = false)
+    // ИЛИ если это наше сообщение (мы его только что отправили)
+    const isAtLiveBottom = !hasMoreNewer.value;
     const isMyMessage = isOwn(lastMsg);
 
-    const isJustCreated =
-      Date.now() - new Date(lastMsg.created_at).getTime() < 5000;
-    if ((isMyMessage || isNearBottom()) && !props.highlightMessageId) {
+    // Специальная проверка для оптимистичных сообщений (видео/аудио), у них id отрицательный
+    const isOptimistic = lastMsg.id < 0;
+
+    // Нужно скроллить, если:
+    // 1. Это моё сообщение (обычное или оптимистичное)
+    // 2. Я уже был внизу чата и это "живой" чат
+    const shouldScroll =
+      isMyMessage || isOptimistic || (isNearBottom() && isAtLiveBottom);
+
+    // Но НЕ скроллим, если у нас активен highlight (мы смотрим конкретное сообщение)
+    if (shouldScroll && !props.highlightMessageId) {
       scrollToBottom("smooth");
     }
 
+    // Если список вырос, помечаем прочитанными
     if (newLength > oldLength) {
-      const newMessages = currentMessages.value.slice(oldLength);
-
-      // Логика автоскролла для новых сообщений
-      const hasOwnMessage = newMessages.some((msg) => isOwn(msg));
-
-      // Скроллим вниз только если:
-      // А) Это наше сообщение
-      // Б) Мы уже были внизу
-      // В) У нас НЕТ активного highlight (чтобы не сбивать просмотр истории)
-      const shouldScroll =
-        (hasOwnMessage || isNearBottom()) && !props.highlightMessageId;
-
-      if (shouldScroll) {
-        scrollToBottom("smooth");
-      }
-
       nextTick(() => checkAndMarkRead());
     }
+
     previousMessageCount.value = newLength;
   }
 );
+
 // === Lifecycle ===
 onMounted(() => {
+  // Если компонент смонтировался, а данные уже есть (например, переход назад)
   if (!isLoading.value && currentMessages.value.length > 0) {
     initializeScrollPosition();
   }

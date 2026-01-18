@@ -239,20 +239,19 @@ export const useMessagesStore = defineStore("messages", () => {
       const { data } = await messagesAPI.send(chatId, content);
       console.log("[MessagesStore] Message sent via REST:", data.id);
 
-      // Если мы находимся "в прошлом" (есть более новые сообщения),
-      // то отправка сообщения должна вернуть нас в "настоящее".
-      // Просто добавить сообщение нельзя — будет дырка в истории.
       if (getHasMoreNewer(chatId)) {
         console.log(
           "[MessagesStore] Sending from history mode -> Reloading chat to live"
         );
-        // Перезагружаем чат (это сбросит offset, флаги и загрузит последние 50)
-        await loadMessages(chatId);
+        try {
+          await loadMessages(chatId);
+        } catch (loadErr) {
+          console.warn(
+            "[MessagesStore] Failed to reload to live, but message was sent:",
+            loadErr
+          );
+        }
       }
-      // Если мы уже внизу (Live режим), то сообщение добавится само
-      // через WebSocket (MessageCreatedEvent) или можно добавить вручную,
-      // но обычно WS быстрее.
-
       return data;
     } catch (err: any) {
       error.value = err.response?.data?.detail || "Failed to send message";

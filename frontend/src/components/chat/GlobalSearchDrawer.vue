@@ -232,19 +232,29 @@ const handleUserClick = (user: any) => {
   showProfileModal.value = true;
 };
 
+// const handleMessageClick = async (msg: MessageRead) => {
+//   // 1. Выбираем чат (чтобы UI переключился)
+//   router.push(`/chat/${msg.chat_id}`);
+
+//   // 2. Выполняем прыжок (загрузку сообщений вокруг)
+//   // Мы делаем это здесь, чтобы данные начали грузиться еще до анимации закрытия шторки
+//   await messagesStore.jumpToMessage(msg.chat_id, msg.id);
+
+//   // 3. Закрываем поиск
+//   emit("close");
+
+//   // 4. Переходим на страницу (если мы не там) с параметром highlight
+//   // Мы передаем highlight в query, чтобы ChatPage передал его пропом в MessageList
+//   router.push({
+//     path: `/chat/${msg.chat_id}`,
+//     query: { highlight: msg.id },
+//   });
+// };
+
 const handleMessageClick = async (msg: MessageRead) => {
-  // 1. Выбираем чат (чтобы UI переключился)
-  router.push(`/chat/${msg.chat_id}`);
-
-  // 2. Выполняем прыжок (загрузку сообщений вокруг)
-  // Мы делаем это здесь, чтобы данные начали грузиться еще до анимации закрытия шторки
-  await messagesStore.jumpToMessage(msg.chat_id, msg.id);
-
-  // 3. Закрываем поиск
+  // Don't call router.push twice or jumpToMessage here.
+  // Just navigate with the query param.
   emit("close");
-
-  // 4. Переходим на страницу (если мы не там) с параметром highlight
-  // Мы передаем highlight в query, чтобы ChatPage передал его пропом в MessageList
   router.push({
     path: `/chat/${msg.chat_id}`,
     query: { highlight: msg.id },
