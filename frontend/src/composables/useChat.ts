@@ -51,15 +51,29 @@ function createChatInstance() {
     if (!chatId.value || !ws.value?.isConnected) {
       return;
     }
+
+    // 1. Отправляем событие на сервер
     ws.value.send({
       type: "mark_chat_read",
       last_message_id: lastMessageId,
     });
+
     console.log(
       `[useChat] 📬 Marked chat read until message #${lastMessageId}`
     );
-  };
 
+    // 2. Оптимистично обновляем стор СРАЗУ, не дожидаясь ответа
+    if (authStore.user?.id) {
+      messagesStore.markMessagesReadUntil(
+        lastMessageId,
+        authStore.user.id, // ID "читателя" (нас)
+        chatId.value
+      );
+      console.log(
+        `[useChat] ⚡ Optimistic read update for msg #${lastMessageId}`
+      );
+    }
+  };
   // WebSocket Connection
   async function connectWebSocket() {
     console.log("[useChat] === Starting WebSocket connection ===");
@@ -91,7 +105,17 @@ function createChatInstance() {
         }
       });
 
-      ws.value.onMessage("chat_read", (event: any) => {
+      // ws.value.onMessage("chat_read", (event: any) => {
+      //   const readEvent = event as ChatReadEvent;
+      //   console.log("[useChat] 📩 Received chat_read event:", readEvent);
+      //   messagesStore.markMessagesReadUntil(
+      //     readEvent.last_read_message_id,
+      //     readEvent.user_id,
+      //     readEvent.chat_id
+      //   );
+      // });
+
+      ws.value.onMessage("message_read", (event: any) => {
         const readEvent = event as ChatReadEvent;
         console.log("[useChat] 📩 Received chat_read event:", readEvent);
         messagesStore.markMessagesReadUntil(
