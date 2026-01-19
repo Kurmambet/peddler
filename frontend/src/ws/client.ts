@@ -117,6 +117,18 @@ export class WebSocketClient {
     }
   }
 
+  /**
+   * Отправляет "сырую" строку без JSON.stringify.
+   * Используется для ping/heartbeat.
+   */
+  sendRaw(message: string): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      // Можно раскомментировать для отладки, но будет спамить в консоль раз в 30 сек
+      console.log(`[WebSocketClient] 💓 Sending raw: ${message}`);
+      this.ws.send(message);
+    }
+  }
+
   onMessage(type: string, handler: (event: WSEvent) => void): void {
     if (!this.eventHandlers.has(type)) {
       this.eventHandlers.set(type, []);

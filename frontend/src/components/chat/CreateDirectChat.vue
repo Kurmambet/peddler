@@ -25,7 +25,11 @@
       >
         <div class="flex items-center gap-3">
           <!-- Avatar -->
-          <Avatar :username="selectedUser.username" size="md" />
+          <Avatar
+            :username="selectedUser.username"
+            :src="selectedUser.avatar_url"
+            size="md"
+          />
 
           <!-- User Info -->
           <div class="flex-1">

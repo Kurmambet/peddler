@@ -192,13 +192,19 @@ class ConnectionManager:
     def get_chat_participant_count(self, chat_id: int) -> int:
         return len(self.active_connections.get(chat_id, set()))
 
-    async def set_user_online(self, user_id: int, db):
+    async def set_user_online(self, user_id: int, db) -> None:
+        """
+        Только пишет в БД. Логику 'нужно ли писать' выносим выше (в router),
+        или вызываем этот метод только когда реально надо.
+        """
         stmt = update(User).where(User.id == user_id).values(is_online=True)
         await db.execute(stmt)
         await db.commit()
 
     async def set_user_offline(self, user_id: int, db):
+        """Пишет в БД Offline, только если нет других подключений"""
         async with self._lock:
+            # Проверяем, остались ли соединения WebSocket в памяти этого инстанса
             has_connections = (
                 user_id in self.status_connections and len(self.status_connections[user_id]) > 0
             )
@@ -213,5 +219,7 @@ class ConnectionManager:
             await db.execute(stmt)
             await db.commit()
             logger.info(f"[Manager] User {user_id} set to OFFLINE (no devices)")
+            return True  # Возвращаем True, если статус реально сменился на Offline
         else:
             logger.info(f"[Manager] User {user_id} still has {device_count} device(s) online")
+            return False

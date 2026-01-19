@@ -10,6 +10,7 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore"
   },
   "dependencies": {
+    "@vueuse/core": "^14.1.0",
     "axios": "^1.13.2",
     "date-fns": "^4.1.0",
     "fix-webm-duration": "^1.0.6",

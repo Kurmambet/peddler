@@ -41,6 +41,7 @@
         <SettingsModal v-if="showSettings" @close="showSettings = false" />
         <Avatar
           v-if="authStore.user"
+          :src="authStore.user.avatar_url"
           :username="authStore.user.username"
           size="lg"
         />

@@ -14,6 +14,13 @@ export const useMessagesStore = defineStore("messages", () => {
   const hasMore = ref<Map<number, boolean>>(new Map());
   const error = ref<string | null>(null);
 
+  // Можно ли скроллить вверх (в прошлое)
+  const hasMoreOlder = ref<Map<number, boolean>>(new Map());
+
+  // Можно ли скроллить вниз (в будущее)
+  // По умолчанию false, становится true только после jumpToMessage
+  const hasMoreNewer = ref<Map<number, boolean>>(new Map());
+
   // Хранилище для "зависших" в загрузке сообщений
   // Key: chatId, Value: Array of pending messages
   const pendingMessages = ref<Record<number, MessageRead[]>>({});
@@ -26,57 +33,134 @@ export const useMessagesStore = defineStore("messages", () => {
     return hasMore.value.get(chatId) ?? true;
   };
 
+  const getHasMoreNewer = (chatId: number): boolean => {
+    return hasMoreNewer.value.get(chatId) ?? false;
+  };
+
+  // ==========================================
+  // ОБЫЧНЫЙ ВХОД В ЧАТ (последние сообщения)
+  // ==========================================
   const loadMessages = async (chatId: number, limit = 50) => {
     isLoading.value = true;
     error.value = null;
+
+    // Сбрасываем флаги (мы начинаем с "самых новых")
+    hasMoreOlder.value.set(chatId, true);
+    hasMoreNewer.value.set(chatId, false); // В будущем сообщений нет
+
     try {
-      const { data } = await messagesAPI.list(chatId, limit, 0);
+      // Запрос БЕЗ курсоров = дай самые последние
+      const { data } = await messagesAPI.list(chatId, limit);
       messagesByChat.value.set(chatId, data.messages);
-      hasMore.value.set(chatId, data.has_more);
-      console.log(
-        `[MessagesStore] Loaded ${data.messages.length} messages for chat ${chatId}, has_more: ${data.has_more}`
-      );
+
+      // has_more от API здесь означает "есть ли еще СТАРЕЕ"
+      hasMoreOlder.value.set(chatId, data.has_more);
     } catch (err: any) {
       error.value = err.response?.data?.detail || "Failed to load messages";
-      console.error("Load messages error:", err);
     } finally {
       isLoading.value = false;
     }
   };
 
-  const loadMoreMessages = async (chatId: number, limit = 50) => {
-    // Проверяем есть ли ещё сообщения
-    if (!getHasMore(chatId)) {
-      console.log("[MessagesStore] No more messages to load");
-      return;
-    }
-
-    isLoadingMore.value = true;
+  // ==========================================
+  // JUMP TO MESSAGE (Прыжок в историю)
+  // ==========================================
+  const jumpToMessage = async (
+    chatId: number,
+    messageId: number,
+    limit = 50
+  ) => {
+    isLoading.value = true;
     error.value = null;
     try {
+      // Очищаем текущие (чтобы не было дырок)
+      messagesByChat.value.set(chatId, []);
+
+      const data = await messagesAPI.listAround(chatId, messageId, limit);
+
+      // Устанавливаем сообщения
+      messagesByChat.value.set(chatId, data.messages);
+      hasMoreOlder.value.set(chatId, true);
+      hasMoreNewer.value.set(chatId, true);
+
+      // console.log(
+      //   `[MessagesStore] Jumped to message ${messageId} in chat ${chatId}`
+      // );
+    } catch (err: any) {
+      error.value = "Failed to jump to message";
+      // console.error(err);
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  // ==========================================
+  // SCROLL UP (В прошлое)
+  // ==========================================
+  const loadMoreMessages = async (chatId: number, limit = 50) => {
+    if (!getHasMore(chatId)) return 0; // alias getHasMoreOlder
+
+    isLoadingMore.value = true;
+    try {
       const currentMessages = getChatMessages(chatId);
-      const offset = currentMessages.length;
+      if (currentMessages.length === 0) return 0;
 
-      console.log(
-        `[MessagesStore] Loading more messages: offset=${offset}, limit=${limit}`
-      );
+      // Берем ID самого СТАРОГО сообщения (первое в массиве)
+      const oldestMsg = currentMessages[0];
 
-      const { data } = await messagesAPI.list(chatId, limit, offset);
+      // Запрашиваем: дай сообщения СТАРЕЕ чем oldestMsg.id
+      const { data } = await messagesAPI.list(chatId, limit, {
+        before_id: oldestMsg.id,
+      });
 
-      // Добавляем старые сообщения В НАЧАЛО массива
+      // Добавляем новые (старые) в начало списка
       const allMessages = [...data.messages, ...currentMessages];
       messagesByChat.value.set(chatId, allMessages);
-      hasMore.value.set(chatId, data.has_more);
 
-      console.log(
-        `[MessagesStore] Loaded ${data.messages.length} more messages, total: ${allMessages.length}, has_more: ${data.has_more}`
-      );
+      hasMoreOlder.value.set(chatId, data.has_more);
 
-      return data.messages.length; // Возвращаем количество загруженных
+      return data.messages.length;
     } catch (err: any) {
-      error.value =
-        err.response?.data?.detail || "Failed to load more messages";
-      console.error("Load more messages error:", err);
+      console.error(err);
+      return 0;
+    } finally {
+      isLoadingMore.value = false;
+    }
+  };
+
+  // ============================
+  // SCROLL DOWN (В БУДУЩЕЕ)
+  // ============================
+  const loadNewerMessages = async (chatId: number, limit = 50) => {
+    // Внимание: hasMoreNewer выставляется в true ТОЛЬКО после jumpToMessage
+    if (!getHasMoreNewer(chatId)) return 0;
+
+    // Тут нужен отдельный loading state, чтобы не конфликтовать,
+    // но пока используем isLoadingMore или локальный
+    isLoadingMore.value = true;
+
+    try {
+      const currentMessages = getChatMessages(chatId);
+      if (currentMessages.length === 0) return 0;
+
+      // Берем ID самого НОВОГО сообщения (последнее в массиве)
+      const newestMsg = currentMessages[currentMessages.length - 1];
+
+      // Запрашиваем: дай сообщения НОВЕЕ чем newestMsg.id
+      const { data } = await messagesAPI.list(chatId, limit, {
+        after_id: newestMsg.id,
+      });
+
+      // Добавляем новые (будущие) в КОНЕЦ списка
+      const allMessages = [...currentMessages, ...data.messages];
+      messagesByChat.value.set(chatId, allMessages);
+
+      // has_more от API здесь означает "есть ли еще НОВЕЕ"
+      hasMoreNewer.value.set(chatId, data.has_more);
+
+      return data.messages.length;
+    } catch (err: any) {
+      console.error(err);
       return 0;
     } finally {
       isLoadingMore.value = false;
@@ -138,10 +222,24 @@ export const useMessagesStore = defineStore("messages", () => {
     }
   };
 
+  // === HELPER: Reset to Live Mode ===
+  // Если мы в истории, перезагружаем чат, чтобы увидеть отправленное сообщение
+  const checkAndResetToLive = async (chatId: number) => {
+    if (getHasMoreNewer(chatId)) {
+      console.log(
+        "[MessagesStore] Sending from history -> Reloading to live..."
+      );
+      hasMoreNewer.value.set(chatId, false);
+      await loadMessages(chatId);
+      return true;
+    }
+    return false;
+  };
+
   const sendMessage = async (chatId: number, content: string) => {
     try {
       const { data } = await messagesAPI.send(chatId, content);
-      console.log("[MessagesStore] Message sent via REST:", data.id);
+      await checkAndResetToLive(chatId);
       return data;
     } catch (err: any) {
       error.value = err.response?.data?.detail || "Failed to send message";
@@ -156,41 +254,40 @@ export const useMessagesStore = defineStore("messages", () => {
   ) => {
     const authStore = useAuthStore();
     const myUserId = authStore.user?.id;
+    // Гарантируем, что работаем с числами
+    const lastIdNum = Number(lastMessageId);
+    const chatIdNum = Number(chatId);
 
-    // Получаем сообщения конкретного чата
-    const chatMsgs = messagesByChat.value.get(chatId);
+    const currentMsgs = messagesByChat.value.get(chatIdNum);
+    if (!currentMsgs || !myUserId) return;
 
-    if (!chatMsgs || !myUserId) return;
+    let hasChanges = false;
 
-    let updatedCount = 0;
-
-    chatMsgs.forEach((msg) => {
-      // Проверяем условия:
-      // 1. ID меньше или равен последнему прочитанному
-      // 2. Сообщение еще не помечено как прочитанное
-      if (msg.id <= lastMessageId && !msg.is_read) {
-        // Логика обновления статуса:
-
-        // А) Это МОЕ сообщение, и его прочитал КТО-ТО ДРУГОЙ (readerId != me)
-        // Значит, мой собеседник увидел сообщение -> ставим галочки
+    // Создаем НОВЫЙ массив, в котором будем подменять объекты
+    const updatedMsgs = currentMsgs.map((msg) => {
+      // Условие: сообщение старое (или текущее) И не прочитано
+      if (msg.id <= lastIdNum && !msg.is_read) {
+        // Проверяем условия принадлежности
         const isMyMessageReadByOther =
           msg.sender_id === myUserId && readerId !== myUserId;
-
-        // Б) Это ЧУЖОЕ сообщение, и его прочитал Я (readerId == me)
-        // (например, я прочитал с телефона, а веб-версия обновилась)
         const isOtherMessageReadByMe =
           msg.sender_id !== myUserId && readerId === myUserId;
 
         if (isMyMessageReadByOther || isOtherMessageReadByMe) {
-          msg.is_read = true;
-          updatedCount++;
+          hasChanges = true;
+          // ВОТ ОНО: Возвращаем НОВЫЙ объект, копируя все поля и меняя is_read
+          return { ...msg, is_read: true };
         }
       }
+      // Если изменений нет, возвращаем старый объект
+      return msg;
     });
 
-    if (updatedCount > 0) {
+    // Если были изменения, обновляем Map новым массивом
+    if (hasChanges) {
+      messagesByChat.value.set(chatIdNum, updatedMsgs);
       console.log(
-        `[MessagesStore] Updated read status for ${updatedCount} messages in chat ${chatId}`
+        `[MessagesStore] 🟢 Updated read status for chat ${chatIdNum} (replaced objects)`
       );
     }
   };
@@ -231,12 +328,13 @@ export const useMessagesStore = defineStore("messages", () => {
     };
   };
 
-  // === VOICE ACTION ===
+  // === SEND VOICE ===
   const sendVoiceOptimistic = async (
     chatId: number,
     blob: Blob,
     duration: number
   ) => {
+    const wasInHistory = getHasMoreNewer(chatId);
     const optimisticMsg = createOptimisticMessage(
       chatId,
       MessageType.VOICE,
@@ -254,10 +352,11 @@ export const useMessagesStore = defineStore("messages", () => {
         );
         if (msg) msg.uploadProgress = progress;
       });
-      // Удаляем, так как придет реальное сообщение через WS
       removePendingMessage(chatId, optimisticMsg.id);
-      // Очищаем URL (освобождаем память)
       if (optimisticMsg.file_url) URL.revokeObjectURL(optimisticMsg.file_url);
+
+      // Fix: Reload if we were in history
+      if (wasInHistory) await checkAndResetToLive(chatId);
     } catch (err) {
       console.error("Voice upload failed", err);
       const msg = pendingMessages.value[chatId]?.find(
@@ -270,12 +369,13 @@ export const useMessagesStore = defineStore("messages", () => {
     }
   };
 
-  // === VIDEO NOTE ACTION ===
+  // === SEND VIDEO NOTE ===
   const sendVideoNoteOptimistic = async (
     chatId: number,
     blob: Blob,
     duration: number
   ) => {
+    const wasInHistory = getHasMoreNewer(chatId);
     const optimisticMsg = createOptimisticMessage(
       chatId,
       MessageType.VIDEO_NOTE,
@@ -295,6 +395,9 @@ export const useMessagesStore = defineStore("messages", () => {
       });
       removePendingMessage(chatId, optimisticMsg.id);
       if (optimisticMsg.file_url) URL.revokeObjectURL(optimisticMsg.file_url);
+
+      // Fix: Reload if we were in history
+      if (wasInHistory) await checkAndResetToLive(chatId);
     } catch (err) {
       console.error("Video note upload failed", err);
       const msg = pendingMessages.value[chatId]?.find(
@@ -306,12 +409,14 @@ export const useMessagesStore = defineStore("messages", () => {
       }
     }
   };
+
   // --- ACTION: Отправка файла с оптимистичным UI ---
   const sendFileOptimistic = async (
     chatId: number,
     file: File,
     caption: string = ""
   ) => {
+    const wasInHistory = getHasMoreNewer(chatId);
     const authStore = useAuthStore();
     const tempId = -Date.now();
 
@@ -341,14 +446,15 @@ export const useMessagesStore = defineStore("messages", () => {
       isError: false,
     };
 
-    // 3. Добавляем в список pendingMessages
+    optimisticMsg.content = caption;
+
     if (!pendingMessages.value[chatId]) {
       pendingMessages.value[chatId] = [];
     }
     pendingMessages.value[chatId].push(optimisticMsg);
 
     try {
-      // 4. Запускаем реальную отправку
+      // Запускаем реальную отправку
       await messagesAPI.sendFile(chatId, file, caption, (progress) => {
         // Обновляем прогресс реактивно
         const msg = pendingMessages.value[chatId]?.find((m) => m.id === tempId);
@@ -357,6 +463,7 @@ export const useMessagesStore = defineStore("messages", () => {
         }
       });
       removePendingMessage(chatId, tempId);
+      if (wasInHistory) await checkAndResetToLive(chatId);
     } catch (err) {
       console.error("Upload failed", err);
       const msg = pendingMessages.value[chatId]?.find((m) => m.id === tempId);
@@ -383,10 +490,14 @@ export const useMessagesStore = defineStore("messages", () => {
     isLoading,
     isLoadingMore,
     error,
+    hasMoreNewer,
     getChatMessages,
-    getHasMore,
+    getHasMore, // Старый (Older)
+    getHasMoreNewer, // Новый
     loadMessages,
-    loadMoreMessages,
+    loadMoreMessages, // Load Older
+    loadNewerMessages, // Load Newer
+    jumpToMessage, // Jump
     addMessage,
     sendMessage,
     markMessagesReadUntil,

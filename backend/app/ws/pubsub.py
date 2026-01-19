@@ -207,3 +207,20 @@ class RedisPubSubManager:
             # При критической ошибке перезапускаем listener
             await asyncio.sleep(5)
             self._listener_task = asyncio.create_task(self._listen_to_redis())
+
+    async def update_user_heartbeat(self, user_id: int, ttl: int = 45):
+        """Обновляет TTL ключа 'онлайн' в Redis"""
+        if self.redis:
+            # Значение не важно, важен сам факт наличия ключа и его TTL
+            await self.redis.set(f"user:{user_id}:online_heartbeat", "1", ex=ttl)
+
+    async def delete_user_heartbeat(self, user_id: int):
+        """Удаляет ключ при явном выходе"""
+        if self.redis:
+            await self.redis.delete(f"user:{user_id}:online_heartbeat")
+
+    async def is_user_online_in_redis(self, user_id: int) -> bool:
+        """Проверяет, жив ли ключ (чтобы не спамить в БД)"""
+        if self.redis:
+            return await self.redis.exists(f"user:{user_id}:online_heartbeat") > 0
+        return False

@@ -234,113 +234,122 @@ async def handle_mark_chat_read(
 
 @router.websocket("/status")
 async def status_websocket_endpoint(websocket: WebSocket):
-    """
-    Глобальный WebSocket для статусов.
-    """
-
-    # Шаг 1: Аутентификация (короткая сессия)
+    # --- Шаг 1: Auth ---
     async with AsyncSessionLocal() as db:
         user = await authenticate_websocket(websocket, db)
         if not user:
-            await reject_websocket(
-                websocket,
-                status.WS_1008_POLICY_VIOLATION,
-                "Invalid or missing authentication token",
-            )
+            await reject_websocket(websocket, status.WS_1008_POLICY_VIOLATION, "Auth failed")
             return
 
-        # Шаг 3: Пометить пользователя как online (нужна DB)
-        # Мы принимаем соединение здесь, чтобы можно было отправить ответ
         await websocket.accept()
         await manager.connect_status(user.id, websocket)
-        await manager.set_user_online(user.id, db)
 
-        # Шаг 4: Получить чаты для уведомления (нужна DB)
+        # === ЛОГИКА HEARTBEAT: ВХОД ===
+
+        # 1. Проверяем Redis через pubsub_manager: был ли юзер онлайн 1 сек назад?
+        # (Проверка "мерцающего" соединения)
+        was_online_redis = await pubsub_manager.is_user_online_in_redis(user.id)
+
+        # 2. Сразу обновляем heartbeat в Redis (TTL 45 сек)
+        await pubsub_manager.update_user_heartbeat(user.id)
+
+        should_broadcast_online = False
+
+        if not was_online_redis:
+            # Если в Redis его не было -> значит он пришел из оффлайна -> пишем в БД
+            await manager.set_user_online(user.id, db)
+            should_broadcast_online = True
+
+        # Получаем список чатов (нужен в любом случае для подписки)
         stmt = select(ChatParticipant.chat_id).where(ChatParticipant.user_id == user.id)
         result = await db.execute(stmt)
         user_chat_ids = [row[0] for row in result.fetchall()]
 
-    # Дальше работаем с Redis/памятью, сессия закрыта
+    # Сессия БД закрыта
     connected = True
 
     try:
         await pubsub_manager.subscribe_to_user(user.id)
 
-        # Шаг 5: Broadcast статус online во все чаты
-        status_event = UserStatusChangedEvent(
-            user_id=user.id, username=user.username, is_online=True
-        )
+        # --- Шаг 2: Broadcast (только если реально новый вход) ---
+        if should_broadcast_online:
+            status_event = UserStatusChangedEvent(
+                user_id=user.id, username=user.username, is_online=True
+            )
+            for chat_id in user_chat_ids:
+                await pubsub_manager.publish_to_chat(chat_id, status_event.model_dump_json())
+            logger.info(f"[StatusWS] User {user.id} set ONLINE (Broadcast sent)")
+        else:
+            logger.info(f"[StatusWS] User {user.id} reconnected (Silent update)")
 
-        for chat_id in user_chat_ids:
-            await pubsub_manager.publish_to_chat(chat_id, status_event.model_dump_json())
-
-        logger.info(f"[StatusWS] User {user.id} set to ONLINE, notified {len(user_chat_ids)} chats")
-
-        # Шаг 6: Подписаться на все чаты
+        # Подписка на чаты
         for chat_id in user_chat_ids:
             await pubsub_manager.subscribe_to_chat(chat_id)
 
-        # Шаг 7: Отправить подтверждение
-        connected_event = ConnectedEvent(
-            user_id=user.id,
-            chat_id=0,
-            message=f"Status WebSocket connected for user {user.username}",
+        # Приветственное сообщение
+        await websocket.send_text(
+            ConnectedEvent(user_id=user.id, chat_id=0, message="Connected").model_dump_json()
         )
-        await websocket.send_text(connected_event.model_dump_json())
 
-        # Шаг 8: Ping-pong loop
+        # --- Шаг 3: Loop с поддержкой Heartbeat ---
         while True:
             try:
                 data = await websocket.receive_text()
-                if data == "ping":
+
+                if data == "heartbeat":
+                    # Просто обновляем Redis ключ. Никакой БД.
+                    await pubsub_manager.update_user_heartbeat(user.id)
+
+                elif data == "ping":
                     await websocket.send_text("pong")
+
             except WebSocketDisconnect:
                 break
 
-    except WebSocketDisconnect:
-        logger.info(f"[StatusWS] User {user.id} disconnected from status WebSocket")
-
     except Exception as e:
-        logger.error(f"[StatusWS] Error for user {user.id}: {e}")
+        logger.error(f"[StatusWS] Error: {e}")
 
     finally:
         # Шаг 9: Cleanup
         if connected:
-            # Нам снова нужна DB, чтобы поставить статус Offline
             async with AsyncSessionLocal() as db:
+                # 1. Удаляем соединение из памяти менеджера
                 await manager.disconnect_status(user.id, websocket)
-                await manager.set_user_offline(user.id, db)
 
-                # Получить актуальный список чатов
+                # 2. Пробуем поставить статус Offline в БД
+                # Метод вернет True, ТОЛЬКО если у пользователя не осталось других активных соединений (вкладок/устройств)
+                is_fully_offline = await manager.set_user_offline(user.id, db)
+
+                # 3. Получаем актуальный список чатов (чтобы знать, куда слать "Offline", если придется)
                 stmt = select(ChatParticipant.chat_id).where(ChatParticipant.user_id == user.id)
-                result = await db.execute(stmt)
-                # Переписываем user_chat_ids, так как пользователь мог выйти из чатов пока был онлайн
-                current_user_chat_ids = [row[0] for row in result.fetchall()]
+                res = await db.execute(stmt)
+                current_user_chat_ids = [row[0] for row in res.fetchall()]
 
-            # Broadcast offline (без DB)
-            async with manager._lock:
-                has_devices = user.id in manager.status_connections
+            # Если это было последнее устройство пользователя:
+            if is_fully_offline:
+                # А. Удаляем ключ Heartbeat из Redis (чтобы статус пропал мгновенно)
+                await pubsub_manager.delete_user_heartbeat(user.id)
 
-            if not has_devices:
+                # Б. Отписываем сервер от личного канала уведомлений юзера
                 await pubsub_manager.unsubscribe_from_user(user.id)
+
+                # В. Рассылаем событие "Offline" во все чаты
                 status_event = UserStatusChangedEvent(
                     user_id=user.id,
                     username=user.username,
                     is_online=False,
                     last_seen=datetime.utcnow(),
                 )
-
                 for chat_id in current_user_chat_ids:
                     await pubsub_manager.publish_to_chat(chat_id, status_event.model_dump_json())
 
-                logger.info(
-                    f"[StatusWS] User {user.id} set to OFFLINE, notified {len(current_user_chat_ids)} chats"
-                )
+                logger.info(f"[StatusWS] User {user.id} is fully OFFLINE. Broadcast sent.")
             else:
-                logger.info(f"[StatusWS] User {user.id} still has other devices online")
+                logger.info(
+                    f"[StatusWS] User {user.id} disconnected one device, but remains ONLINE."
+                )
 
+            # 4. Очистка подписок на чаты (если в этом чате больше нет наших локальных юзеров)
             for chat_id in current_user_chat_ids:
                 if manager.get_chat_participant_count(chat_id) == 0:
                     await pubsub_manager.unsubscribe_from_chat(chat_id)
-
-            logger.info(f"[StatusWS] Cleaned up status connection for user {user.id}")

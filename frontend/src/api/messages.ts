@@ -3,9 +3,17 @@ import type { MessageListResponse, MessageRead } from "../types/api";
 import { apiClient } from "./client";
 
 export const messagesAPI = {
-  list: (chatId: number, limit: number = 50, offset: number = 0) =>
+  list: (
+    chatId: number,
+    limit: number = 50,
+    cursor?: { before_id?: number; after_id?: number }
+  ) =>
     apiClient.get<MessageListResponse>(`/chats/${chatId}/messages`, {
-      params: { limit, offset },
+      params: {
+        limit,
+        before_id: cursor?.before_id,
+        after_id: cursor?.after_id,
+      },
     }),
 
   send: (chatId: number, content: string) =>
@@ -98,5 +106,26 @@ export const messagesAPI = {
         timeout: 0,
       }
     );
+  },
+
+  async search(query: string, limit = 50): Promise<MessageRead[]> {
+    const { data } = await apiClient.get<MessageRead[]>("/search", {
+      params: { q: query, limit },
+    });
+    return data;
+  },
+
+  async listAround(
+    chatId: number,
+    messageId: number,
+    limit = 50
+  ): Promise<MessageListResponse> {
+    const { data } = await apiClient.get<MessageListResponse>(
+      `/chats/${chatId}/messages/around`,
+      {
+        params: { message_id: messageId, limit },
+      }
+    );
+    return data;
   },
 };

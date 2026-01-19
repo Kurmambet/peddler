@@ -56,9 +56,9 @@
 
           <!-- Search button -->
           <button
-            class="p-2 -mr-2 rounded-lg hover:bg-app-hover transition-colors opacity-50 cursor-not-allowed"
+            @click="showSearch = true"
+            class="p-2 -mr-2 rounded-lg hover:bg-app-hover transition-colors text-app-text-secondary hover:text-app-text"
             aria-label="Search"
-            disabled
           >
             <svg
               class="w-5 h-5 text-app-text-secondary"
@@ -75,6 +75,7 @@
             </svg>
           </button>
         </div>
+        <GlobalSearchDrawer :is-open="showSearch" @close="showSearch = false" />
 
         <!-- ТАБЫ для фильтрации -->
         <ChatFolderTabs v-model="activeFolder" :horizontal="false" />
@@ -84,7 +85,7 @@
       </aside>
 
       <!-- RIGHT PANEL - выбранный чат или placeholder -->
-      <main class="flex-1 flex flex-col min-h-0 bg-app-bg">
+      <main class="flex-1 flex flex-col min-h-0 bg-app-bg h-full">
         <!-- Если чат выбран -->
         <template v-if="selectedChatId">
           <!-- HEADER -->
@@ -97,13 +98,16 @@
           </div>
 
           <!-- MESSAGES -->
-          <div class="flex-1 overflow-y-auto min-h-0">
-            <MessageList />
+          <div class="flex-1 min-h-0 relative overflow-hidden flex flex-col">
+            <MessageList
+              class="flex-1 h-full"
+              :highlight-message-id="route.query.highlight ? parseInt(route.query.highlight as string) : undefined"
+            />
           </div>
 
           <!-- INPUT -->
           <div class="flex-shrink-0">
-            <MessageInput />
+            <MessageInput @send="handleSendMessage" />
           </div>
         </template>
 
@@ -150,7 +154,8 @@
 
 <script setup lang="ts">
 import { useChatsStore } from "@/stores/chats";
-import { onMounted, ref, watch } from "vue";
+import { useMessagesStore } from "@/stores/messages";
+import { nextTick, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useChat } from "../../composables/useChat";
 import ChatFolderTabs from "./ChatFolderTabs.vue";
@@ -158,11 +163,14 @@ import ChatHeader from "./ChatHeader.vue";
 import ChatList from "./ChatList.vue";
 import CreateDirectChat from "./CreateDirectChat.vue";
 import CreateGroupChat from "./CreateGroupChat.vue";
+import GlobalSearchDrawer from "./GlobalSearchDrawer.vue";
 import MessageInput from "./MessageInput.vue";
 import MessageList from "./MessageList.vue";
 import SidebarDrawer from "./SidebarDrawer.vue";
 const chatsStore = useChatsStore();
+const messagesStore = useMessagesStore();
 
+const showSearch = ref(false);
 const route = useRoute();
 const router = useRouter();
 const { typingText } = useChat();
@@ -176,35 +184,73 @@ const selectedChatId = ref<number | null>(null);
 // Единая логика установки чата
 const initializeChat = async (idStr: string | string[]) => {
   const id = Number(idStr);
-  if (!isNaN(id)) {
-    selectedChatId.value = id;
-
-    // Если чатов нет - грузим
-    if (chatsStore.chats.length === 0) {
-      await chatsStore.loadChats();
-    }
-
-    // Устанавливаем текущий чат в сторе
-    chatsStore.setCurrentChat(id);
-  } else {
+  if (isNaN(id)) {
     selectedChatId.value = null;
     chatsStore.resetCurrentChat();
+    return;
   }
+
+  selectedChatId.value = id;
+  chatsStore.setCurrentChat(id);
+
+  // If we don't have chat list yet, load it for the sidebar
+  if (chatsStore.chats.length === 0) {
+    await chatsStore.loadChats();
+  }
+
+  // DATA LOADING STRATEGY
+  if (route.query.highlight) {
+    const msgId = Number(route.query.highlight);
+    console.log(`[ChatPage] 🎯 Initializing with Jump to ${msgId}`);
+    await messagesStore.jumpToMessage(id, msgId);
+  } else {
+    // Standard load: latest messages
+    console.log(`[ChatPage] 📥 Initializing with Latest messages`);
+    await messagesStore.loadMessages(id);
+  }
+};
+
+const handleSendMessage = async (content: string) => {
+  if (!selectedChatId.value) return;
+
+  if (route.query.highlight) {
+    await router.replace({
+      path: `/chat/${selectedChatId.value}`,
+      query: {},
+    });
+    await nextTick();
+  }
+  await messagesStore.sendMessage(selectedChatId.value, content);
 };
 
 // Следим за роутом (реагируем на навигацию)
 watch(
-  () => route.params.id,
-  async (newId) => {
-    if (newId) await initializeChat(newId);
+  () => ({ id: route.params.id, highlight: route.query.highlight }),
+  async (newVal, oldVal) => {
+    const newId = newVal.id;
+    const oldId = oldVal?.id;
+    const newHighlight = newVal.highlight;
+    const oldHighlight = oldVal?.highlight;
+
+    // If ID changed, full init
+    if (newId !== oldId) {
+      if (newId) await initializeChat(newId as string);
+    }
+    // If only highlight changed (e.g. clicked search result for same chat)
+    else if (newHighlight !== oldHighlight && newId) {
+      if (newHighlight) {
+        await messagesStore.jumpToMessage(Number(newId), Number(newHighlight));
+      } else {
+        // Highlight removed (user manually cleared URL?) -> Optional logic
+        // For now, we do nothing to avoid unnecessary reloads
+      }
+    }
   },
-  { immediate: true } // Сработает и при маунте
+  { immediate: true }
 );
 
-// Обработчики
 const handleChatSelected = (chatId: number) => {
   selectedChatId.value = chatId;
-  // На mobile закрываем список чатов
 };
 
 const handleBackToList = () => {

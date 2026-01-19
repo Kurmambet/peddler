@@ -3,11 +3,12 @@ import logging
 import os
 import subprocess
 import uuid
+from typing import List, Optional
 
 import aiofiles
 from app.api.dependencies import get_current_user
 from app.database import get_db
-from app.models.message import Message, MessageType
+from app.models.message import MessageType
 from app.models.user import User
 from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
 from app.services.message_service import MessageService
@@ -41,7 +42,7 @@ async def send_message(
     msg_in: MessageCreate,
     current_user: User = Depends(get_current_user),
     service: MessageService = Depends(get_message_service),
-) -> Message:
+) -> MessageRead:
     """Отправляет текстовое сообщение в чат"""
     # return await service.send_message(chat_id, msg_in, current_user)
     message = await service.send_message(chat_id, msg_in, current_user)
@@ -57,22 +58,93 @@ async def send_message(
         is_read=message.is_read,
         message_type=message.message_type,
     )
+    message_resp = MessageRead(
+        id=message.id,
+        chat_id=message.chat_id,
+        sender_id=message.sender_id,
+        sender_username=current_user.username,
+        sender_display_name=current_user.display_name,
+        avatar_url=current_user.avatar_url,
+        content=message.content,
+        created_at=message.created_at,
+        is_read=message.is_read,
+        message_type=message.message_type,
+    )
 
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
-    logger.info("[Text] Event published successfully")
-    return message
+    return message_resp
 
 
 @router.get("/chats/{chat_id}/messages", response_model=MessageListResponse)
 async def get_chat_messages(
     chat_id: int,
     limit: int = 50,
-    offset: int = 0,
+    before_id: Optional[int] = None,
+    after_id: Optional[int] = None,
     current_user: User = Depends(get_current_user),
     service: MessageService = Depends(get_message_service),
 ) -> MessageListResponse:
-    """Возвращает сообщения из чата"""
-    return await service.get_chat_messages(chat_id, current_user, limit, offset)
+    await service.repo.verify_chat_access(chat_id, current_user.id)
+    # 1. Получаем сообщения (+1 для проверки has_more)
+    messages = await service.repo.get_chat_messages(
+        chat_id, limit=limit, before_id=before_id, after_id=after_id
+    )
+
+    has_more = len(messages) > limit
+    if has_more:
+        messages = messages[:limit]  # Обрезаем лишнее
+
+    # Если запрашивали по after_id (в будущее, ASC), то порядок уже правильный (старые -> новые).
+    # Если запрашивали по before_id или без всего (в прошлое, DESC), то они идут (новые -> старые).
+    # Фронт обычно ожидает массив [старое ... новое].
+    # В вашем коде сервиса было messages[::-1] для offset.
+
+    # ЛОГИКА СОРТИРОВКИ ДЛЯ ОТВЕТА:
+    if not after_id:
+        # Это был запрос "самые новые" или "еще старее". Они пришли DESC.
+        # Переворачиваем, чтобы отдать [старое ... новое]
+        messages = messages[::-1]
+
+    # Маппинг в Pydantic
+    message_reads = [
+        MessageRead(
+            id=msg.id,
+            chat_id=msg.chat_id,
+            sender_id=msg.sender_id,
+            sender_username=msg.sender.username,
+            sender_display_name=msg.sender.display_name,
+            avatar_url=msg.sender.avatar_url,
+            content=msg.content,
+            is_read=msg.is_read,
+            created_at=msg.created_at,
+            message_type=msg.message_type,
+            file_url=msg.file_url,
+            file_size=msg.file_size,
+            duration=msg.duration,
+            filename=msg.filename,
+            mimetype=msg.mimetype,
+        )
+        for msg in messages
+    ]
+
+    return MessageListResponse(
+        messages=message_reads,
+        has_more=has_more,
+        offset=0,  # Deprecated, можно слать 0
+        limit=limit,
+        total=0,  # Можно не считать count(*), дорого
+    )
+
+
+@router.get("/chats/{chat_id}/messages/around", response_model=MessageListResponse)
+async def get_messages_around(
+    chat_id: int,
+    message_id: int,
+    limit: int = 50,
+    current_user: User = Depends(get_current_user),
+    service: MessageService = Depends(get_message_service),
+):
+    return await service.get_messages_around(chat_id, message_id, limit, current_user.id)
 
 
 @router.post("/chats/{chat_id}/messages/voice", response_model=MessageRead)
@@ -308,3 +380,60 @@ async def upload_file_message(
 
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
     return message
+
+
+@router.get("/search", response_model=List[MessageRead])
+async def search_messages_endpoint(
+    q: str = Query(..., min_length=1, description="Текст для поиска"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+    service: MessageService = Depends(get_message_service),
+):
+    """
+    Полнотекстовый поиск по всем сообщениям пользователя.
+    """
+    offset = (page - 1) * limit
+
+    # Получаем сырые объекты SQLAlchemy с подгруженными связями
+    messages = await service.search_messages(
+        user_id=current_user.id, query=q, limit=limit, offset=offset
+    )
+
+    # Ручной маппинг
+    message_reads = []
+    for msg in messages:
+        # Логика определения названия чата
+        chat_title = None
+        if msg.chat:
+            if msg.chat.type == "group":
+                chat_title = msg.chat.title
+            elif msg.chat.type == "direct":
+                # Для direct чата сложнее: нужно понять, кто "other user".
+                # Но msg.chat не содержит инфо о current_user.
+                # Можно пока просто вернуть None или "Direct Chat"
+                # Если очень нужно имя собеседника, то придется подгружать участников.
+                pass
+
+        message_reads.append(
+            MessageRead(
+                id=msg.id,
+                chat_id=msg.chat_id,
+                chat_title=chat_title,
+                sender_id=msg.sender_id,
+                sender_username=msg.sender.username if msg.sender else None,
+                sender_display_name=msg.sender.display_name if msg.sender else None,
+                avatar_url=msg.sender.avatar_url if msg.sender else None,
+                content=msg.content,
+                is_read=msg.is_read,
+                created_at=msg.created_at,
+                message_type=msg.message_type,
+                file_url=msg.file_url,
+                file_size=msg.file_size,
+                duration=msg.duration,
+                filename=msg.filename,
+                mimetype=msg.mimetype,
+            )
+        )
+
+    return message_reads

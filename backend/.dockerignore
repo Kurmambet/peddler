@@ -62,3 +62,8 @@ docs/
 .DS_Store
 Thumbs.db
 alembic/versions/__pycache__/
+
+
+
+
+tests/

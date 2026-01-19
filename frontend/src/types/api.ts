@@ -208,6 +208,7 @@ export interface TransferOwnershipResponse {
 export interface MessageRead {
   id: number;
   chat_id: number;
+  chat_title?: string | null;
   sender_id: number;
   sender_username: string;
   sender_display_name: string | null;

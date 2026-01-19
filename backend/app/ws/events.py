@@ -24,7 +24,7 @@ class EventType(str, Enum):
 
     # Server -> Client
     MESSAGE_CREATED = "message_created"  # новое сообщение появилось в чате
-    MESSAGE_READ = "message_read"
+    CHAT_READ = "chat_read"
     TYPING_INDICATOR = "typing_indicator"
     ERROR = "error"
     CONNECTED = "connected"
@@ -91,7 +91,7 @@ class MarkChatReadEvent(WSEvent):
 class ChatReadEvent(WSEvent):
     """Сервер отправляет это всем участникам (чтобы обновить галочки и счетчики)"""
 
-    type: EventType = EventType.MESSAGE_READ
+    type: EventType = EventType.CHAT_READ
     chat_id: int
     user_id: int  # Кто прочитал
     last_read_message_id: int  # До какого сообщения прочитал

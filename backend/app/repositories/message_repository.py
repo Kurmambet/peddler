@@ -4,7 +4,7 @@ from typing import List, Optional
 from app.core.exceptions import ChatAccessDenied
 from app.models.chat import Chat, ChatParticipant
 from app.models.message import Message, MessageType
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -60,25 +60,51 @@ class MessageRepository:
         return message
 
     async def get_chat_messages(
-        self, chat_id: int, limit: int = 50, offset: int = 0
+        self,
+        chat_id: int,
+        limit: int = 50,
+        before_id: Optional[int] = None,  # ID < before_id (СТАРЕЕ)
+        after_id: Optional[int] = None,  # ID > after_id (НОВЕЕ)
     ) -> List[Message]:
-        """Получить сообщения чата с пагинацией"""
+        # Базовый запрос
         stmt = (
             select(Message)
             .options(selectinload(Message.sender))
             .where(
-                and_(
-                    Message.chat_id == chat_id,
-                    Message.is_deleted == False,
-                )
+                Message.chat_id == chat_id,
+                Message.is_deleted.is_(False),
             )
-            .order_by(Message.created_at.desc())
-            .limit(limit + 1)  # +1 для проверки has_more
-            .offset(offset)
         )
 
+        # 1. Скролл вверх (в прошлое) ИЛИ первая загрузка
+        if before_id:
+            stmt = stmt.where(Message.id < before_id).order_by(Message.id.desc())
+
+        # 2. Скролл вниз (в будущее)
+        elif after_id:
+            stmt = stmt.where(Message.id > after_id).order_by(Message.id.asc())
+
+        # 3. Дефолт (самые новые, если нет курсоров)
+        else:
+            stmt = stmt.order_by(Message.id.desc())
+
+        # Лимит (+1 чтобы проверить has_more)
+        stmt = stmt.limit(limit + 1)
+
         result = await self.db.execute(stmt)
-        return list(result.scalars().all())
+        messages = list(result.scalars().all())
+
+        # Если был запрос "after_id" (в будущее), мы получили их ASC (101, 102...).
+        # Но фронтенд ждет сортировку всегда от старых к новым (или наоборот, как договорились).
+        # Обычно API возвращает список отсортированный по времени.
+        # В вашем текущем коде вы возвращаете DESC (новые первые) для первой страницы,
+        # и фронт их переворачивает (или нет).
+
+        # Давайте договоримся: Репозиторий возвращает как есть,
+        # но для консистентности "after_id" (ASC) лучше не трогать,
+        # а "before_id" (DESC) - это естественный порядок "от конца".
+
+        return messages
 
     async def get_message_by_id(
         self, chat_id: int, message_id: int, user_id: int
@@ -131,3 +157,92 @@ class MessageRepository:
         result = await self.db.execute(stmt)
         await self.db.commit()
         return result.rowcount
+
+    async def search_messages(
+        self, user_id: int, query_str: str, limit: int = 20, offset: int = 0
+    ) -> list[Message]:
+        """
+        Поиск сообщений во всех чатах, где состоит пользователь.
+        Использует websearch_to_tsquery для обработки запроса.
+        """
+
+        # 1. Формируем tsquery для двух языков
+        # websearch_to_tsquery — безопасная функция, она сама выкинет спецсимволы,
+        # обработает кавычки и т.д.
+        # Мы ищем: (query в русском) ИЛИ (query в английском)
+        search_query = func.websearch_to_tsquery("russian", query_str).op("||")(
+            func.websearch_to_tsquery("english", query_str)
+        )
+        # оператор | для tsquery означает OR.
+
+        stmt = (
+            select(Message)
+            # !!! 1. Подгружаем связанные сущности (Eager Loading) !!!
+            .options(
+                selectinload(Message.sender),  # Чтобы получить username, display_name
+                selectinload(Message.chat),  # Чтобы получить title
+            )
+            # .join(Message.chat) - этот join уже не обязателен для выборки данных,
+            # но может быть нужен для фильтрации, если бы фильтровали по свойствам чата.
+            # В данном случае join с ChatParticipant достаточен для безопасности.
+            .join(ChatParticipant, Message.chat_id == ChatParticipant.chat_id)
+            .where(
+                ChatParticipant.user_id == user_id,
+                Message.is_deleted.is_(False),
+                Message.search_vector.op("@@")(search_query),
+            )
+            .order_by(
+                func.ts_rank(Message.search_vector, search_query).desc(), Message.created_at.desc()
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_messages_around(
+        self, chat_id: int, message_id: int, limit: int = 50
+    ) -> list[Message]:
+        """
+        Возвращает сообщения вокруг указанного ID.
+        Примерно limit/2 до и limit/2 после.
+        """
+        half_limit = limit // 2
+
+        # 1. Сообщения "старее или само сообщение" (включая self)
+        stmt_older = (
+            select(Message)
+            .options(selectinload(Message.sender))
+            .where(
+                Message.chat_id == chat_id,
+                Message.id <= message_id,
+                Message.is_deleted.is_(False),
+            )
+            .order_by(Message.id.desc())
+            .limit(half_limit + 1)  # +1 на всякий случай для центровки
+        )
+
+        # 2. Сообщения "новее"
+        stmt_newer = (
+            select(Message)
+            .options(selectinload(Message.sender))
+            .where(
+                Message.chat_id == chat_id, Message.id > message_id, Message.is_deleted.is_(False)
+            )
+            .order_by(Message.id.asc())
+            .limit(half_limit)
+        )
+
+        # Выполняем
+        res_older = await self.db.execute(stmt_older)
+        res_newer = await self.db.execute(stmt_newer)
+
+        older_msgs = res_older.scalars().all()  # [target, target-1, target-2...]
+        newer_msgs = res_newer.scalars().all()  # [target+1, target+2...]
+
+        # Объединяем и сортируем правильно (от старых к новым)
+        # older_msgs нужно перевернуть, т.к. они были DESC
+        all_messages = sorted(list(older_msgs) + list(newer_msgs), key=lambda x: x.id)
+
+        return all_messages
