@@ -25,7 +25,7 @@
       :class="isOwn ? 'text-white' : 'text-blue-500'"
       fill="none"
       stroke="currentColor"
-      viewBox="0 0 24 24"
+      viewBox="3 0 24 25"
     >
       <g>
         <path
@@ -38,7 +38,7 @@
           stroke-linecap="round"
           stroke-linejoin="round"
           stroke-width="2.5"
-          d="M8 13l4 4L22 7"
+          d="M12 13l4 4L26 7"
           opacity="0.8"
         />
       </g>
