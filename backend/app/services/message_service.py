@@ -1,5 +1,7 @@
 # app/services/message_service.py
-from app.models.message import MessageType
+from typing import List
+
+from app.models.message import Message, MessageType
 from app.models.user import User
 from app.repositories.message_repository import MessageRepository
 from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
@@ -156,3 +158,7 @@ class MessageService:
             for msg in messages
         ]
         return MessageListResponse(messages=message_reads, has_more=True, next_offset=0)
+
+    async def search_chat_messages(self, chat_id: int, query: str, user_id: int) -> List[Message]:
+        await self.repo.verify_chat_access(chat_id, user_id)
+        return await self.repo.search_chat_messages(chat_id, query)

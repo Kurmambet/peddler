@@ -89,23 +89,15 @@ async def get_chat_messages(
     messages = await service.repo.get_chat_messages(
         chat_id, limit=limit, before_id=before_id, after_id=after_id
     )
-
     has_more = len(messages) > limit
     if has_more:
-        messages = messages[:limit]  # Обрезаем лишнее
+        messages = messages[:limit]
 
-    # Если запрашивали по after_id (в будущее, ASC), то порядок уже правильный (старые -> новые).
-    # Если запрашивали по before_id или без всего (в прошлое, DESC), то они идут (новые -> старые).
-    # Фронт обычно ожидает массив [старое ... новое].
-    # В вашем коде сервиса было messages[::-1] для offset.
-
-    # ЛОГИКА СОРТИРОВКИ ДЛЯ ОТВЕТА:
     if not after_id:
         # Это был запрос "самые новые" или "еще старее". Они пришли DESC.
         # Переворачиваем, чтобы отдать [старое ... новое]
         messages = messages[::-1]
 
-    # Маппинг в Pydantic
     message_reads = [
         MessageRead(
             id=msg.id,
@@ -132,7 +124,7 @@ async def get_chat_messages(
         has_more=has_more,
         offset=0,  # Deprecated, можно слать 0
         limit=limit,
-        total=0,  # Можно не считать count(*), дорого
+        total=0,
     )
 
 
@@ -380,6 +372,31 @@ async def upload_file_message(
 
     await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
     return message
+
+
+@router.get("/chats/{chat_id}/messages/search", response_model=List[MessageRead])
+async def search_messages_in_chat(
+    chat_id: int,
+    q: str = Query(..., min_length=1),
+    current_user: User = Depends(get_current_user),
+    service: MessageService = Depends(get_message_service),
+):
+    """Поиск сообщений внутри конкретного чата"""
+    messages = await service.search_chat_messages(chat_id, q, current_user.id)
+
+    # Маппинг в MessageRead (упрощенный, без лишних join-ов если они не нужны для навигации)
+    return [
+        MessageRead(
+            id=msg.id,
+            chat_id=msg.chat_id,
+            sender_id=msg.sender_id,
+            content=msg.content,
+            created_at=msg.created_at,
+            message_type=msg.message_type,
+            is_read=msg.is_read,
+        )
+        for msg in messages
+    ]
 
 
 @router.get("/search", response_model=List[MessageRead])

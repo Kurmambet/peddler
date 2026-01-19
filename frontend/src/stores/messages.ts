@@ -25,6 +25,13 @@ export const useMessagesStore = defineStore("messages", () => {
   // Key: chatId, Value: Array of pending messages
   const pendingMessages = ref<Record<number, MessageRead[]>>({});
 
+  // === STATE ПОИСКА внутри чата ===
+  const isSearchingInfoChat = ref(false); // Открыта ли панель
+  const searchQuery = ref("");
+  const searchResults = ref<MessageRead[]>([]);
+  const currentMatchIndex = ref(-1); // Индекс текущего выбранного сообщения в массиве searchResults
+  // === STATE ПОИСКА внутри чата ===
+
   const getChatMessages = (chatId: number): MessageRead[] => {
     return messagesByChat.value.get(chatId) || [];
   };
@@ -36,6 +43,64 @@ export const useMessagesStore = defineStore("messages", () => {
   const getHasMoreNewer = (chatId: number): boolean => {
     return hasMoreNewer.value.get(chatId) ?? false;
   };
+
+  // v=== ДЛЯ ПОИСКА внутри чата ===v
+  const startSearch = async (chatId: number, query: string) => {
+    searchQuery.value = query;
+    currentMatchIndex.value = -1;
+
+    if (!query.trim()) {
+      searchResults.value = [];
+      return;
+    }
+
+    try {
+      const results = await messagesAPI.searchInChat(chatId, query);
+      searchResults.value = results;
+
+      // Если нашли что-то, переходим к ПОСЛЕДНЕМУ (самому новому) совпадению, как в Telegram
+      if (results.length > 0) {
+        currentMatchIndex.value = results.length - 1;
+        await jumpToSearchMatch(chatId);
+      }
+    } catch (e) {
+      console.error("In-chat search failed", e);
+    }
+  };
+
+  const nextMatch = async (chatId: number) => {
+    if (searchResults.value.length === 0) return;
+    // Идем "вверх" (к более старым), значит уменьшаем индекс
+    if (currentMatchIndex.value > 0) {
+      currentMatchIndex.value--;
+      await jumpToSearchMatch(chatId);
+    }
+  };
+
+  const prevMatch = async (chatId: number) => {
+    if (searchResults.value.length === 0) return;
+    // Идем "вниз" (к более новым), значит увеличиваем индекс
+    if (currentMatchIndex.value < searchResults.value.length - 1) {
+      currentMatchIndex.value++;
+      await jumpToSearchMatch(chatId);
+    }
+  };
+
+  const jumpToSearchMatch = async (chatId: number) => {
+    const msg = searchResults.value[currentMatchIndex.value];
+    if (!msg) return;
+
+    // Используем уже существующий jumpToMessage, он сам подгрузит контекст
+    await jumpToMessage(chatId, msg.id);
+  };
+
+  const clearSearch = () => {
+    isSearchingInfoChat.value = false;
+    searchQuery.value = "";
+    searchResults.value = [];
+    currentMatchIndex.value = -1;
+  };
+  // ^=== ДЛЯ ПОИСКА внутри чата ===^
 
   // ==========================================
   // ОБЫЧНЫЙ ВХОД В ЧАТ (последние сообщения)
@@ -62,9 +127,6 @@ export const useMessagesStore = defineStore("messages", () => {
     }
   };
 
-  // ==========================================
-  // JUMP TO MESSAGE (Прыжок в историю)
-  // ==========================================
   const jumpToMessage = async (
     chatId: number,
     messageId: number,
@@ -506,5 +568,15 @@ export const useMessagesStore = defineStore("messages", () => {
     sendFileOptimistic,
     sendVoiceOptimistic,
     sendVideoNoteOptimistic,
+
+    // для поиска
+    isSearchingInfoChat,
+    searchQuery,
+    searchResults,
+    currentMatchIndex,
+    startSearch,
+    nextMatch,
+    prevMatch,
+    clearSearch,
   };
 });

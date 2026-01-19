@@ -29,7 +29,7 @@ SKIP_CONTENT_DIRS = {
     "video_notes",
     "voice",
     "files",
-    "backend",
+    # "backend",
     # "backend/app/models",
     # "core",
     # "utils",

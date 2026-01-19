@@ -153,8 +153,6 @@
 <script setup lang="ts">
 import { authAPI } from "@/api/auth";
 import { messagesAPI } from "@/api/messages";
-import { useChatsStore } from "@/stores/chats";
-import { useMessagesStore } from "@/stores/messages";
 import type { MessageRead, UserRead } from "@/types/api";
 import { useDebounceFn } from "@vueuse/core";
 import { computed, nextTick, ref, watch } from "vue";
@@ -162,14 +160,10 @@ import { useRouter } from "vue-router";
 import Avatar from "../ui/Avatar.vue";
 import UserProfileModal from "../user/UserProfileModal.vue";
 
-const chatsStore = useChatsStore();
-const messagesStore = useMessagesStore();
-
 const props = defineProps<{ isOpen: boolean }>();
 const emit = defineEmits(["close"]);
 
 const router = useRouter();
-// const chatsStore = useChatsStore();
 const searchInput = ref<HTMLInputElement | null>(null);
 
 const query = ref("");
@@ -192,7 +186,7 @@ watch(
     if (newVal) {
       nextTick(() => searchInput.value?.focus());
     } else {
-      // Очистка при закрытии (опционально)
+      // Очистка при закрытии
       query.value = "";
       users.value = [];
       messages.value = [];
@@ -232,28 +226,7 @@ const handleUserClick = (user: any) => {
   showProfileModal.value = true;
 };
 
-// const handleMessageClick = async (msg: MessageRead) => {
-//   // 1. Выбираем чат (чтобы UI переключился)
-//   router.push(`/chat/${msg.chat_id}`);
-
-//   // 2. Выполняем прыжок (загрузку сообщений вокруг)
-//   // Мы делаем это здесь, чтобы данные начали грузиться еще до анимации закрытия шторки
-//   await messagesStore.jumpToMessage(msg.chat_id, msg.id);
-
-//   // 3. Закрываем поиск
-//   emit("close");
-
-//   // 4. Переходим на страницу (если мы не там) с параметром highlight
-//   // Мы передаем highlight в query, чтобы ChatPage передал его пропом в MessageList
-//   router.push({
-//     path: `/chat/${msg.chat_id}`,
-//     query: { highlight: msg.id },
-//   });
-// };
-
 const handleMessageClick = async (msg: MessageRead) => {
-  // Don't call router.push twice or jumpToMessage here.
-  // Just navigate with the query param.
   emit("close");
   router.push({
     path: `/chat/${msg.chat_id}`,
@@ -268,7 +241,7 @@ const highlightText = (text: string, q: string) => {
   const re = new RegExp(`(${q})`, "gi");
   return text.replace(
     re,
-    '<mark class="bg-yellow-200 text-black rounded-sm">$1</mark>'
+    '<mark class="bg-gray-300 text-black rounded-sm">$1</mark>'
   );
 };
 </script>

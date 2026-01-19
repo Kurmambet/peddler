@@ -84,7 +84,7 @@
               class="flex animate-slide-up w-full transition-colors duration-500 rounded-lg"
               :class="{
                 'justify-end': isOwn(msg),
-                'bg-gray-800': msg.id === highlightMessageId,
+                'bg-gray-800': msg.id === highlightId,
               }"
             >
               <!-- Avatar for incoming messages -->
@@ -276,18 +276,16 @@
                     <p
                       v-if="msg.content"
                       class="mt-1 text-sm whitespace-pre-wrap break-words px-1"
-                    >
-                      {{ msg.content }}
-                    </p>
+                      v-html="formatMessageContent(msg.content)"
+                    ></p>
                   </div>
 
                   <!-- Текст (дефолт) -->
                   <p
                     v-else
                     class="text-sm break-all whitespace-pre-wrap leading-relaxed"
-                  >
-                    {{ msg.content }}
-                  </p>
+                    v-html="formatMessageContent(msg.content)"
+                  ></p>
 
                   <!-- Timestamp + Read status -->
                   <div
@@ -356,6 +354,19 @@ const { loadMoreMessages, loadNewerMessages } = messagesStore;
 
 // === Props ===
 const props = defineProps<{ highlightMessageId?: number }>();
+
+const highlightId = computed(() => {
+  // Приоритет: проп (из URL) -> или текущее найденное сообщение в поиске
+  if (props.highlightMessageId) return props.highlightMessageId;
+
+  if (
+    messagesStore.isSearchingInfoChat &&
+    messagesStore.currentMatchIndex !== -1
+  ) {
+    return messagesStore.searchResults[messagesStore.currentMatchIndex]?.id;
+  }
+  return undefined;
+});
 
 // === Refs ===
 const scrollContainer = ref<HTMLElement | null>(null);
@@ -458,16 +469,6 @@ const checkAndMarkRead = () => {
   }
 };
 
-watch(chatId, () => {
-  markedAsReadMessages.value.clear();
-});
-
-watch(isConnected, (connected) => {
-  if (connected) {
-    checkAndMarkRead();
-  }
-});
-
 // Проверка: находится ли юзер внизу чата
 const isNearBottom = (): boolean => {
   const container = scrollContainer.value;
@@ -485,17 +486,15 @@ const initializeScrollPosition = async () => {
 
   // FIX: If highlight is requested, NEVER scroll to bottom automatically.
   // Wait for the message to appear or do nothing.
-  if (props.highlightMessageId) {
-    console.log(
-      `[Scroll] Initializing with highlight ${props.highlightMessageId}`
-    );
+  if (highlightId.value) {
+    console.log(`[Scroll] Initializing with highlight ${highlightId.value}`);
     // Check if message exists in current list
     const exists = currentMessages.value.some(
-      (m) => m.id === props.highlightMessageId
+      (m) => m.id === highlightId.value
     );
 
     if (exists) {
-      scrollToMessage(props.highlightMessageId);
+      scrollToMessage(highlightId.value);
     } else {
       console.warn(
         "[Scroll] Highlight ID not found in current messages. Waiting..."
@@ -602,6 +601,34 @@ const handleScroll = () => {
   }
 };
 
+// Функция подсветки
+const formatMessageContent = (text: string) => {
+  if (!text) return "";
+
+  // Эскейпинг HTML, чтобы не было XSS
+  let safeText = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+  const query = messagesStore.searchQuery;
+  if (!messagesStore.isSearchingInfoChat || !query) {
+    return safeText;
+  }
+
+  // Подсветка (case-insensitive)
+  const re = new RegExp(
+    `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+    "gi"
+  );
+  return safeText.replace(
+    re,
+    '<mark class="bg-gray-300 text-black rounded-sm">$1</mark>'
+  );
+};
+
 // === Watchers ===
 
 // 1. Инициализация при завершении загрузки
@@ -613,7 +640,7 @@ watch(isLoading, async (loading) => {
 
 // 2. Изменение highlight ID на лету (навигация из поиска)
 watch(
-  () => props.highlightMessageId,
+  () => highlightId.value,
   async (newId) => {
     if (newId) {
       await nextTick();
@@ -654,7 +681,7 @@ watch(
       isMyMessage || isOptimistic || (isNearBottom() && isAtLiveBottom);
 
     // Но НЕ скроллим, если у нас активен highlight (мы смотрим конкретное сообщение)
-    if (shouldScroll && !props.highlightMessageId) {
+    if (shouldScroll && !highlightId.value) {
       scrollToBottom("smooth");
     }
 
@@ -667,9 +694,17 @@ watch(
   }
 );
 
-// === Lifecycle ===
+watch(chatId, () => {
+  markedAsReadMessages.value.clear();
+});
+
+watch(isConnected, (connected) => {
+  if (connected) {
+    checkAndMarkRead();
+  }
+});
+
 onMounted(() => {
-  // Если компонент смонтировался, а данные уже есть (например, переход назад)
   if (!isLoading.value && currentMessages.value.length > 0) {
     initializeScrollPosition();
   }
