@@ -45,6 +45,13 @@
             View Profile
           </button>
           <button
+            @click="emitAction('search-chat')"
+            class="w-full px-4 py-2.5 text-left text-sm text-app-text hover:bg-app-hover transition-colors flex items-center gap-3"
+          >
+            <span class="w-5 text-center">🔍</span>
+            Search
+          </button>
+          <button
             @click="emitAction('delete-chat')"
             class="w-full px-4 py-2.5 text-left text-sm text-app-error hover:bg-app-error/10 transition-colors flex items-center gap-3"
           >
@@ -62,7 +69,13 @@
             <span class="w-5 text-center">ℹ️</span>
             Group Info
           </button>
-
+          <button
+            @click="emitAction('search-chat')"
+            class="w-full px-4 py-2.5 text-left text-sm text-app-text hover:bg-app-hover transition-colors flex items-center gap-3"
+          >
+            <span class="w-5 text-center">🔍</span>
+            Search
+          </button>
           <button
             @click="emitAction('toggle-mute')"
             class="w-full px-4 py-2.5 text-left text-sm text-app-text hover:bg-app-hover transition-colors flex items-center gap-3"
@@ -102,6 +115,7 @@ const emit = defineEmits<{
   "view-info": [];
   "toggle-mute": [];
   "leave-group": [];
+  "search-chat": [];
 }>();
 
 const isOpen = ref(false);

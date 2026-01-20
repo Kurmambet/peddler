@@ -246,3 +246,32 @@ class MessageRepository:
         all_messages = sorted(list(older_msgs) + list(newer_msgs), key=lambda x: x.id)
 
         return all_messages
+
+    async def search_chat_messages(
+        self, chat_id: int, query_str: str, limit: int = 1000
+    ) -> List[Message]:
+        """
+        Поиск внутри конкретного чата.
+        Возвращаем список сообщений, отсортированных по дате (старые -> новые),
+        чтобы фронтенд мог удобно навигироваться.
+        """
+        # Формируем поисковый запрос (так же, как в глобальном поиске)
+        search_query = func.websearch_to_tsquery("russian", query_str).op("||")(
+            func.websearch_to_tsquery("english", query_str)
+        )
+
+        stmt = (
+            select(Message)
+            # Нам нужны только ID и created_at для навигации, но для простоты
+            # вернем объекты (можно оптимизировать через load_only, если сообщений тысячи)
+            .where(
+                Message.chat_id == chat_id,
+                Message.is_deleted.is_(False),
+                Message.search_vector.op("@@")(search_query),
+            )
+            .order_by(Message.created_at.asc())  # Важно: хронологический порядок
+            .limit(limit)
+        )
+
+        result = await self.db.execute(stmt)
+        return result.scalars().all()

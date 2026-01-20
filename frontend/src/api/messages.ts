@@ -128,4 +128,12 @@ export const messagesAPI = {
     );
     return data;
   },
+
+  async searchInChat(chatId: number, query: string): Promise<MessageRead[]> {
+    const { data } = await apiClient.get<MessageRead[]>(
+      `/chats/${chatId}/messages/search`,
+      { params: { q: query } }
+    );
+    return data;
+  },
 };
