@@ -14,6 +14,7 @@ docker-compose -f docker-compose.dev.yml down
 
 docker-compose -f docker-compose.dev.yml build --no-cache backend
 
+
 ```
 
 ```bash
@@ -110,4 +111,9 @@ alembic upgrade head
 # 3. Выйди
 exit
 
+```
+
+```
+# Проверить что worker подключился
+docker exec peddler-celery-worker-dev celery -A app.celery_app inspect active
 ```

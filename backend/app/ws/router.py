@@ -300,8 +300,8 @@ async def status_websocket_endpoint(websocket: WebSocket):
                     # Просто обновляем Redis ключ. Никакой БД.
                     await pubsub_manager.update_user_heartbeat(user.id)
 
-                elif data == "ping":
-                    await websocket.send_text("pong")
+                # elif data == "ping":
+                #     await websocket.send_text("pong")
 
             except WebSocketDisconnect:
                 break

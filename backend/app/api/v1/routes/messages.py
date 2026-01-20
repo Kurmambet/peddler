@@ -1,7 +1,6 @@
 # app/api/v1/routes/messages.py
 import logging
 import os
-import subprocess
 import uuid
 from typing import List, Optional
 
@@ -12,11 +11,9 @@ from app.models.message import MessageType
 from app.models.user import User
 from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
 from app.services.message_service import MessageService
+from app.tasks.media_tasks import process_video_note_and_publish_task
+from app.tasks.message_tasks import publish_to_chat_task
 from app.ws.events import MessageCreatedEvent
-from app.ws.globals import pubsub_manager
-
-# from app.ws.manager import ConnectionManager
-# from app.ws.pubsub import RedisPubSubManager
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -71,7 +68,8 @@ async def send_message(
         message_type=message.message_type,
     )
 
-    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    publish_to_chat_task.delay(chat_id, message_event.model_dump_json())
     return message_resp
 
 
@@ -200,50 +198,10 @@ async def upload_voice_message(
     logger.info(
         f"[Voice] Publishing event to chat {chat_id}: message_id={message.id}, file_url={message.file_url}"
     )
-    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    publish_to_chat_task.delay(chat_id, message_event.model_dump_json())
     logger.info("[Voice] Event published successfully")
     return message
-
-
-def fix_webm_container(filepath: str):
-    """
-    Перепаковывает WebM контейнер через FFmpeg для исправления метаданных и таймстемпов.
-    Использует stream copy, поэтому это очень быстро и не теряет качество.
-    """
-    tmp_path = f"{filepath}.tmp.webm"
-    try:
-        # Команда ffmpeg:
-        # -i input - входной файл
-        # -c copy - копировать видео и аудио потоки БЕЗ перекодирования
-        # -movflags +faststart - оптимизация для веб-воспроизведения (метаданные в начало)
-        # -y - перезаписать output
-        command = [
-            "ffmpeg",
-            "-v",
-            "error",  # Меньше логов
-            "-i",
-            filepath,
-            "-c",
-            "copy",  # Просто копируем потоки (решает 99% проблем совместимости FF->Chrome)
-            "-movflags",
-            "+faststart",
-            "-y",
-            tmp_path,
-        ]
-
-        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-
-        # Если всё ок, заменяем оригинал
-        os.replace(tmp_path, filepath)
-        logger.info(f"Successfully fixed WebM container: {filepath}")
-
-    except subprocess.CalledProcessError as e:
-        logger.error(f"FFmpeg failed: {e.stderr.decode()}")
-        # Если упало, удаляем времянку, оставляем как есть (лучше кривой файл, чем никакого)
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-    except Exception as ex:
-        logger.error(f"FFmpeg generic error: {ex}")
 
 
 @router.post("/chats/{chat_id}/messages/video_note", response_model=MessageRead)
@@ -268,10 +226,6 @@ async def upload_video_note(
     async with aiofiles.open(filepath, "wb") as f:
         await f.write(content)
 
-    # Это синхронная операция, но для -c copy она занимает миллисекунды.
-    # Для high-load это выносят в Celery/BackgroundTasks, но для мессенджера пока ок.
-    fix_webm_container(filepath)
-
     public_url = f"/static/video_notes/{chat_id}/{new_filename}"
 
     msg_create = MessageCreate(
@@ -279,7 +233,7 @@ async def upload_video_note(
         chat_id=chat_id,
         message_type=MessageType.VIDEO_NOTE,
         file_url=public_url,
-        file_size=len(content),  # Размер может чуть измениться, но не критично
+        file_size=len(content),
         duration=duration,
     )
 
@@ -303,8 +257,10 @@ async def upload_video_note(
         mimetype=message.mimetype,
     )
 
-    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
-    return message
+    # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    # publish_to_chat_task.delay(chat_id, message_event.model_dump_json())
+    process_video_note_and_publish_task.delay(filepath, chat_id, message_event.model_dump_json())
+    return message  # Возвращаем ответ отправителю (у него optimistic UI, он сообщение уже видит)
 
 
 @router.post("/chats/{chat_id}/messages/file", response_model=MessageRead)
@@ -370,7 +326,8 @@ async def upload_file_message(
         mimetype=message.mimetype,
     )
 
-    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    publish_to_chat_task.delay(chat_id, message_event.model_dump_json())
     return message
 
 

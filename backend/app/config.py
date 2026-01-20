@@ -13,12 +13,6 @@ ENV_FILE = BASE_DIR / ".env"
 
 
 class Settings(BaseSettings):
-    """
-    Конфигурация приложения.
-    Читает переменные из .env файла и environment.
-    """
-
-    # Pydantic v2: model_config вместо class Config
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
@@ -97,6 +91,11 @@ class Settings(BaseSettings):
     # ========== REDIS ==========
     REDIS_URL: str = "redis://localhost:6379"
     USE_REDIS_PUBSUB: bool = True
+
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
+    CELERY_TASK_TRACK_STARTED: bool = True
+    CELERY_TASK_TIME_LIMIT: int = 300  # 5 минут
 
     # ========== LOGGING ==========
     LOG_LEVEL: str = "INFO"
