@@ -278,7 +278,7 @@ const debouncedSearch = useDebounceFn(async () => {
     messagesStore.searchResults = [];
     messagesStore.currentMatchIndex = -1;
   }
-}, 500);
+}, 1500);
 // --- Handlers ---
 
 const handleTitleClick = () => {

@@ -605,7 +605,7 @@ const handleScroll = () => {
 const formatMessageContent = (text: string) => {
   if (!text) return "";
 
-  // Эскейпинг HTML, чтобы не было XSS
+  // 1. Эскейпинг HTML (защита от XSS)
   let safeText = text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -613,20 +613,41 @@ const formatMessageContent = (text: string) => {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 
-  const query = messagesStore.searchQuery;
+  const query = messagesStore.searchQuery.trim();
   if (!messagesStore.isSearchingInfoChat || !query) {
     return safeText;
   }
 
-  // Подсветка (case-insensitive)
-  const re = new RegExp(
-    `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-    "gi"
-  );
-  return safeText.replace(
-    re,
-    '<mark class="bg-gray-300 text-black rounded-sm">$1</mark>'
-  );
+  // 2. Логика обработки запроса
+  const isPhrase = query.startsWith('"') && query.endsWith('"');
+
+  if (isPhrase) {
+    // Если в кавычках — подсвечиваем как целую фразу
+    const phrase = query.slice(1, -1);
+    const escapedPhrase = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const re = new RegExp(`(${escapedPhrase})`, "gi");
+    return safeText.replace(
+      re,
+      '<mark class="bg-gray-300 text-black rounded-sm">$1</mark>'
+    );
+  } else {
+    // 3. Если без кавычек — разбиваем на слова (как Postgres FTS)
+    // Фильтруем слишком короткие слова (меньше 2 символов), чтобы не подсвечивать каждую букву "a", "i"
+    const words = query.split(/\s+/).filter((w) => w.length >= 2);
+
+    if (words.length === 0) return safeText;
+
+    // Создаем одно регулярное выражение типа: \b(word1|word2|word3)\b
+    const escapedWords = words
+      .map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|");
+    const re = new RegExp(`\\b(${escapedWords})\\b`, "gi");
+
+    return safeText.replace(
+      re,
+      '<mark class="bg-gray-300 text-black rounded-sm">$1</mark>'
+    );
+  }
 };
 
 // === Watchers ===
