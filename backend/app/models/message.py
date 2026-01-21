@@ -13,6 +13,8 @@ class MessageType(str, PyEnum):
     VOICE = "voice"
     VIDEO_NOTE = "video_note"
     FILE = "file"
+    IMAGE = "image"
+    VIDEO = "video"
 
 
 class Message(BaseModel):
@@ -43,10 +45,20 @@ class Message(BaseModel):
     )
     file_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)  # байты
-    duration: Mapped[int | None] = mapped_column(Integer, nullable=True)  # секунды
+    duration: Mapped[int | None] = mapped_column(Integer, nullable=True)  # секунды. Для видео/аудио
 
     filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mimetype: Mapped[str | None] = mapped_column(String(100), nullable=True)
+
+    # Специфика Медиа (Фото/Видео/Кружочки)
+    # Храним превью (размытую или маленькую картинку)
+    preview_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    # Размеры - критично для UI, чтобы чат не прыгал при загрузке картинок
+    media_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    media_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # is_processed: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
 
     # TSVECTOR не поддерживается "автоматически" на уровне ORM для генерации значений в Python,
     # но оно нужно для схемы БД.

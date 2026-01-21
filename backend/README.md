@@ -31,6 +31,7 @@ taskkill /PID 8200 /F
 # Автогенерация миграции на основе моделей
 alembic revision --autogenerate -m "Initial migration"
 alembic revision --autogenerate -m "add_full_text_search"
+alembic revision --autogenerate -m "add media fields"
 
 # Применить миграцию
 alembic upgrade head
