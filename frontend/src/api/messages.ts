@@ -108,6 +108,38 @@ export const messagesAPI = {
     );
   },
 
+  sendMedia(
+    chatId: number,
+    file: File,
+    caption?: string,
+    width?: number,
+    height?: number,
+    onProgress?: (progress: number) => void
+  ) {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (caption) formData.append("caption", caption);
+    if (width) formData.append("client_width", width.toString());
+    if (height) formData.append("client_height", height.toString());
+
+    return apiClient.post<MessageRead>(
+      `/chats/${chatId}/messages/media`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total && onProgress) {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(percent);
+          }
+        },
+        timeout: 0,
+      }
+    );
+  },
+
   async search(query: string, limit = 50): Promise<MessageRead[]> {
     const { data } = await apiClient.get<MessageRead[]>("/search", {
       params: { q: query, limit },

@@ -354,6 +354,65 @@ export const useMessagesStore = defineStore("messages", () => {
     }
   };
 
+  // Хелпер для получения размеров картинки/видео
+  const getMediaDimensions = (
+    file: File
+  ): Promise<{ w: number; h: number }> => {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+
+      if (file.type.startsWith("image/")) {
+        const img = new Image();
+        // Важно: назначить обработчики ДО src
+        img.onload = () => {
+          console.log(`[Image] Loaded dimensions: ${img.width}x${img.height}`);
+          resolve({ w: img.width, h: img.height });
+          URL.revokeObjectURL(url);
+        };
+        img.onerror = (e) => {
+          console.error("[Image] Error loading dimensions", e);
+          resolve({ w: 0, h: 0 });
+          URL.revokeObjectURL(url);
+        };
+        img.src = url;
+      } else if (file.type.startsWith("video/")) {
+        const video = document.createElement("video");
+        video.preload = "metadata";
+        video.muted = true; // На всякий случай
+        video.playsInline = true; // Для iOS
+
+        // Хак для некоторых браузеров - запустить загрузку
+        video.onloadedmetadata = () => {
+          console.log(
+            `[Video] Loaded metadata: ${video.videoWidth}x${video.videoHeight}`
+          );
+          // Проверка на случай 0 (иногда бывает на старте)
+          if (video.videoWidth > 0 && video.videoHeight > 0) {
+            resolve({ w: video.videoWidth, h: video.videoHeight });
+            URL.revokeObjectURL(url);
+          } else {
+            // Если метаданные "загрузились", но размеры 0 (странно)
+            resolve({ w: 0, h: 0 });
+            URL.revokeObjectURL(url);
+          }
+        };
+
+        video.onerror = (e) => {
+          console.error("[Video] Error loading metadata", e);
+          resolve({ w: 0, h: 0 });
+          URL.revokeObjectURL(url);
+        };
+
+        video.src = url;
+        // Принудительно пнуть (некоторые браузеры не грузят метаданные для элементов вне DOM без этого)
+        video.load();
+        // А для некоторых видео нужно попытаться "проиграть" кадр, но load() обычно хватает
+      } else {
+        resolve({ w: 0, h: 0 });
+      }
+    });
+  };
+
   // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИЯ ДЛЯ ОПТИМИСТИЧНОГО UI ===
   const createOptimisticMessage = (
     chatId: number,
@@ -482,6 +541,18 @@ export const useMessagesStore = defineStore("messages", () => {
     const authStore = useAuthStore();
     const tempId = -Date.now();
 
+    const isImage = file.type.startsWith("image/");
+    const isVideo = file.type.startsWith("video/");
+
+    // Определяем тип сообщения
+    let msgType = MessageType.FILE;
+    if (isImage) msgType = MessageType.IMAGE;
+    if (isVideo) msgType = MessageType.VIDEO;
+
+    // Вычисляем размеры (асинхронно, но быстро)
+    const { w, h } =
+      isImage || isVideo ? await getMediaDimensions(file) : { w: 0, h: 0 };
+
     const optimisticMsg: MessageRead = {
       id: tempId,
       chat_id: chatId,
@@ -493,13 +564,17 @@ export const useMessagesStore = defineStore("messages", () => {
       is_read: false,
       created_at: new Date().toISOString(),
       updated_at: "", // TODO
-      message_type: "file" as any,
+      message_type: msgType, // IMAGE / VIDEO / FILE
 
       // Файловые данные
       filename: file.name,
       file_size: file.size,
       mimetype: file.type,
-      file_url: "#",
+      file_url: URL.createObjectURL(file), // Локальный URL для превью "#"
+
+      media_width: w || undefined,
+      media_height: h || undefined,
+      preview_url: null, // Локально используем file_url как превью
 
       // Локальные флаги
       isLocal: true,
@@ -508,7 +583,7 @@ export const useMessagesStore = defineStore("messages", () => {
       isError: false,
     };
 
-    optimisticMsg.content = caption;
+    // optimisticMsg.content = caption;
 
     if (!pendingMessages.value[chatId]) {
       pendingMessages.value[chatId] = [];
@@ -516,14 +591,25 @@ export const useMessagesStore = defineStore("messages", () => {
     pendingMessages.value[chatId].push(optimisticMsg);
 
     try {
-      // Запускаем реальную отправку
-      await messagesAPI.sendFile(chatId, file, caption, (progress) => {
-        // Обновляем прогресс реактивно
-        const msg = pendingMessages.value[chatId]?.find((m) => m.id === tempId);
-        if (msg) {
-          msg.uploadProgress = progress;
-        }
-      });
+      // ВЫБОР ЭНДПОИНТА
+      if (isImage || isVideo) {
+        // Шлем на новый эндпоинт /media
+        await messagesAPI.sendMedia(chatId, file, caption, w, h, (p) => {
+          const msg = pendingMessages.value[chatId]?.find(
+            (m) => m.id === tempId
+          );
+          if (msg) msg.uploadProgress = p;
+        });
+      } else {
+        // Шлем как обычный файл (старый эндпоинт)
+        await messagesAPI.sendFile(chatId, file, caption, (p) => {
+          const msg = pendingMessages.value[chatId]?.find(
+            (m) => m.id === tempId
+          );
+          if (msg) msg.uploadProgress = p;
+        });
+      }
+
       removePendingMessage(chatId, tempId);
       if (wasInHistory) await checkAndResetToLive(chatId);
     } catch (err) {

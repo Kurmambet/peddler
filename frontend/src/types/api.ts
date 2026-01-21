@@ -5,6 +5,8 @@ export enum MessageType {
   VOICE = "voice",
   VIDEO_NOTE = "video_note",
   FILE = "file",
+  IMAGE = "image",
+  VIDEO = "video",
 }
 
 // ============================================================
@@ -224,6 +226,11 @@ export interface MessageRead {
   duration?: number | null;
   filename?: string | null;
   mimetype?: string | null;
+
+  // поля для медиа
+  preview_url?: string | null;
+  media_width?: number | null;
+  media_height?: number | null;
 
   isLocal?: boolean; // Флаг, что это локальное сообщение
   isUploading?: boolean; // Флаг, что идет загрузка

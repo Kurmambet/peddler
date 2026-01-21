@@ -36,6 +36,10 @@ export interface MessageCreatedEvent extends BaseEvent {
 
   filename?: string | null;
   mimetype?: string | null;
+
+  preview_url?: string | null;
+  media_width?: number | null;
+  media_height?: number | null;
 }
 
 export interface ChatReadEvent extends BaseEvent {
