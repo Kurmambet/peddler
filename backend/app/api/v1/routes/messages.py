@@ -48,30 +48,38 @@ async def send_message(
 ) -> MessageRead:
     """Отправляет текстовое сообщение в чат"""
     # return await service.send_message(chat_id, msg_in, current_user)
-    message = await service.send_message(chat_id, msg_in, current_user)
+    msg = await service.send_message(chat_id, msg_in, current_user)
     message_event = MessageCreatedEvent(
-        id=message.id,
-        chat_id=message.chat_id,
-        sender_id=message.sender_id,
+        id=msg.id,
+        chat_id=msg.chat_id,
+        sender_id=msg.sender_id,
         sender_username=current_user.username,
         sender_display_name=current_user.display_name,
         avatar_url=current_user.avatar_url,
-        content=message.content,
-        created_at=message.created_at,
-        is_read=message.is_read,
-        message_type=message.message_type,
+        content=msg.content,
+        created_at=msg.created_at,
+        is_read=msg.is_read,
+        message_type=msg.message_type,
     )
     message_resp = MessageRead(
-        id=message.id,
-        chat_id=message.chat_id,
-        sender_id=message.sender_id,
+        id=msg.id,
+        chat_id=msg.chat_id,
+        sender_id=msg.sender_id,
         sender_username=current_user.username,
         sender_display_name=current_user.display_name,
         avatar_url=current_user.avatar_url,
-        content=message.content,
-        created_at=message.created_at,
-        is_read=message.is_read,
-        message_type=message.message_type,
+        content=msg.content,
+        is_read=msg.is_read,
+        created_at=msg.created_at,
+        message_type=msg.message_type,
+        file_url=msg.file_url,
+        file_size=msg.file_size,
+        duration=msg.duration,
+        filename=msg.filename,
+        mimetype=msg.mimetype,
+        preview_url=msg.preview_url,
+        media_width=msg.media_width,
+        media_height=msg.media_height,
     )
 
     # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
@@ -119,6 +127,9 @@ async def get_chat_messages(
             duration=msg.duration,
             filename=msg.filename,
             mimetype=msg.mimetype,
+            preview_url=msg.preview_url,
+            media_width=msg.media_width,
+            media_height=msg.media_height,
         )
         for msg in messages
     ]
@@ -330,6 +341,9 @@ async def upload_file_message(
         duration=message.duration,
         filename=message.filename,
         mimetype=message.mimetype,
+        preview_url=message.preview_url,
+        media_width=message.media_width,
+        media_height=message.media_height,
     )
 
     # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
@@ -434,6 +448,7 @@ async def upload_media_message(
     Загрузка фото или видео.
     Автоматически определяет тип (IMAGE/VIDEO) по mimetype.
     """
+    print("client_width", client_width, "client_height", client_height)
     if not file.content_type:
         raise HTTPException(400, "Unknown content type")
 
@@ -465,7 +480,7 @@ async def upload_media_message(
 
     # 2. Определяем размеры (синхронно, это быстро для картинок)
     width, height = client_width, client_height
-    duration = None
+    duration = None  # noqa: F841
 
     if is_image:
         try:

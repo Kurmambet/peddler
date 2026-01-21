@@ -264,6 +264,9 @@ export const useMessagesStore = defineStore("messages", () => {
       duration: event.duration,
       filename: event.filename,
       mimetype: event.mimetype,
+      media_width: event.media_width,
+      media_height: event.media_height,
+      preview_url: event.preview_url,
     };
 
     const newMessageTime = new Date(event.created_at).getTime();
@@ -582,8 +585,6 @@ export const useMessagesStore = defineStore("messages", () => {
       uploadProgress: 0,
       isError: false,
     };
-
-    // optimisticMsg.content = caption;
 
     if (!pendingMessages.value[chatId]) {
       pendingMessages.value[chatId] = [];
