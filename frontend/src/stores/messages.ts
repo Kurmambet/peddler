@@ -592,33 +592,59 @@ export const useMessagesStore = defineStore("messages", () => {
     pendingMessages.value[chatId].push(optimisticMsg);
 
     try {
-      // ВЫБОР ЭНДПОИНТА
+      let response;
       if (isImage || isVideo) {
-        // Шлем на новый эндпоинт /media
-        await messagesAPI.sendMedia(chatId, file, caption, w, h, (p) => {
-          const msg = pendingMessages.value[chatId]?.find(
-            (m) => m.id === tempId
-          );
-          if (msg) msg.uploadProgress = p;
-        });
+        response = await messagesAPI.sendMedia(
+          chatId,
+          file,
+          caption,
+          w,
+          h,
+          (p) => {
+            const msg = pendingMessages.value[chatId]?.find(
+              (m) => m.id === tempId
+            );
+            if (msg) msg.uploadProgress = p;
+          }
+        );
       } else {
-        // Шлем как обычный файл (старый эндпоинт)
-        await messagesAPI.sendFile(chatId, file, caption, (p) => {
+        response = await messagesAPI.sendFile(chatId, file, caption, (p) => {
           const msg = pendingMessages.value[chatId]?.find(
             (m) => m.id === tempId
           );
           if (msg) msg.uploadProgress = p;
         });
       }
+      const realMessage = response.data;
+
+      const messageToSave: any = {
+        ...realMessage,
+        type: "message_created",
+        // Принудительно ставим локальный URL как preview/file url
+        // Vue покажет его, так как он валиден.
+        file_url: optimisticMsg.file_url,
+        preview_url: optimisticMsg.file_url,
+
+        // Флаг, что это всё еще "наше" локальное сообщение, хоть и с ID от сервера
+        isLocal: true,
+        isUploading: false, // Загрузка завершена
+      };
+
+      addMessage(messageToSave);
 
       removePendingMessage(chatId, tempId);
+
+      // Очистка URL (memory leak fix) - в этом случае ненадо вобщем
+      // URL.revokeObjectURL(optimisticMsg.file_url!);
+
       if (wasInHistory) await checkAndResetToLive(chatId);
     } catch (err) {
       console.error("Upload failed", err);
       const msg = pendingMessages.value[chatId]?.find((m) => m.id === tempId);
       if (msg) {
-        msg.isError = true;
+        msg.isError = true; // Показываем ошибку (красный)
         msg.isUploading = false;
+        // Не удаляем сообщение, чтобы юзер мог нажать "Повторить"
       }
     }
   };
