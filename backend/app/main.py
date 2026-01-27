@@ -1,4 +1,5 @@
 # backend/app/main.py
+
 import mimetypes
 import os
 from contextlib import asynccontextmanager
@@ -22,12 +23,15 @@ settings = get_settings()
 mimetypes.init()
 mimetypes.add_type("video/webm", ".webm")
 mimetypes.add_type("audio/ogg", ".ogg")
+mimetypes.add_type("video/mp4", ".mp4")
+mimetypes.add_type("image/webp", ".webp")
 
 UPLOAD_DIR = "uploads"
 VOICE_DIR = f"{UPLOAD_DIR}/voice"
 AVATARS_DIR = f"{UPLOAD_DIR}/avatars"
 VIDEO_NOTES_DIR = f"{UPLOAD_DIR}/video_notes"
 FILES_DIR = f"{UPLOAD_DIR}/files"
+MEDIA_DIR = f"{UPLOAD_DIR}/media"
 
 # Создаём родительскую папку
 if not os.path.exists(UPLOAD_DIR):
@@ -42,6 +46,8 @@ if not os.path.exists(VIDEO_NOTES_DIR):
     os.makedirs(VIDEO_NOTES_DIR, exist_ok=True)
 if not os.path.exists(FILES_DIR):
     os.makedirs(FILES_DIR, exist_ok=True)
+if not os.path.exists(MEDIA_DIR):
+    os.makedirs(MEDIA_DIR, exist_ok=True)
 
 
 @asynccontextmanager

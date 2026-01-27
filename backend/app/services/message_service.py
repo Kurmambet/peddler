@@ -47,7 +47,10 @@ class MessageService:
                 )
 
         # 4. Валидация обычных файлов
-        if msg_in.message_type == MessageType.FILE and not msg_in.file_url:
+        if (
+            msg_in.message_type in [MessageType.VIDEO, MessageType.IMAGE, MessageType.FILE]
+            and not msg_in.file_url
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="file_url required for file messages",
@@ -64,6 +67,9 @@ class MessageService:
             duration=msg_in.duration,
             filename=msg_in.filename,
             mimetype=msg_in.mimetype,
+            preview_url=msg_in.preview_url,
+            media_width=msg_in.media_width,
+            media_height=msg_in.media_height,
         )
 
         await self.db.commit()
@@ -109,6 +115,9 @@ class MessageService:
                 duration=msg.duration,
                 filename=msg.filename,
                 mimetype=msg.mimetype,
+                preview_url=msg.preview_url,
+                media_width=msg.media_width,
+                media_height=msg.media_height,
             )
             for msg in messages
         ]
@@ -154,6 +163,9 @@ class MessageService:
                 duration=msg.duration,
                 filename=msg.filename,
                 mimetype=msg.mimetype,
+                preview_url=msg.preview_url,
+                media_width=msg.media_width,
+                media_height=msg.media_height,
             )
             for msg in messages
         ]

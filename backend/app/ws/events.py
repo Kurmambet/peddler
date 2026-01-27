@@ -126,6 +126,10 @@ class MessageCreatedEvent(WSEvent):
     filename: str | None = None
     mimetype: str | None = None
 
+    preview_url: str | None = None
+    media_width: int | None = None
+    media_height: int | None = None
+
 
 class TypingIndicatorEvent(WSEvent):
     """

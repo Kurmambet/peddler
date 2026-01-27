@@ -1,7 +1,6 @@
 # app/api/v1/routes/messages.py
 import logging
 import os
-import subprocess
 import uuid
 from typing import List, Optional
 
@@ -12,12 +11,15 @@ from app.models.message import MessageType
 from app.models.user import User
 from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
 from app.services.message_service import MessageService
+from app.tasks.media_tasks import (
+    process_image_and_publish_task,
+    process_video_and_publish_task,
+    process_video_note_and_publish_task,
+)
+from app.tasks.message_tasks import publish_to_chat_task
 from app.ws.events import MessageCreatedEvent
-from app.ws.globals import pubsub_manager
-
-# from app.ws.manager import ConnectionManager
-# from app.ws.pubsub import RedisPubSubManager
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
@@ -27,6 +29,7 @@ MAX_VOICE_SIZE = 10 * 1024 * 1024  # 10 MB
 
 FILES_DIR = "uploads/files"
 VIDEO_NOTES_DIR = "uploads/video_notes"
+MEDIA_DIR = "uploads/media"
 
 router = APIRouter(tags=["messages"])
 
@@ -45,33 +48,42 @@ async def send_message(
 ) -> MessageRead:
     """Отправляет текстовое сообщение в чат"""
     # return await service.send_message(chat_id, msg_in, current_user)
-    message = await service.send_message(chat_id, msg_in, current_user)
+    msg = await service.send_message(chat_id, msg_in, current_user)
     message_event = MessageCreatedEvent(
-        id=message.id,
-        chat_id=message.chat_id,
-        sender_id=message.sender_id,
+        id=msg.id,
+        chat_id=msg.chat_id,
+        sender_id=msg.sender_id,
         sender_username=current_user.username,
         sender_display_name=current_user.display_name,
         avatar_url=current_user.avatar_url,
-        content=message.content,
-        created_at=message.created_at,
-        is_read=message.is_read,
-        message_type=message.message_type,
+        content=msg.content,
+        created_at=msg.created_at,
+        is_read=msg.is_read,
+        message_type=msg.message_type,
     )
     message_resp = MessageRead(
-        id=message.id,
-        chat_id=message.chat_id,
-        sender_id=message.sender_id,
+        id=msg.id,
+        chat_id=msg.chat_id,
+        sender_id=msg.sender_id,
         sender_username=current_user.username,
         sender_display_name=current_user.display_name,
         avatar_url=current_user.avatar_url,
-        content=message.content,
-        created_at=message.created_at,
-        is_read=message.is_read,
-        message_type=message.message_type,
+        content=msg.content,
+        is_read=msg.is_read,
+        created_at=msg.created_at,
+        message_type=msg.message_type,
+        file_url=msg.file_url,
+        file_size=msg.file_size,
+        duration=msg.duration,
+        filename=msg.filename,
+        mimetype=msg.mimetype,
+        preview_url=msg.preview_url,
+        media_width=msg.media_width,
+        media_height=msg.media_height,
     )
 
-    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    publish_to_chat_task.delay(chat_id, message_event.model_dump_json())
     return message_resp
 
 
@@ -115,6 +127,9 @@ async def get_chat_messages(
             duration=msg.duration,
             filename=msg.filename,
             mimetype=msg.mimetype,
+            preview_url=msg.preview_url,
+            media_width=msg.media_width,
+            media_height=msg.media_height,
         )
         for msg in messages
     ]
@@ -200,50 +215,10 @@ async def upload_voice_message(
     logger.info(
         f"[Voice] Publishing event to chat {chat_id}: message_id={message.id}, file_url={message.file_url}"
     )
-    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    publish_to_chat_task.delay(chat_id, message_event.model_dump_json())
     logger.info("[Voice] Event published successfully")
     return message
-
-
-def fix_webm_container(filepath: str):
-    """
-    Перепаковывает WebM контейнер через FFmpeg для исправления метаданных и таймстемпов.
-    Использует stream copy, поэтому это очень быстро и не теряет качество.
-    """
-    tmp_path = f"{filepath}.tmp.webm"
-    try:
-        # Команда ffmpeg:
-        # -i input - входной файл
-        # -c copy - копировать видео и аудио потоки БЕЗ перекодирования
-        # -movflags +faststart - оптимизация для веб-воспроизведения (метаданные в начало)
-        # -y - перезаписать output
-        command = [
-            "ffmpeg",
-            "-v",
-            "error",  # Меньше логов
-            "-i",
-            filepath,
-            "-c",
-            "copy",  # Просто копируем потоки (решает 99% проблем совместимости FF->Chrome)
-            "-movflags",
-            "+faststart",
-            "-y",
-            tmp_path,
-        ]
-
-        subprocess.run(command, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-
-        # Если всё ок, заменяем оригинал
-        os.replace(tmp_path, filepath)
-        logger.info(f"Successfully fixed WebM container: {filepath}")
-
-    except subprocess.CalledProcessError as e:
-        logger.error(f"FFmpeg failed: {e.stderr.decode()}")
-        # Если упало, удаляем времянку, оставляем как есть (лучше кривой файл, чем никакого)
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-    except Exception as ex:
-        logger.error(f"FFmpeg generic error: {ex}")
 
 
 @router.post("/chats/{chat_id}/messages/video_note", response_model=MessageRead)
@@ -268,10 +243,6 @@ async def upload_video_note(
     async with aiofiles.open(filepath, "wb") as f:
         await f.write(content)
 
-    # Это синхронная операция, но для -c copy она занимает миллисекунды.
-    # Для high-load это выносят в Celery/BackgroundTasks, но для мессенджера пока ок.
-    fix_webm_container(filepath)
-
     public_url = f"/static/video_notes/{chat_id}/{new_filename}"
 
     msg_create = MessageCreate(
@@ -279,7 +250,7 @@ async def upload_video_note(
         chat_id=chat_id,
         message_type=MessageType.VIDEO_NOTE,
         file_url=public_url,
-        file_size=len(content),  # Размер может чуть измениться, но не критично
+        file_size=len(content),
         duration=duration,
     )
 
@@ -303,8 +274,10 @@ async def upload_video_note(
         mimetype=message.mimetype,
     )
 
-    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
-    return message
+    # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    # publish_to_chat_task.delay(chat_id, message_event.model_dump_json())
+    process_video_note_and_publish_task.delay(filepath, chat_id, message_event.model_dump_json())
+    return message  # Возвращаем ответ отправителю (у него optimistic UI, он сообщение уже видит)
 
 
 @router.post("/chats/{chat_id}/messages/file", response_model=MessageRead)
@@ -368,9 +341,13 @@ async def upload_file_message(
         duration=message.duration,
         filename=message.filename,
         mimetype=message.mimetype,
+        preview_url=message.preview_url,
+        media_width=message.media_width,
+        media_height=message.media_height,
     )
 
-    await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    # await pubsub_manager.publish_to_chat(chat_id, message_event.model_dump_json())
+    publish_to_chat_task.delay(chat_id, message_event.model_dump_json())
     return message
 
 
@@ -454,3 +431,121 @@ async def search_messages_endpoint(
         )
 
     return message_reads
+
+
+@router.post("/chats/{chat_id}/messages/media", response_model=MessageRead)
+async def upload_media_message(
+    chat_id: int,
+    file: UploadFile = File(...),
+    # width/height опционально от фронта (как подсказка), но мы перепроверим
+    client_width: Optional[int] = Form(None),
+    client_height: Optional[int] = Form(None),
+    caption: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_user),
+    service: MessageService = Depends(get_message_service),
+):
+    """
+    Загрузка фото или видео.
+    Автоматически определяет тип (IMAGE/VIDEO) по mimetype.
+    """
+    print("client_width", client_width, "client_height", client_height)
+    if not file.content_type:
+        raise HTTPException(400, "Unknown content type")
+
+    is_video = file.content_type.startswith("video/")
+    is_image = file.content_type.startswith("image/")
+
+    if not (is_video or is_image):
+        raise HTTPException(400, "File must be image or video")
+
+    # 1. Сохраняем оригинал
+    file_ext = file.filename.split(".")[-1] if "." in file.filename else "bin"
+    if is_video and file_ext == "bin":
+        file_ext = "mp4"  # fallback
+    if is_image and file_ext == "bin":
+        file_ext = "jpg"
+
+    new_filename = f"{uuid.uuid4()}.{file_ext}"
+    chat_dir = f"{MEDIA_DIR}/{chat_id}"  # uploads/media/123/
+    os.makedirs(chat_dir, exist_ok=True)
+
+    filepath = f"{chat_dir}/{new_filename}"
+
+    # Читаем и пишем файл
+    content = await file.read()
+    file_size = len(content)
+
+    async with aiofiles.open(filepath, "wb") as f:
+        await f.write(content)
+
+    # 2. Определяем размеры (синхронно, это быстро для картинок)
+    width, height = client_width, client_height
+    duration = None  # noqa: F841
+
+    if is_image:
+        try:
+            with Image.open(filepath) as img:
+                width, height = img.size
+        except Exception:
+            pass  # Если Pillow не смог прочитать, оставим client_width или None
+
+    # Для видео размеры достать сложнее без запуска ffprobe,
+    # пока доверимся клиенту или оставим None (Celery обновит)
+
+    # 3. Формируем пути
+    public_url = f"/static/media/{chat_id}/{new_filename}"
+
+    # Сразу генерируем имя для будущего превью (оно создастся в Celery)
+    preview_filename = f"thumb_{os.path.splitext(new_filename)[0]}.jpg"
+    preview_url = f"/static/media/{chat_id}/{preview_filename}"
+
+    # 4. Создаем сообщение в БД
+    msg_type = MessageType.VIDEO if is_video else MessageType.IMAGE
+
+    msg_create = MessageCreate(
+        chat_id=chat_id,
+        content=caption or "",
+        message_type=msg_type,
+        file_url=public_url,
+        file_size=file_size,
+        filename=file.filename,
+        mimetype=file.content_type,
+        media_width=width,
+        media_height=height,
+        preview_url=preview_url,  # Ссылка уже есть, картинки пока нет (404)
+        duration=None,  # Celery обновит
+    )
+
+    message = await service.send_message(chat_id, msg_create, current_user)
+
+    # 5. Готовим Event для WS (как и раньше)
+    message_event = MessageCreatedEvent(
+        id=message.id,
+        chat_id=message.chat_id,
+        sender_id=message.sender_id,
+        sender_username=current_user.username,
+        sender_display_name=current_user.display_name,
+        avatar_url=current_user.avatar_url,
+        content=message.content,
+        created_at=message.created_at,
+        is_read=message.is_read,
+        message_type=message.message_type,
+        file_url=message.file_url,
+        preview_url=message.preview_url,
+        media_width=message.media_width,
+        media_height=message.media_height,
+        file_size=message.file_size,
+        filename=message.filename,
+        mimetype=message.mimetype,
+    )
+
+    # 6. Запускаем Celery задачу
+    # Мы НЕ публикуем событие здесь (publish_to_chat_task нет).
+    # Событие опубликует Celery ПОСЛЕ обработки (создания превью).
+
+    if is_image:
+        process_image_and_publish_task.delay(filepath, chat_id, message_event.model_dump_json())
+    else:
+        process_video_and_publish_task.delay(filepath, chat_id, message_event.model_dump_json())
+    print(message_event.model_dump_json())
+    return message  # Возвращаем ответ отправителю (Optimistic UI)

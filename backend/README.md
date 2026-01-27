@@ -14,6 +14,7 @@ docker-compose -f docker-compose.dev.yml down
 
 docker-compose -f docker-compose.dev.yml build --no-cache backend
 
+
 ```
 
 ```bash
@@ -30,7 +31,11 @@ taskkill /PID 8200 /F
 # Автогенерация миграции на основе моделей
 alembic revision --autogenerate -m "Initial migration"
 alembic revision --autogenerate -m "add_full_text_search"
+alembic revision --autogenerate -m "add media fields2"
 
+    with op.get_context().autocommit_block():
+        op.execute("ALTER TYPE messagetype ADD VALUE 'IMAGE'")
+        op.execute("ALTER TYPE messagetype ADD VALUE 'VIDEO'")
 # Применить миграцию
 alembic upgrade head
 
@@ -46,6 +51,11 @@ alembic upgrade head
 docker-compose -f docker-compose.dev.yml up -d
 docker-compose -f docker-compose.dev.yml up --build -d
 docker-compose -f docker-compose.dev.yml down
+
+
+docker exec peddler-backend-dev alembic upgrade head
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
 
 # Подключение
 docker exec -it peddler-db-dev psql -U peddler -d peddler
@@ -110,4 +120,9 @@ alembic upgrade head
 # 3. Выйди
 exit
 
+```
+
+```
+# Проверить что worker подключился
+docker exec peddler-celery-worker-dev celery -A app.celery_app inspect active
 ```

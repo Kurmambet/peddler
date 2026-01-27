@@ -90,7 +90,7 @@
               <!-- Avatar for incoming messages -->
               <Avatar
                 v-if="!isOwn(msg)"
-                :username="msg.sender_username"
+                :username="msg.sender_display_name || msg.sender_username"
                 :src="msg.avatar_url ? msg.avatar_url : null"
                 size="sm"
                 class="mr-2 mt-1 flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
@@ -157,6 +157,73 @@
                       :message-id="msg.id"
                       :duration="msg.duration!"
                     />
+                  </div>
+
+                  <!-- КАРТИНКА -->
+                  <div v-else-if="msg.message_type === 'image'" class="my-1">
+                    <div
+                      class="relative overflow-hidden rounded-lg bg-black/5"
+                      :style="{
+                        // Вычисляем aspect-ratio, чтобы блок занял место сразу
+                        aspectRatio:
+                          msg.media_width && msg.media_height
+                            ? `${msg.media_width}/${msg.media_height}`
+                            : '1/1',
+                        maxWidth: '100%',
+                        maxHeight: '400px', // Ограничение высоты
+                      }"
+                    >
+                      <img
+                        :src="
+                          (msg.isLocal
+                            ? msg.file_url
+                            : msg.preview_url || msg.file_url) ?? undefined
+                        "
+                        class="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                        loading="lazy"
+                        @click="openLightbox(msg)"
+                      />
+
+                      <!-- Спиннер загрузки поверх картинки -->
+                      <div
+                        v-if="msg.isLocal && msg.isUploading"
+                        class="absolute inset-0 bg-black/40 flex items-center justify-center"
+                      >
+                        <span class="text-white font-bold text-sm"
+                          >{{ msg.uploadProgress }}%</span
+                        >
+                      </div>
+                    </div>
+                    <!-- Caption -->
+                    <p v-if="msg.content" class="mt-1 text-sm px-1">
+                      {{ msg.content }}
+                    </p>
+                  </div>
+
+                  <!-- ВИДЕО (Обычное, не кружочек) -->
+                  <div v-else-if="msg.message_type === 'video'" class="my-1">
+                    <div
+                      class="relative overflow-hidden rounded-lg bg-black"
+                      :style="{
+                        aspectRatio:
+                          msg.media_width && msg.media_height
+                            ? `${msg.media_width}/${msg.media_height}`
+                            : '16/9',
+                      }"
+                    >
+                      <!-- Poster используем preview_url (сгенерированный Celery) -->
+                      <video
+                        controls
+                        preload="metadata"
+                        class="w-full h-full"
+                        :src="msg.file_url ?? undefined"
+                        :poster="
+                          !msg.isLocal && msg.preview_url
+                            ? msg.preview_url
+                            : undefined
+                        "
+                      ></video>
+                    </div>
                   </div>
 
                   <!-- ФАЙЛ -->
@@ -319,6 +386,40 @@
         :user-id="selectedUserId"
         @close="showUserProfile = false"
       />
+      <!-- Lightbox Modal -->
+      <div
+        v-if="lightboxOpen"
+        class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4 cursor-pointer backdrop-blur-sm"
+        @click="closeLightbox"
+      >
+        <!-- Кнопка закрытия (крестик) -->
+        <button
+          class="absolute top-4 right-4 text-white hover:text-gray-300 p-2"
+          @click.stop="closeLightbox"
+        >
+          <svg
+            class="w-8 h-8"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+
+        <!-- Сама картинка -->
+        <img
+          :src="lightboxImageSrc"
+          class="max-w-full max-h-full object-contain rounded-sm shadow-2xl transition-transform duration-200"
+          @click.stop
+          alt="Full size"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -376,6 +477,9 @@ const showUserProfile = ref(false);
 const selectedUserId = ref<number | null>(null);
 const markedAsReadMessages = ref(new Set<number>());
 
+const lightboxOpen = ref(false);
+const lightboxImageSrc = ref<string>("");
+
 // === Computed ===
 const isLoadingMore = computed(() => messagesStore.isLoadingMore);
 
@@ -427,6 +531,21 @@ const groupedMessages = computed(() => {
 });
 
 // === Helper Functions ===
+
+// Функция открытия (исправляет ошибку Property does not exist)
+const openLightbox = (msg: MessageRead) => {
+  // Берем file_url (оригинал), так как превью мы уже видели
+  const src = msg.isLocal ? msg.file_url : msg.file_url || msg.preview_url;
+  if (src) {
+    lightboxImageSrc.value = src;
+    lightboxOpen.value = true;
+  }
+};
+
+const closeLightbox = () => {
+  lightboxOpen.value = false;
+  lightboxImageSrc.value = "";
+};
 
 const isOwn = (msg: MessageRead) => {
   return msg.sender_id === authStore.user?.id;
@@ -603,6 +722,7 @@ const handleScroll = () => {
 
 // Функция подсветки
 const formatMessageContent = (text: string) => {
+  //TODO не работает с русским языком
   if (!text) return "";
 
   // 1. Эскейпинг HTML (защита от XSS)
