@@ -39,7 +39,64 @@ def get_message_service(db: AsyncSession = Depends(get_db)) -> MessageService:
     return MessageService(db)
 
 
-@router.post("/chats/{chat_id}/messages", response_model=MessageRead, status_code=201)
+@router.get("/search", response_model=List[MessageRead])
+async def search_messages_endpoint(
+    q: str = Query(..., min_length=1, description="Текст для поиска"),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+    service: MessageService = Depends(get_message_service),
+):
+    """
+    Полнотекстовый поиск по всем сообщениям пользователя.
+    """
+    offset = (page - 1) * limit
+
+    # Получаем сырые объекты SQLAlchemy с подгруженными связями
+    messages = await service.search_messages(
+        user_id=current_user.id, query=q, limit=limit, offset=offset
+    )
+
+    # Ручной маппинг
+    message_reads = []
+    for msg in messages:
+        # Логика определения названия чата
+        chat_title = None
+        if msg.chat:
+            if msg.chat.type == "group":
+                chat_title = msg.chat.title
+            elif msg.chat.type == "direct":
+                # Для direct чата сложнее: нужно понять, кто "other user".
+                # Но msg.chat не содержит инфо о current_user.
+                # Можно пока просто вернуть None или "Direct Chat"
+                # Если очень нужно имя собеседника, то придется подгружать участников.
+                pass
+
+        message_reads.append(
+            MessageRead(
+                id=msg.id,
+                chat_id=msg.chat_id,
+                chat_title=chat_title,
+                sender_id=msg.sender_id,
+                sender_username=msg.sender.username if msg.sender else None,
+                sender_display_name=msg.sender.display_name if msg.sender else None,
+                avatar_url=msg.sender.avatar_url if msg.sender else None,
+                content=msg.content,
+                is_read=msg.is_read,
+                created_at=msg.created_at,
+                message_type=msg.message_type,
+                file_url=msg.file_url,
+                file_size=msg.file_size,
+                duration=msg.duration,
+                filename=msg.filename,
+                mimetype=msg.mimetype,
+            )
+        )
+
+    return message_reads
+
+
+@router.post("/{chat_id}", response_model=MessageRead, status_code=201)
 async def send_message(
     chat_id: int,
     msg_in: MessageCreate,
@@ -87,7 +144,7 @@ async def send_message(
     return message_resp
 
 
-@router.get("/chats/{chat_id}/messages", response_model=MessageListResponse)
+@router.get("/{chat_id}", response_model=MessageListResponse)
 async def get_chat_messages(
     chat_id: int,
     limit: int = 50,
@@ -143,7 +200,7 @@ async def get_chat_messages(
     )
 
 
-@router.get("/chats/{chat_id}/messages/around", response_model=MessageListResponse)
+@router.get("/{chat_id}/around", response_model=MessageListResponse)
 async def get_messages_around(
     chat_id: int,
     message_id: int,
@@ -154,7 +211,7 @@ async def get_messages_around(
     return await service.get_messages_around(chat_id, message_id, limit, current_user.id)
 
 
-@router.post("/chats/{chat_id}/messages/voice", response_model=MessageRead)
+@router.post("/{chat_id}/voice", response_model=MessageRead)
 async def upload_voice_message(
     chat_id: int,
     file: UploadFile = File(...),
@@ -221,7 +278,7 @@ async def upload_voice_message(
     return message
 
 
-@router.post("/chats/{chat_id}/messages/video_note", response_model=MessageRead)
+@router.post("/{chat_id}/video_note", response_model=MessageRead)
 async def upload_video_note(
     chat_id: int,
     file: UploadFile = File(...),
@@ -280,7 +337,7 @@ async def upload_video_note(
     return message  # Возвращаем ответ отправителю (у него optimistic UI, он сообщение уже видит)
 
 
-@router.post("/chats/{chat_id}/messages/file", response_model=MessageRead)
+@router.post("/{chat_id}/file", response_model=MessageRead)
 async def upload_file_message(
     chat_id: int,
     file: UploadFile = File(...),
@@ -351,7 +408,7 @@ async def upload_file_message(
     return message
 
 
-@router.get("/chats/{chat_id}/messages/search", response_model=List[MessageRead])
+@router.get("/{chat_id}/search", response_model=List[MessageRead])
 async def search_messages_in_chat(
     chat_id: int,
     q: str = Query(..., min_length=1),
@@ -376,64 +433,7 @@ async def search_messages_in_chat(
     ]
 
 
-@router.get("/search", response_model=List[MessageRead])
-async def search_messages_endpoint(
-    q: str = Query(..., min_length=1, description="Текст для поиска"),
-    page: int = Query(1, ge=1),
-    limit: int = Query(20, ge=1, le=50),
-    current_user: User = Depends(get_current_user),
-    service: MessageService = Depends(get_message_service),
-):
-    """
-    Полнотекстовый поиск по всем сообщениям пользователя.
-    """
-    offset = (page - 1) * limit
-
-    # Получаем сырые объекты SQLAlchemy с подгруженными связями
-    messages = await service.search_messages(
-        user_id=current_user.id, query=q, limit=limit, offset=offset
-    )
-
-    # Ручной маппинг
-    message_reads = []
-    for msg in messages:
-        # Логика определения названия чата
-        chat_title = None
-        if msg.chat:
-            if msg.chat.type == "group":
-                chat_title = msg.chat.title
-            elif msg.chat.type == "direct":
-                # Для direct чата сложнее: нужно понять, кто "other user".
-                # Но msg.chat не содержит инфо о current_user.
-                # Можно пока просто вернуть None или "Direct Chat"
-                # Если очень нужно имя собеседника, то придется подгружать участников.
-                pass
-
-        message_reads.append(
-            MessageRead(
-                id=msg.id,
-                chat_id=msg.chat_id,
-                chat_title=chat_title,
-                sender_id=msg.sender_id,
-                sender_username=msg.sender.username if msg.sender else None,
-                sender_display_name=msg.sender.display_name if msg.sender else None,
-                avatar_url=msg.sender.avatar_url if msg.sender else None,
-                content=msg.content,
-                is_read=msg.is_read,
-                created_at=msg.created_at,
-                message_type=msg.message_type,
-                file_url=msg.file_url,
-                file_size=msg.file_size,
-                duration=msg.duration,
-                filename=msg.filename,
-                mimetype=msg.mimetype,
-            )
-        )
-
-    return message_reads
-
-
-@router.post("/chats/{chat_id}/messages/media", response_model=MessageRead)
+@router.post("/{chat_id}/media", response_model=MessageRead)
 async def upload_media_message(
     chat_id: int,
     file: UploadFile = File(...),
