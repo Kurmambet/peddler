@@ -6,12 +6,10 @@ uv run uvicorn app.main:app --reload
 ```
 
 ```bash
-docker-compose -f docker-compose.dev.yml up -d
 docker-compose -f docker-compose.dev.yml up --build -d
+docker-compose -f docker-compose.prod.yml up --build -d
 docker ps
-docker exec -it peddler-redis-dev redis-cli ping
 docker-compose -f docker-compose.dev.yml down
-
 docker-compose -f docker-compose.dev.yml build --no-cache backend
 
 
@@ -54,8 +52,6 @@ docker-compose -f docker-compose.dev.yml down
 
 
 docker exec peddler-backend-dev alembic upgrade head
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
-INFO  [alembic.runtime.migration] Will assume transactional DDL.
 
 # Подключение
 docker exec -it peddler-db-dev psql -U peddler -d peddler

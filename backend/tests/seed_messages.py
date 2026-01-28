@@ -7,8 +7,8 @@ import requests
 # КОНФИГУРАЦИЯ
 # ==========================================
 BASE_URL = "http://localhost:8000/api/v1"
-CHAT_ID = 4  # ID чата, куда будем спамить
-USER_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY4Mzg5ODMwLCJleHAiOjE3Njg5OTQ2MzB9.r8QbFptxHcGb41HEFRowW-7Gepf92VikX0tNtB1qez8"  # без 'Bearer '
+CHAT_ID = 1  # ID чата, куда будем спамить
+USER_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY5NjAwOTA1LCJleHAiOjE3NzAyMDU3MDV9.LI3IJZ88R_wc29C2O3t6x10l3_eMYoEK1mp3RTeePOQ"  # без 'Bearer '
 MESSAGE_COUNT = 2000  # Сколько сообщений создать
 DELAY = 0.01  # Задержка (сек). 0.01 = ~100 req/sec
 
@@ -147,9 +147,7 @@ def run_seeding():
             }
 
             try:
-                # ВАЖНО: Убедитесь, что URL совпадает с вашим роутером
-                # Если у вас префикс /messages, то может быть .../chats/{id}/messages
-                resp = s.post(f"{BASE_URL}/chats/{CHAT_ID}/messages", json=payload)
+                resp = s.post(f"{BASE_URL}/messages/{CHAT_ID}", json=payload)
 
                 if resp.status_code == 201:
                     success += 1
