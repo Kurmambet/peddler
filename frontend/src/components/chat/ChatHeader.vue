@@ -14,7 +14,7 @@
           v-model="localQuery"
           @keydown.enter="handleSearch"
           placeholder="Search in this chat..."
-          class="w-full bg-app-bg rounded-lg pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+          class="w-full bg-app-bg rounded-lg pl-9 pr-4 py-1.5 text-sm text-app-text focus:outline-none focus:ring-1 focus:ring-primary"
         />
         <!-- Лупа иконка слева -->
         <svg

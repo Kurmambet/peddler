@@ -8,7 +8,7 @@ import requests
 # ==========================================
 BASE_URL = "http://localhost:8000/api/v1"
 CHAT_ID = 1  # ID чата, куда будем спамить
-USER_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY5NjAwOTA1LCJleHAiOjE3NzAyMDU3MDV9.LI3IJZ88R_wc29C2O3t6x10l3_eMYoEK1mp3RTeePOQ"  # без 'Bearer '
+USER_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY5NjA0Mjc0LCJleHAiOjE3NzAyMDkwNzR9.XbABOG6yuN8DzPP51AcG0_JjuskdmESCOD7mu2ucLUI"  # без 'Bearer '
 MESSAGE_COUNT = 2000  # Сколько сообщений создать
 DELAY = 0.01  # Задержка (сек). 0.01 = ~100 req/sec
 
