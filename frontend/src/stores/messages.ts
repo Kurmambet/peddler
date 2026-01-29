@@ -1,13 +1,13 @@
 // src/stores/messages.ts
 import { compressImage } from "@/utils/compressor";
 import { defineStore } from "pinia";
+import * as tus from "tus-js-client";
 import { ref } from "vue";
 import { messagesAPI } from "../api/messages";
 import type { MessageRead } from "../types/api";
 import { MessageType } from "../types/api";
 import type { MessageCreatedEvent } from "../types/events";
 import { useAuthStore } from "./auth";
-// import * as tus from "tus-js-client";
 
 export const useMessagesStore = defineStore("messages", () => {
   const messagesByChat = ref<Map<number, MessageRead[]>>(new Map());
@@ -26,6 +26,10 @@ export const useMessagesStore = defineStore("messages", () => {
   // Хранилище для "зависших" в загрузке сообщений
   // Key: chatId, Value: Array of pending messages
   const pendingMessages = ref<Record<number, MessageRead[]>>({});
+
+  // Состояние для активных загрузок (чтобы можно было делать abort/pause)
+  // Ключ - временный ID сообщения (tempId)
+  const activeUploads = ref<Map<number, tus.Upload>>(new Map());
 
   // === STATE ПОИСКА внутри чата ===
   const isSearchingInfoChat = ref(false); // Открыта ли панель
@@ -454,6 +458,56 @@ export const useMessagesStore = defineStore("messages", () => {
     };
   };
 
+  // === TUS UPLOAD HELPER ===
+  const uploadWithTus = (
+    file: File | Blob,
+    metadata: any,
+    onProgress: (p: number) => void
+  ): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const authStore = useAuthStore();
+
+      // Создаем экземпляр загрузки
+      const upload = new tus.Upload(file, {
+        // endpoint: "http://localhost:1080/files/", // Локально
+        // В проде это будет /files/ через Nginx, или полный URL
+        // У вас tusd слушает 1080, если нет прокси - то http://localhost:1080/files/
+        endpoint: "http://localhost:1080/files/",
+        retryDelays: [0, 1000, 3000, 5000],
+        metadata: {
+          ...metadata,
+          token: authStore.token || "", // Передаем токен для хука бэкенда!
+        },
+        onError: (error) => {
+          console.error("Tus upload failed:", error);
+          reject(error);
+        },
+        onProgress: (bytesUploaded, bytesTotal) => {
+          const percentage = (bytesUploaded / bytesTotal) * 100;
+          onProgress(percentage);
+        },
+        onSuccess: () => {
+          console.log("Tus upload finished:", upload.url);
+          resolve();
+        },
+      });
+
+      // Сохраняем ссылку на аплоад (если захотим отменить)
+      // metadata.tempId должен быть передан
+      if (metadata.tempId) {
+        activeUploads.value.set(metadata.tempId, upload);
+      }
+
+      // Запускаем
+      upload.findPreviousUploads().then((previousUploads) => {
+        if (previousUploads.length) {
+          upload.resumeFromPreviousUpload(previousUploads[0]);
+        }
+        upload.start();
+      });
+    });
+  };
+
   // === SEND VOICE ===
   const sendVoiceOptimistic = async (
     chatId: number,
@@ -468,30 +522,53 @@ export const useMessagesStore = defineStore("messages", () => {
       duration
     );
 
+    const tempId = optimisticMsg.id;
+
     if (!pendingMessages.value[chatId]) pendingMessages.value[chatId] = [];
     pendingMessages.value[chatId].push(optimisticMsg);
 
     try {
-      await messagesAPI.sendVoice(chatId, blob, duration, (progress) => {
-        const msg = pendingMessages.value[chatId]?.find(
-          (m) => m.id === optimisticMsg.id
-        );
-        if (msg) msg.uploadProgress = progress;
-      });
-      removePendingMessage(chatId, optimisticMsg.id);
+      // await messagesAPI.sendVoice(chatId, blob, duration, (progress) => {
+      //   const msg = pendingMessages.value[chatId]?.find(
+      //     (m) => m.id === tempId
+      //   );
+      //   if (msg) msg.uploadProgress = progress;
+      // });
+
+      // ИСПОЛЬЗУЕМ TUS
+      await uploadWithTus(
+        blob,
+        {
+          filename: "voice.webm",
+          mimetype: "audio/webm", // Или audio/ogg
+          chat_id: chatId.toString(),
+          tempId: tempId,
+          // duration для Tus не обязателен, бэкенд сам разберется или через метаданные хука
+          // Но хук пока не умеет читать duration из метаданных (только из файла или Celery)
+        },
+        (progress) => {
+          const msg = pendingMessages.value[chatId]?.find(
+            (m) => m.id === tempId
+          );
+          if (msg) msg.uploadProgress = progress;
+        }
+      );
+
+      removePendingMessage(chatId, tempId);
+      activeUploads.value.delete(tempId);
+
       if (optimisticMsg.file_url) URL.revokeObjectURL(optimisticMsg.file_url);
 
-      // Fix: Reload if we were in history
+      // Reload if we were in history
       if (wasInHistory) await checkAndResetToLive(chatId);
     } catch (err) {
       console.error("Voice upload failed", err);
-      const msg = pendingMessages.value[chatId]?.find(
-        (m) => m.id === optimisticMsg.id
-      );
+      const msg = pendingMessages.value[chatId]?.find((m) => m.id === tempId);
       if (msg) {
         msg.isError = true;
         msg.isUploading = false;
       }
+      activeUploads.value.delete(tempId);
     }
   };
 
@@ -509,34 +586,52 @@ export const useMessagesStore = defineStore("messages", () => {
       duration
     );
 
+    const tempId = optimisticMsg.id;
+
     if (!pendingMessages.value[chatId]) pendingMessages.value[chatId] = [];
     pendingMessages.value[chatId].push(optimisticMsg);
 
     try {
-      await messagesAPI.sendVideoNote(chatId, blob, duration, (progress) => {
-        const msg = pendingMessages.value[chatId]?.find(
-          (m) => m.id === optimisticMsg.id
-        );
-        if (msg) msg.uploadProgress = progress;
-      });
-      removePendingMessage(chatId, optimisticMsg.id);
+      // await messagesAPI.sendVideoNote(chatId, blob, duration, (progress) => {
+      //   const msg = pendingMessages.value[chatId]?.find(
+      //     (m) => m.id === tempId
+      //   );
+      //   if (msg) msg.uploadProgress = progress;
+      // });
+      await uploadWithTus(
+        blob,
+        {
+          filename: "videonote.webm",
+          mimetype: "video/webm",
+          chat_id: chatId.toString(),
+          tempId: tempId,
+        },
+        (progress) => {
+          const msg = pendingMessages.value[chatId]?.find(
+            (m) => m.id === tempId
+          );
+          if (msg) msg.uploadProgress = progress;
+        }
+      );
+
+      removePendingMessage(chatId, tempId);
+      activeUploads.value.delete(tempId);
       if (optimisticMsg.file_url) URL.revokeObjectURL(optimisticMsg.file_url);
 
-      // Fix: Reload if we were in history
+      // Reload if we were in history
       if (wasInHistory) await checkAndResetToLive(chatId);
     } catch (err) {
       console.error("Video note upload failed", err);
-      const msg = pendingMessages.value[chatId]?.find(
-        (m) => m.id === optimisticMsg.id
-      );
+      const msg = pendingMessages.value[chatId]?.find((m) => m.id === tempId);
       if (msg) {
         msg.isError = true;
         msg.isUploading = false;
       }
+      activeUploads.value.delete(tempId);
     }
   };
 
-  // --- ACTION: Отправка файла с оптимистичным UI ---
+  // === SEND FILE / MEDIA ===
   const sendFileOptimistic = async (
     chatId: number,
     file: File,
@@ -608,50 +703,68 @@ export const useMessagesStore = defineStore("messages", () => {
     pendingMessages.value[chatId].push(optimisticMsg);
 
     try {
-      let response;
-      if (isImage || isVideo) {
-        response = await messagesAPI.sendMedia(
-          chatId,
-          fileToUpload,
-          caption,
-          w,
-          h,
-          (p) => {
-            const msg = pendingMessages.value[chatId]?.find(
-              (m) => m.id === tempId
-            );
-            if (msg) msg.uploadProgress = p;
-          }
-        );
-      } else {
-        response = await messagesAPI.sendFile(chatId, file, caption, (p) => {
+      // let response;
+      // if (isImage || isVideo) {
+      //   response = await messagesAPI.sendMedia(
+      //     chatId,
+      //     fileToUpload,
+      //     caption,
+      //     w,
+      //     h,
+      //     (p) => {
+      //       const msg = pendingMessages.value[chatId]?.find(
+      //         (m) => m.id === tempId
+      //       );
+      //       if (msg) msg.uploadProgress = p;
+      //     }
+      //   );
+      // } else {
+      //   response = await messagesAPI.sendFile(chatId, file, caption, (p) => {
+      //     const msg = pendingMessages.value[chatId]?.find(
+      //       (m) => m.id === tempId
+      //     );
+      //     if (msg) msg.uploadProgress = p;
+      //   });
+      // }
+
+      // const realMessage = response.data;
+
+      // const messageToSave: any = {
+      //   ...realMessage,
+      //   type: "message_created",
+      //   // Принудительно ставим локальный URL как preview/file url
+      //   // Vue покажет его, так как он валиден.
+      //   file_url: optimisticMsg.file_url,
+      //   preview_url: optimisticMsg.file_url,
+
+      //   // Флаг, что это всё еще "наше" локальное сообщение, хоть и с ID от сервера
+      //   isLocal: true,
+      //   isUploading: false, // Загрузка завершена
+      // };
+
+      // addMessage(messageToSave);
+
+      await uploadWithTus(
+        fileToUpload,
+        {
+          filename: file.name,
+          mimetype: fileToUpload.type,
+          chat_id: chatId.toString(),
+          caption: caption, // Передаем caption в метаданных!
+          width: w ? w.toString() : null,
+          height: h ? h.toString() : null,
+          tempId: tempId,
+        },
+        (p) => {
           const msg = pendingMessages.value[chatId]?.find(
             (m) => m.id === tempId
           );
           if (msg) msg.uploadProgress = p;
-        });
-      }
-      const realMessage = response.data;
-
-      const messageToSave: any = {
-        ...realMessage,
-        type: "message_created",
-        // Принудительно ставим локальный URL как preview/file url
-        // Vue покажет его, так как он валиден.
-        file_url: optimisticMsg.file_url,
-        preview_url: optimisticMsg.file_url,
-
-        // Флаг, что это всё еще "наше" локальное сообщение, хоть и с ID от сервера
-        isLocal: true,
-        isUploading: false, // Загрузка завершена
-      };
-
-      addMessage(messageToSave);
+        }
+      );
 
       removePendingMessage(chatId, tempId);
-
-      // Очистка URL (memory leak fix) - в этом случае ненадо вобщем
-      // URL.revokeObjectURL(optimisticMsg.file_url!);
+      activeUploads.value.delete(tempId);
 
       if (wasInHistory) await checkAndResetToLive(chatId);
     } catch (err) {
@@ -662,6 +775,7 @@ export const useMessagesStore = defineStore("messages", () => {
         msg.isUploading = false;
         // Не удаляем сообщение, чтобы юзер мог нажать "Повторить"
       }
+      activeUploads.value.delete(tempId);
     }
   };
 
