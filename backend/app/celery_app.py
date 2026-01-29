@@ -9,7 +9,7 @@ celery_app = Celery(
     "peddler",
     broker=settings.CELERY_BROKER_URL,
     backend=settings.CELERY_RESULT_BACKEND,
-    include=["app.tasks.message_tasks", "app.tasks.media_tasks"],
+    include=["app.tasks.message_tasks", "app.tasks.media_tasks", "app.tasks.avatar_tasks"],
 )
 
 celery_app.conf.update(
