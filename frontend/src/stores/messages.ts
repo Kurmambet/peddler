@@ -7,6 +7,7 @@ import type { MessageRead } from "../types/api";
 import { MessageType } from "../types/api";
 import type { MessageCreatedEvent } from "../types/events";
 import { useAuthStore } from "./auth";
+// import * as tus from "tus-js-client";
 
 export const useMessagesStore = defineStore("messages", () => {
   const messagesByChat = ref<Map<number, MessageRead[]>>(new Map());

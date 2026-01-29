@@ -5,8 +5,7 @@ import uuid
 from typing import List, Optional
 
 import aiofiles
-from app.api.dependencies import get_current_user
-from app.database import get_db
+from app.api.dependencies import get_current_user, get_message_service
 from app.models.message import MessageType
 from app.models.user import User
 from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
@@ -20,7 +19,6 @@ from app.tasks.message_tasks import publish_to_chat_task
 from app.ws.events import MessageCreatedEvent
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from PIL import Image
-from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +30,6 @@ VIDEO_NOTES_DIR = "uploads/video_notes"
 MEDIA_DIR = "uploads/media"
 
 router = APIRouter(tags=["messages"])
-
-
-def get_message_service(db: AsyncSession = Depends(get_db)) -> MessageService:
-    """Dependency injection для сервиса"""
-    return MessageService(db)
 
 
 @router.get("/search", response_model=List[MessageRead])
@@ -105,7 +98,7 @@ async def send_message(
 ) -> MessageRead:
     """Отправляет текстовое сообщение в чат"""
     # return await service.send_message(chat_id, msg_in, current_user)
-    msg = await service.send_message(chat_id, msg_in, current_user)
+    msg = await service.send_message(chat_id, msg_in, current_user.id)
     message_event = MessageCreatedEvent(
         id=msg.id,
         chat_id=msg.chat_id,
@@ -249,7 +242,7 @@ async def upload_voice_message(
         duration=duration,
     )
 
-    message = await service.send_message(chat_id, msg_create, current_user)
+    message = await service.send_message(chat_id, msg_create, current_user.id)
 
     # Публикуем событие в Redis/WebSocket
     message_event = MessageCreatedEvent(
@@ -311,7 +304,7 @@ async def upload_video_note(
         duration=duration,
     )
 
-    message = await service.send_message(chat_id, msg_create, current_user)
+    message = await service.send_message(chat_id, msg_create, current_user.id)
 
     message_event = MessageCreatedEvent(
         id=message.id,
@@ -380,7 +373,7 @@ async def upload_file_message(
         mimetype=file.content_type,
     )
 
-    message = await service.send_message(chat_id, msg_create, current_user)
+    message = await service.send_message(chat_id, msg_create, current_user.id)
 
     message_event = MessageCreatedEvent(
         id=message.id,
@@ -448,7 +441,7 @@ async def upload_media_message(
     Загрузка фото или видео.
     Автоматически определяет тип (IMAGE/VIDEO) по mimetype.
     """
-    print("client_width", client_width, "client_height", client_height)
+    # print("client_width", client_width, "client_height", client_height)
     if not file.content_type:
         raise HTTPException(400, "Unknown content type")
 
@@ -516,7 +509,7 @@ async def upload_media_message(
         duration=None,  # Celery обновит
     )
 
-    message = await service.send_message(chat_id, msg_create, current_user)
+    message = await service.send_message(chat_id, msg_create, current_user.id)
 
     # 5. Готовим Event для WS (как и раньше)
     message_event = MessageCreatedEvent(
@@ -547,5 +540,5 @@ async def upload_media_message(
         process_image_and_publish_task.delay(filepath, chat_id, message_event.model_dump_json())
     else:
         process_video_and_publish_task.delay(filepath, chat_id, message_event.model_dump_json())
-    print(message_event.model_dump_json())
+    # print(message_event.model_dump_json())
     return message  # Возвращаем ответ отправителю (Optimistic UI)

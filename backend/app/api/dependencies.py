@@ -1,6 +1,9 @@
 # app/api/dependencies.py
 from app.database import get_db
 from app.models.user import User
+from app.services.chat_service import ChatService
+from app.services.message_service import MessageService
+from app.services.user_service import UserService
 from app.utils.security import get_user_id_from_token
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -24,3 +27,18 @@ async def get_current_user(
             detail="User not found",
         )
     return user
+
+
+def get_message_service(db: AsyncSession = Depends(get_db)) -> MessageService:
+    """Dependency injection для сервиса"""
+    return MessageService(db)
+
+
+def get_chat_service(db: AsyncSession = Depends(get_db)) -> ChatService:
+    """Dependency injection для сервиса"""
+    return ChatService(db)
+
+
+def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
+    """Dependency injection для сервиса"""
+    return UserService(db)

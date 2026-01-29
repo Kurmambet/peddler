@@ -18,6 +18,7 @@ from app.schemas.chat import (
     UpdateGroup,
 )
 from app.schemas.message import MessageBase, MessageCreate, MessageListResponse, MessageRead
+from app.schemas.tus import TusHookRequest
 from app.schemas.user import UserBase, UserCreate, UserRead
 
 __all__ = [
@@ -44,4 +45,5 @@ __all__ = [
     "LeaveGroupResponse",
     "TransferOwnershipRequest",
     "TransferOwnershipResponse",
+    "TusHookRequest",
 ]

@@ -6,7 +6,7 @@ from typing import List
 
 import aiofiles
 import aiofiles.os
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, get_user_service
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import MyUserProfile, OtherUserProfile, UserRead, UserUpdate
@@ -22,11 +22,6 @@ IMAGEDIR = "uploads/avatars/"
 
 if not os.path.exists(IMAGEDIR):
     os.makedirs(IMAGEDIR)
-
-
-def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
-    """Dependency injection для сервиса"""
-    return UserService(db)
 
 
 @router.get("/search", response_model=List[UserRead])
