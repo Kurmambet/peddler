@@ -52,7 +52,7 @@ export function useVideoRecorder() {
 
       mediaRecorder = new MediaRecorder(mediaStream, {
         mimeType,
-        videoBitsPerSecond: 1500000,
+        videoBitsPerSecond: 600000, // 600 Kbps -> ~4.5 МБ/мин
       });
 
       mediaRecorder.ondataavailable = (e) => {

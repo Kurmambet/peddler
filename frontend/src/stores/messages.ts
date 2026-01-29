@@ -1,4 +1,5 @@
 // src/stores/messages.ts
+import { compressImage } from "@/utils/compressor";
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { messagesAPI } from "../api/messages";
@@ -547,14 +548,28 @@ export const useMessagesStore = defineStore("messages", () => {
     const isImage = file.type.startsWith("image/");
     const isVideo = file.type.startsWith("video/");
 
+    // === СЖАТИЕ (Только для картинок) ===
+    let fileToUpload = file;
+    if (isImage) {
+      try {
+        // Сжимаем перед отправкой.
+        // Это может занять 100-300мс, что незаметно для юзера
+        fileToUpload = await compressImage(file);
+      } catch (e) {
+        console.warn("Image compression failed, sending original", e);
+      }
+    }
+
     // Определяем тип сообщения
     let msgType = MessageType.FILE;
     if (isImage) msgType = MessageType.IMAGE;
     if (isVideo) msgType = MessageType.VIDEO;
 
-    // Вычисляем размеры (асинхронно, но быстро)
+    // Вычисляем размеры (асинхронно, но быстро. сжатый файл)
     const { w, h } =
-      isImage || isVideo ? await getMediaDimensions(file) : { w: 0, h: 0 };
+      isImage || isVideo
+        ? await getMediaDimensions(fileToUpload)
+        : { w: 0, h: 0 };
 
     const optimisticMsg: MessageRead = {
       id: tempId,
@@ -571,9 +586,9 @@ export const useMessagesStore = defineStore("messages", () => {
 
       // Файловые данные
       filename: file.name,
-      file_size: file.size,
-      mimetype: file.type,
-      file_url: URL.createObjectURL(file), // Локальный URL для превью "#"
+      file_size: fileToUpload.size,
+      mimetype: fileToUpload.type,
+      file_url: URL.createObjectURL(fileToUpload), // URL создаем от сжатого файла, чтобы превью сразу соответствовало реальности
 
       media_width: w || undefined,
       media_height: h || undefined,
@@ -596,7 +611,7 @@ export const useMessagesStore = defineStore("messages", () => {
       if (isImage || isVideo) {
         response = await messagesAPI.sendMedia(
           chatId,
-          file,
+          fileToUpload,
           caption,
           w,
           h,
