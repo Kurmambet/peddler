@@ -84,7 +84,7 @@ export const messagesAPI = {
     onProgress?: (progress: number) => void
   ) {
     const formData = new FormData();
-    formData.append("file", videoBlob, "videonote.webm");
+    formData.append("file", videoBlob, "video_note.webm");
 
     return apiClient.post<MessageRead>(
       `/messages/${chatId}/video_note?duration=${duration}`,

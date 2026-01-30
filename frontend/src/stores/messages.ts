@@ -237,6 +237,7 @@ export const useMessagesStore = defineStore("messages", () => {
 
   const addMessage = (event: MessageCreatedEvent) => {
     const chatId = event.chat_id;
+    const authStore = useAuthStore();
 
     if (!messagesByChat.value.has(chatId)) {
       messagesByChat.value.set(chatId, []);
@@ -251,6 +252,37 @@ export const useMessagesStore = defineStore("messages", () => {
         event.id
       );
       return;
+    }
+
+    // Если это мое сообщение
+    if (event.sender_id === authStore.user?.id) {
+      const pendingList = pendingMessages.value[chatId];
+      if (pendingList && pendingList.length > 0) {
+        // Ищем подходящее pending сообщение
+        // Самая простая эвристика: первое сообщение того же типа, которое уже "загружено" (!isUploading)
+        // или просто самое старое.
+        const pendingIndex = pendingList.findIndex(
+          (p) =>
+            !p.isUploading && // Оно уже загрузилось (Tus finished)
+            (p.message_type === event.message_type ||
+              (p.message_type === MessageType.FILE &&
+                event.message_type === MessageType.IMAGE)) // Тип может уточниться
+        );
+
+        if (pendingIndex !== -1) {
+          console.log(
+            "[MessagesStore] Replacing pending message with real one",
+            pendingList[pendingIndex].id,
+            "->",
+            event.id
+          );
+          // Удаляем из pending
+          const removed = pendingList.splice(pendingIndex, 1);
+
+          // Очищаем URL, если нужно (но осторожно, чтобы не мигнуло картинкой, если браузер еще не закешировал новый URL)
+          // URL.revokeObjectURL(removed.file_url!);
+        }
+      }
     }
 
     const newMessage: MessageRead = {
@@ -466,18 +498,33 @@ export const useMessagesStore = defineStore("messages", () => {
   ): Promise<void> => {
     return new Promise((resolve, reject) => {
       const authStore = useAuthStore();
+      const token = authStore.token;
+
+      if (!token) {
+        console.error("Upload error: No auth token found!");
+        reject(new Error("No auth token"));
+        return;
+      }
+
+      const cleanMetadata: Record<string, string> = {
+        token: token, // Токен гарантированно есть
+      };
+
+      for (const [key, value] of Object.entries(metadata)) {
+        if (value !== null && value !== undefined) {
+          cleanMetadata[key] = String(value);
+        }
+      }
+
+      console.log("Starting Tus upload with metadata:", cleanMetadata);
 
       // Создаем экземпляр загрузки
       const upload = new tus.Upload(file, {
-        // endpoint: "http://localhost:1080/files/", // Локально
         // В проде это будет /files/ через Nginx, или полный URL
-        // У вас tusd слушает 1080, если нет прокси - то http://localhost:1080/files/
-        endpoint: "http://localhost:1080/files/",
+        // tusd слушает 1080, если нет прокси - то http://localhost:1080/files/
+        endpoint: "http://localhost:1080/files/", // Локально
         retryDelays: [0, 1000, 3000, 5000],
-        metadata: {
-          ...metadata,
-          token: authStore.token || "", // Передаем токен для хука бэкенда!
-        },
+        metadata: cleanMetadata,
         onError: (error) => {
           console.error("Tus upload failed:", error);
           reject(error);
@@ -535,7 +582,7 @@ export const useMessagesStore = defineStore("messages", () => {
       //   if (msg) msg.uploadProgress = progress;
       // });
 
-      // ИСПОЛЬЗУЕМ TUS
+      // TUS
       await uploadWithTus(
         blob,
         {
@@ -543,8 +590,8 @@ export const useMessagesStore = defineStore("messages", () => {
           mimetype: "audio/webm", // Или audio/ogg
           chat_id: chatId.toString(),
           tempId: tempId,
-          // duration для Tus не обязателен, бэкенд сам разберется или через метаданные хука
-          // Но хук пока не умеет читать duration из метаданных (только из файла или Celery)
+          message_type: MessageType.VOICE,
+          duration: duration.toString(),
         },
         (progress) => {
           const msg = pendingMessages.value[chatId]?.find(
@@ -601,10 +648,12 @@ export const useMessagesStore = defineStore("messages", () => {
       await uploadWithTus(
         blob,
         {
-          filename: "videonote.webm",
+          filename: "video_note.webm",
           mimetype: "video/webm",
           chat_id: chatId.toString(),
           tempId: tempId,
+          message_type: MessageType.VIDEO_NOTE,
+          duration: duration.toString(),
         },
         (progress) => {
           const msg = pendingMessages.value[chatId]?.find(
@@ -754,6 +803,7 @@ export const useMessagesStore = defineStore("messages", () => {
           width: w ? w.toString() : null,
           height: h ? h.toString() : null,
           tempId: tempId,
+          message_type: msgType,
         },
         (p) => {
           const msg = pendingMessages.value[chatId]?.find(
@@ -763,7 +813,11 @@ export const useMessagesStore = defineStore("messages", () => {
         }
       );
 
-      removePendingMessage(chatId, tempId);
+      // removePendingMessage(chatId, tempId);
+      const msg = pendingMessages.value[chatId]?.find((m) => m.id === tempId);
+      if (msg) {
+        msg.isUploading = false;
+      }
       activeUploads.value.delete(tempId);
 
       if (wasInHistory) await checkAndResetToLive(chatId);

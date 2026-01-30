@@ -28,23 +28,23 @@ export class WebSocketClient {
     this.url = `${wsProtocol}://${wsHost}/api/v1/ws/${endpoint}?token=${token}`;
 
     // this.url = `${wsProtocol}://${wsHost}/api/v1/ws/chats/${chatId}?token=${token}`;
-    console.log("[WebSocketClient] ✅ Created client for chat", chatId);
-    console.log("[WebSocketClient] WebSocket URL:", this.url);
+    // console.log("[WebSocketClient] ✅ Created client for chat", chatId);
+    // console.log("[WebSocketClient] WebSocket URL:", this.url);
   }
 
   async connect(): Promise<void> {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      console.log("[WebSocketClient] ℹ️ Already connected");
+      // console.log("[WebSocketClient] ℹ️ Already connected");
       return;
     }
 
     return new Promise((resolve, reject) => {
       try {
         this.ws = new WebSocket(this.url);
-        console.log("[WebSocketClient] ℹ️ Created native WebSocket object");
+        // console.log("[WebSocketClient] ℹ️ Created native WebSocket object");
 
         this.ws.onopen = () => {
-          console.log("[WebSocketClient] 🎉 onopen fired!");
+          // console.log("[WebSocketClient] 🎉 onopen fired!");
           this.connected = true;
 
           // ЕСЛИ это реконнект (reconnectAttempts > 0) или просто коннект
@@ -59,17 +59,17 @@ export class WebSocketClient {
           } as any);
 
           this.reconnectAttempts = 0;
-          console.log(
-            "[WebSocketClient] ✅ Connected, flushing message queue..."
-          );
+          // console.log(
+          //   "[WebSocketClient] ✅ Connected, flushing message queue..."
+          // );
           this.flushMessageQueue();
           resolve();
         };
 
         this.ws.onclose = (event) => {
-          console.log(
-            `[WebSocketClient] 🔌 onclose fired: code=${event.code} reason=${event.reason}`
-          );
+          // console.log(
+          //   `[WebSocketClient] 🔌 onclose fired: code=${event.code} reason=${event.reason}`
+          // );
           this.connected = false;
           if (event.code !== 1000 && event.code !== 1001) {
             console.warn(
@@ -80,7 +80,7 @@ export class WebSocketClient {
         };
 
         this.ws.onerror = (error) => {
-          console.error("[WebSocketClient] ❌ onerror fired:", error);
+          // console.error("[WebSocketClient] ❌ onerror fired:", error);
           this.connected = false;
           reject(error);
         };
@@ -93,12 +93,12 @@ export class WebSocketClient {
             );
             this.handleMessage(data);
           } catch (err) {
-            console.error("[WebSocketClient] ❌ Failed to parse message:", err);
-            console.error("[WebSocketClient] Raw data:", event.data);
+            // console.error("[WebSocketClient] ❌ Failed to parse message:", err);
+            // console.error("[WebSocketClient] Raw data:", event.data);
           }
         };
       } catch (err) {
-        console.error("[WebSocketClient] ❌ Constructor error:", err);
+        // console.error("[WebSocketClient] ❌ Constructor error:", err);
         reject(err);
       }
     });
@@ -107,12 +107,12 @@ export class WebSocketClient {
   send(data: any): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       const message = JSON.stringify(data);
-      console.log(`[WebSocketClient] 📤 Sending type="${data.type}"`, data);
+      // console.log(`[WebSocketClient] 📤 Sending type="${data.type}"`, data);
       this.ws.send(message);
     } else {
-      console.warn(
-        `[WebSocketClient] ⚠️ Cannot send: readyState=${this.ws?.readyState}, queueing...`
-      );
+      // console.warn(
+      //   `[WebSocketClient] ⚠️ Cannot send: readyState=${this.ws?.readyState}, queueing...`
+      // );
       this.messageQueue.push(data);
     }
   }
@@ -124,7 +124,7 @@ export class WebSocketClient {
   sendRaw(message: string): void {
     if (this.ws?.readyState === WebSocket.OPEN) {
       // Можно раскомментировать для отладки, но будет спамить в консоль раз в 30 сек
-      console.log(`[WebSocketClient] 💓 Sending raw: ${message}`);
+      // console.log(`[WebSocketClient] 💓 Sending raw: ${message}`);
       this.ws.send(message);
     }
   }
@@ -134,13 +134,13 @@ export class WebSocketClient {
       this.eventHandlers.set(type, []);
     }
     this.eventHandlers.get(type)!.push(handler);
-    console.log(
-      `[WebSocketClient] ✅ Registered handler for event type="${type}"`
-    );
+    // console.log(
+    //   `[WebSocketClient] ✅ Registered handler for event type="${type}"`
+    // );
   }
 
   disconnect(): void {
-    console.log("[WebSocketClient] 🔌 Disconnecting...");
+    // console.log("[WebSocketClient] 🔌 Disconnecting...");
     if (this.ws) {
       this.ws.close(1000, "Client disconnect");
       this.ws = null;
@@ -187,9 +187,9 @@ export class WebSocketClient {
       return;
     }
 
-    console.log(
-      `[WebSocketClient] 📤 Flushing ${this.messageQueue.length} queued message(s)...`
-    );
+    // console.log(
+    //   `[WebSocketClient] 📤 Flushing ${this.messageQueue.length} queued message(s)...`
+    // );
 
     while (this.messageQueue.length > 0) {
       const message = this.messageQueue.shift();

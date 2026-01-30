@@ -12,6 +12,8 @@ from app.services.message_service import MessageService
 from app.tasks.media_tasks import (
     process_image_and_publish_task,
     process_video_and_publish_task,
+    process_video_note_and_publish_task,
+    publish_to_chat_task,
 )
 from app.utils.security import decode_token
 from app.ws.events import MessageCreatedEvent
@@ -33,8 +35,11 @@ async def tus_post_finish_hook(
     """
     data = await request.json()
 
+    # print(">>> TUS HOOK DATA:", json.dumps(data, indent=2))
+
     # 1. Достаем данные
-    upload_info = data.get("Upload", {})
+    event_data = data.get("Event", {})
+    upload_info = event_data.get("Upload", {})
     metadata = upload_info.get("MetaData", {})
 
     file_size = upload_info.get("Size")
@@ -46,6 +51,25 @@ async def tus_post_finish_hook(
     caption = metadata.get("caption", "")
     client_width = metadata.get("width")
     client_height = metadata.get("height")
+    raw_msg_type = metadata.get("message_type")
+    duration_str = metadata.get("duration")
+
+    duration = int(duration_str) if duration_str else None
+
+    if chat_id:
+        try:
+            chat_id = int(chat_id)
+        except ValueError:
+            raise HTTPException(400, "Invalid chat_id")
+
+    print(f"DEBUG: file_id={file_id}, chat_id={chat_id}, token_len={len(token) if token else 0}")
+
+    if not file_id or not chat_id or not token:
+        # Если чего-то нет, 400 вернет ошибку, но теперь мы увидим в логах почему
+        raise HTTPException(
+            400,
+            f"Missing metadata. Got: file_id={file_id}, chat_id={chat_id}, has_token={bool(token)}",
+        )
 
     if client_width:
         client_width = int(client_width)
@@ -67,15 +91,6 @@ async def tus_post_finish_hook(
         print(f"Auth error in hook: {e}")
         raise HTTPException(401, "Invalid user token")
 
-    # 3. Перемещение файла
-    # Файл лежит в ./uploads/tus/{file_id} или {file_id}.bin
-    # нужно переместить его в ./uploads/files/{chat_id}/...
-
-    # Путь, где tusd сохранил файл (внутри контейнера backend путь такой же, т.к. volume общий)
-    # В docker-compose backend монтирует ./uploads -> /app/uploads
-    # Tusd монтирует ./uploads/tus -> /srv/tusd-data
-    # Значит, для Бэкенда файл лежит в /app/uploads/tus/{file_id}
-
     source_path = f"uploads/tus/{file_id}"
     # Tusd создает еще .info файлы, их тоже можно почистить, но пока берем только данные
     if not await aiofiles.os.path.exists(source_path):
@@ -83,41 +98,60 @@ async def tus_post_finish_hook(
         # Обычно это просто GUID. Проверим.
         raise HTTPException(404, f"File not found at {source_path}")
 
-    # Определяем целевую папку
+    # Определяем целевую папку и тип
     file_ext = filename.split(".")[-1] if "." in filename else "bin"
     new_filename = f"{uuid.uuid4()}.{file_ext}"
 
-    msg_type = MessageType.FILE
-    target_dir = f"uploads/files/{chat_id}"
-
-    if mimetype.startswith("image/"):
+    if raw_msg_type == "voice":
+        msg_type = MessageType.VOICE
+        target_dir = f"uploads/voice/{chat_id}"
+    elif raw_msg_type == "video_note":
+        msg_type = MessageType.VIDEO_NOTE
+        target_dir = f"uploads/video_notes/{chat_id}"
+    elif raw_msg_type == "image":
         msg_type = MessageType.IMAGE
         target_dir = f"uploads/media/{chat_id}"
-    elif mimetype.startswith("video/"):
+    elif raw_msg_type == "video":
         msg_type = MessageType.VIDEO
         target_dir = f"uploads/media/{chat_id}"
+    else:
+        msg_type = MessageType.FILE
+        target_dir = f"uploads/files/{chat_id}"
 
     os.makedirs(target_dir, exist_ok=True)
+
     target_path = f"{target_dir}/{new_filename}"
 
     # ПЕРЕМЕЩАЕМ (Rename атомарен и быстр)
     await aiofiles.os.rename(source_path, target_path)
+    # Используем синхронный os.chmod, это безопасно здесь.
+    # 0o666 дает права rw-rw-rw- (чтение и запись всем пользователям)
+    try:
+        os.chmod(target_path, 0o666)
+    except Exception as e:
+        print(f"Warning: Failed to chmod {target_path}: {e}")
 
     # Удаляем .info файл от tusd (мусор)
     info_path = f"{source_path}.info"
     if await aiofiles.os.path.exists(info_path):
-        await aiofiles.os.remove(info_path)
+        try:
+            await aiofiles.os.remove(info_path)
+        except Exception:
+            pass
 
-    public_url = (
-        f"/static/media/{chat_id}/{new_filename}"
-        if msg_type != MessageType.FILE
-        else f"/static/files/{chat_id}/{new_filename}"
-    )
-
-    preview_url = None
-    if msg_type in (MessageType.IMAGE, MessageType.VIDEO):
-        preview_filename = f"thumb_{os.path.splitext(new_filename)[0]}.jpg"
-        preview_url = f"/static/media/{chat_id}/{preview_filename}"
+    # Формируем URL
+    if msg_type == MessageType.VOICE:
+        public_url = f"/static/voice/{chat_id}/{new_filename}"
+        preview_url = None
+    elif msg_type == MessageType.VIDEO_NOTE:
+        public_url = f"/static/video_notes/{chat_id}/{new_filename}"
+        preview_url = None
+    elif msg_type in (MessageType.IMAGE, MessageType.VIDEO):
+        public_url = f"/static/media/{chat_id}/{new_filename}"
+        preview_url = f"/static/media/{chat_id}/thumb_{os.path.splitext(new_filename)[0]}.jpg"
+    else:
+        public_url = f"/static/files/{chat_id}/{new_filename}"
+        preview_url = None
 
     msg_create = MessageCreate(
         chat_id=chat_id,
@@ -130,7 +164,7 @@ async def tus_post_finish_hook(
         media_width=client_width,
         media_height=client_height,
         preview_url=preview_url,
-        duration=None,  # Celery обновит
+        duration=duration,  # Celery обновит
     )
     message = await service.send_message(chat_id, msg_create, user_id)
 
@@ -152,6 +186,7 @@ async def tus_post_finish_hook(
         file_size=message.file_size,
         filename=message.filename,
         mimetype=message.mimetype,
+        duration=duration,
     )
 
     # 8. Запускаем обработку (или просто публикуем для файлов)
@@ -161,9 +196,11 @@ async def tus_post_finish_hook(
         process_image_and_publish_task.delay(target_path, int(chat_id), event_json)
     elif msg_type == MessageType.VIDEO:
         process_video_and_publish_task.delay(target_path, int(chat_id), event_json)
+    elif msg_type == MessageType.VIDEO_NOTE:
+        process_video_note_and_publish_task.delay(target_path, int(chat_id), event_json)
+    elif msg_type == MessageType.VOICE:
+        publish_to_chat_task.delay(int(chat_id), event_json)
     else:
         # Для обычных файлов просто публикуем ивент (без обработки)
-        from app.tasks.media_tasks import publish_to_chat_task
-
         publish_to_chat_task.delay(int(chat_id), event_json)
     return {"status": "processed"}
