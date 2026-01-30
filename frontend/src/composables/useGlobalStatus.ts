@@ -41,7 +41,7 @@ export function useGlobalStatus() {
     if (heartbeatInterval) {
       clearInterval(heartbeatInterval);
       heartbeatInterval = null;
-      console.log("[useGlobalStatus] 💔 Heartbeat stopped");
+      // console.log("[useGlobalStatus] 💔 Heartbeat stopped");
     }
   };
 
@@ -117,7 +117,7 @@ export function useGlobalStatus() {
       // !!! ЗАПУСКАЕМ HEARTBEAT ПОСЛЕ УСПЕШНОГО ПОДКЛЮЧЕНИЯ
       startHeartbeat();
     } catch (err) {
-      console.error("[useGlobalStatus] ❌ Connection failed:", err);
+      // console.error("[useGlobalStatus] ❌ Connection failed:", err);
       isConnected.value = false;
       stopHeartbeat(); // Останавливаем при ошибке
     }
@@ -127,7 +127,7 @@ export function useGlobalStatus() {
     stopHeartbeat(); // !!! ВАЖНО: Остановить таймер при отключении
 
     if (ws.value) {
-      console.log("[useGlobalStatus] 🔌 Disconnecting from status WebSocket");
+      // console.log("[useGlobalStatus] 🔌 Disconnecting from status WebSocket");
       ws.value.disconnect();
       ws.value = null;
       isConnected.value = false;

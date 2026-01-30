@@ -532,10 +532,6 @@ async def upload_media_message(
         mimetype=message.mimetype,
     )
 
-    # 6. Запускаем Celery задачу
-    # Мы НЕ публикуем событие здесь (publish_to_chat_task нет).
-    # Событие опубликует Celery ПОСЛЕ обработки (создания превью).
-
     if is_image:
         process_image_and_publish_task.delay(filepath, chat_id, message_event.model_dump_json())
     else:

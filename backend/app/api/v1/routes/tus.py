@@ -1,5 +1,6 @@
 # app/api/v1/routes/tus.py
 import os
+import shutil
 import uuid
 
 import aiofiles.os
@@ -122,14 +123,29 @@ async def tus_post_finish_hook(
 
     target_path = f"{target_dir}/{new_filename}"
 
-    # ПЕРЕМЕЩАЕМ (Rename атомарен и быстр)
-    await aiofiles.os.rename(source_path, target_path)
-    # Используем синхронный os.chmod, это безопасно здесь.
-    # 0o666 дает права rw-rw-rw- (чтение и запись всем пользователям)
+    # # ПЕРЕМЕЩАЕМ (Rename атомарен и быстр)
+    # await aiofiles.os.rename(source_path, target_path)
+    # # Используем синхронный os.chmod, это безопасно здесь.
+    # # 0o666 дает права rw-rw-rw- (чтение и запись всем пользователям)
+    # try:
+    #     os.chmod(target_path, 0o666)
+    # except Exception as e:
+    #     print(f"Warning: Failed to chmod {target_path}: {e}")
+
+    # Чтобы не блокировать event loop на больших файлах, можно вынести в тред
+    # Но для MVP можно и синхронно, rename тоже был быстр
     try:
+        shutil.copy2(source_path, target_path)
+        # Удаляем исходник
+        os.remove(source_path)
+
+        # Теперь файл наш, chmod должен сработать (но он может быть и не нужен,
+        # так как copy создает файл с дефолтными правами umask, обычно rw-r--r--)
         os.chmod(target_path, 0o666)
     except Exception as e:
-        print(f"Warning: Failed to chmod {target_path}: {e}")
+        print(f"Error moving file: {e}")
+        # Пытаемся fallback на rename, если copy не сработал (например места нет)
+        os.rename(source_path, target_path)
 
     # Удаляем .info файл от tusd (мусор)
     info_path = f"{source_path}.info"
