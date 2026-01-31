@@ -42,9 +42,9 @@ class RedisPubSubManager:
                 decode_responses=True,  # Автоматически декодирует bytes → str
             )
             self.pubsub = self.redis.pubsub()
-            logger.info("✅ Redis pub/sub connected")
-        except Exception as e:
-            logger.error(f"❌ Failed to connect to Redis: {e}")
+            # logger.info("✅ Redis pub/sub connected")
+        except Exception:
+            # logger.error(f"❌ Failed to connect to Redis: {e}")
             raise
 
     async def disconnect(self):
@@ -66,7 +66,7 @@ class RedisPubSubManager:
         if self.redis:
             await self.redis.close()
 
-        logger.info("✅ Redis pub/sub disconnected")
+        # logger.info("✅ Redis pub/sub disconnected")
 
     def _get_chat_channel(self, chat_id: int) -> str:
         """
@@ -99,7 +99,7 @@ class RedisPubSubManager:
         if not self._listener_task or self._listener_task.done():
             self._listener_task = asyncio.create_task(self._listen_to_redis())
 
-        logger.info(f"📡 Subscribed to Redis channel: {channel}")
+        # logger.info(f"📡 Subscribed to Redis channel: {channel}")
 
     async def unsubscribe_from_chat(self, chat_id: int):
         """
@@ -115,7 +115,7 @@ class RedisPubSubManager:
         await self.pubsub.unsubscribe(channel)
         self._subscribed_chats.discard(chat_id)
 
-        logger.info(f"📡 Unsubscribed from Redis channel: {channel}")
+        # logger.info(f"📡 Unsubscribed from Redis channel: {channel}")
 
     async def subscribe_to_user(self, user_id: int):
         """Подписываем сервер на личный канал пользователя"""
@@ -123,7 +123,7 @@ class RedisPubSubManager:
         # Подписываемся, даже если уже есть (Redis PubSub handle it),
         # но для оптимизации можно проверить локальный сет, если нужно.
         await self.pubsub.subscribe(channel)
-        logger.info(f"📡 Subscribed to User channel: {channel}")
+        # logger.info(f"📡 Subscribed to User channel: {channel}")
 
         if not self._listener_task or self._listener_task.done():
             self._listener_task = asyncio.create_task(self._listen_to_redis())
@@ -131,13 +131,13 @@ class RedisPubSubManager:
     async def unsubscribe_from_user(self, user_id: int):
         channel = self._get_user_channel(user_id)
         await self.pubsub.unsubscribe(channel)
-        logger.info(f"📡 Unsubscribed from User channel: {channel}")
+        # logger.info(f"📡 Unsubscribed from User channel: {channel}")
 
     async def publish_to_user(self, user_id: int, message: str):
         channel = self._get_user_channel(user_id)
         try:
             await self.redis.publish(channel, message)
-            logger.debug(f"📤 Published to user channel {channel}")
+            # logger.debug(f"📤 Published to user channel {channel}")
         except Exception as e:
             logger.error(f"❌ Failed to publish to user {channel}: {e}")
 
@@ -156,7 +156,7 @@ class RedisPubSubManager:
 
         try:
             await self.redis.publish(channel, message)
-            logger.debug(f"📤 Published to {channel}")
+            # logger.debug(f"📤 Published to {channel}")
         except Exception as e:
             logger.error(f"❌ Failed to publish to Redis channel {channel}: {e}")
 

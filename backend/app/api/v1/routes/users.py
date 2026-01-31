@@ -6,11 +6,12 @@ from typing import List
 
 import aiofiles
 import aiofiles.os
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, get_user_service
 from app.database import get_db
 from app.models.user import User
 from app.schemas.user import MyUserProfile, OtherUserProfile, UserRead, UserUpdate
 from app.services.user_service import UserService
+from app.tasks.avatar_tasks import process_avatar_task
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,11 +22,6 @@ IMAGEDIR = "uploads/avatars/"
 
 if not os.path.exists(IMAGEDIR):
     os.makedirs(IMAGEDIR)
-
-
-def get_user_service(db: AsyncSession = Depends(get_db)) -> UserService:
-    """Dependency injection для сервиса"""
-    return UserService(db)
 
 
 @router.get("/search", response_model=List[UserRead])
@@ -113,20 +109,18 @@ async def upload_avatar(
                 pass
 
     # 4. Асинхронно сохраняем новый файл
-    # file.read() - это метод FastAPI, он уже асинхронный
-    content = await file.read()
+    content = await file.read()  # - метод FastAPI, асинхронный
 
-    # Используем aiofiles для неблокирующей записи на диск
+    # неблокирующая запись на диск
     async with aiofiles.open(file_path, "wb") as out_file:
         await out_file.write(content)
 
     # 5. Обновляем запись в БД
-    public_url = f"/static/avatars/{new_filename}"
-
-    current_user.avatar_url = public_url
-
-    # SQLAlchemy AsyncSession
+    current_user.avatar_url = f"/static/avatars/{new_filename}"
     await db.commit()
     await db.refresh(current_user)
+
+    # запускаем фоновую оптимизацию “in-place”
+    process_avatar_task.delay(file_path)
 
     return current_user

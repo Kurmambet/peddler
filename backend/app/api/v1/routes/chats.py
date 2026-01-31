@@ -1,8 +1,7 @@
 # app/api/v1/routes/chats.py
 from typing import List
 
-from app.api.dependencies import get_current_user
-from app.database import get_db
+from app.api.dependencies import get_chat_service, get_current_user
 from app.models.chat import Chat
 from app.models.user import User
 from app.schemas.chat import (
@@ -25,14 +24,8 @@ from app.schemas.chat import (
 )
 from app.services.chat_service import ChatService
 from fastapi import APIRouter, Depends, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["chats"])
-
-
-def get_chat_service(db: AsyncSession = Depends(get_db)) -> ChatService:
-    """Dependency injection для сервиса"""
-    return ChatService(db)
 
 
 @router.post("/direct", response_model=DirectChatRead)

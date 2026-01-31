@@ -142,6 +142,9 @@ def process_image_and_publish_task(filepath: str, chat_id: int, event_json: str)
             # Исправляем ориентацию согласно EXIF (поворачиваем) перед удалением метаданных
             img = ImageOps.exif_transpose(img)
 
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+
             # 1. Генерируем Thumbnail
             # Формат: uploads/files/{chat_id}/thumb_{uuid}.jpg
             directory = os.path.dirname(filepath)
@@ -152,6 +155,9 @@ def process_image_and_publish_task(filepath: str, chat_id: int, event_json: str)
 
             # Копия для превью (300px по меньшей стороне)
             thumb_img = img.copy()
+            # на случай если нужна будет прозрачность
+            # if thumb_img.mode in ("RGBA", "P"):
+            #     thumb_img = thumb_img.convert("RGB")
             thumb_img.thumbnail((320, 320))
             thumb_img.save(thumb_path, "JPEG", quality=60, optimize=True)
 

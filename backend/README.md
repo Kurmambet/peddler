@@ -6,12 +6,10 @@ uv run uvicorn app.main:app --reload
 ```
 
 ```bash
-docker-compose -f docker-compose.dev.yml up -d
 docker-compose -f docker-compose.dev.yml up --build -d
+docker-compose -f docker-compose.prod.yml up --build -d
 docker ps
-docker exec -it peddler-redis-dev redis-cli ping
 docker-compose -f docker-compose.dev.yml down
-
 docker-compose -f docker-compose.dev.yml build --no-cache backend
 
 
@@ -41,8 +39,45 @@ alembic upgrade head
 
 
 
+добавление триггера для TSVECTOR:
+alembic revision -m "add search trigger"
 
 
+def upgrade() -> None:
+    # ... create_table ...
+
+    # 1. Создаем таблицу messages (если это initial миграция)
+    # ... op.create_table('messages' ...) ...
+
+    # 2. Добавляем триггер для автоматического обновления search_vector
+    # Используем 'russian' конфиг (или 'english', или комбинированный)
+    # coalesce(content, '') защищает от NULL
+
+    op.execute("""
+        CREATE FUNCTION messages_search_vector_update() RETURNS trigger AS $$
+        BEGIN
+            NEW.search_vector :=
+                setweight(to_tsvector('russian', coalesce(NEW.content, '')), 'A') ||
+                setweight(to_tsvector('english', coalesce(NEW.content, '')), 'B');
+            RETURN NEW;
+        END
+        $$ LANGUAGE plpgsql;
+    """)
+
+    op.execute("""
+        CREATE TRIGGER tsvectorupdate BEFORE INSERT OR UPDATE
+        ON messages FOR EACH ROW EXECUTE FUNCTION messages_search_vector_update();
+    """)
+
+
+def downgrade() -> None:
+    # ... удаление индексов ...
+
+    # Удаляем триггер и функцию
+    op.execute("DROP TRIGGER IF EXISTS tsvectorupdate ON messages")
+    op.execute("DROP FUNCTION IF EXISTS messages_search_vector_update")
+
+    # ... drop_table ...
 
 
 ```
@@ -54,8 +89,6 @@ docker-compose -f docker-compose.dev.yml down
 
 
 docker exec peddler-backend-dev alembic upgrade head
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
-INFO  [alembic.runtime.migration] Will assume transactional DDL.
 
 # Подключение
 docker exec -it peddler-db-dev psql -U peddler -d peddler

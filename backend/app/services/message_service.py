@@ -20,14 +20,12 @@ class MessageService:
         self.repo = MessageRepository(db)
         self.db = db
 
-    async def send_message(
-        self, chat_id: int, msg_in: MessageCreate, current_user: User
-    ) -> MessageRead:
+    async def send_message(self, chat_id: int, msg_in: MessageCreate, user_id: int) -> MessageRead:
         """
         Отправить сообщение в чат.
         """
         # 1. Проверяем доступ к чату
-        await self.repo.verify_chat_access(chat_id, current_user.id)
+        await self.repo.verify_chat_access(chat_id, user_id)
 
         # 2. Проверяем chat_id на соответствие
         if msg_in.chat_id != chat_id:
@@ -59,7 +57,7 @@ class MessageService:
         # 5. Создание сообщения
         message = await self.repo.create_message(
             chat_id=chat_id,
-            sender_id=current_user.id,
+            sender_id=user_id,
             content=msg_in.content,
             message_type=msg_in.message_type,
             file_url=msg_in.file_url,

@@ -1,3 +1,4 @@
+# docker-compose.dev.yml
 services:
   db:
     image: postgres:16-alpine
@@ -103,6 +104,30 @@ services:
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     networks:
       - peddler-dev-network
+
+  tusd:
+    image: tusproject/tusd:latest
+    container_name: peddler-tusd
+    restart: unless-stopped
+    ports:
+      - "1080:1080" # Порт для Tus протокола
+    volumes:
+      # Важно: монтируем ту же папку uploads, что и у бэкенда!
+      # tusd будет писать в /srv/tusd-data (внутри контейнера),
+      # а мы пробросим это в ./uploads/tus (на хосте)
+      - ./uploads/tus:/srv/tusd-data
+    command: >
+      -host=0.0.0.0 
+      -port=1080 
+      -upload-dir=/srv/tusd-data 
+      -hooks-http=http://backend:8000/api/v1/internal/tus-hook 
+      -hooks-http-retry=3 
+      -hooks-http-backoff=1s
+      -hooks-enabled-events=post-finish
+    networks:
+      - peddler-dev-network
+    depends_on:
+      - backend # Бэкенд должен быть готов принимать хуки
 
   # celery-beat:
   #   build:

@@ -8,7 +8,7 @@ export const messagesAPI = {
     limit: number = 50,
     cursor?: { before_id?: number; after_id?: number }
   ) =>
-    apiClient.get<MessageListResponse>(`/chats/${chatId}/messages`, {
+    apiClient.get<MessageListResponse>(`/messages/${chatId}`, {
       params: {
         limit,
         before_id: cursor?.before_id,
@@ -17,7 +17,7 @@ export const messagesAPI = {
     }),
 
   send: (chatId: number, content: string) =>
-    apiClient.post<MessageRead>(`/chats/${chatId}/messages`, {
+    apiClient.post<MessageRead>(`/messages/${chatId}`, {
       chat_id: chatId,
       content,
     }),
@@ -33,25 +33,21 @@ export const messagesAPI = {
     if (caption) {
       formData.append("content", caption);
     }
-    return apiClient.post<MessageRead>(
-      `/chats/${chatId}/messages/file`,
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-        // Axios progress event
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total && onProgress) {
-            const percent = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            onProgress(percent);
-          }
-        },
-        timeout: 0, // Бесконечный таймаут для больших файлов
-      }
-    );
+    return apiClient.post<MessageRead>(`/messages/${chatId}/file`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      // Axios progress event
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total && onProgress) {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          onProgress(percent);
+        }
+      },
+      timeout: 0, // Бесконечный таймаут для больших файлов
+    });
   },
 
   sendVoice(
@@ -64,7 +60,7 @@ export const messagesAPI = {
     formData.append("file", audioBlob, "voice.webm");
 
     return apiClient.post<MessageRead>(
-      `/chats/${chatId}/messages/voice?duration=${duration}`,
+      `/messages/${chatId}/voice?duration=${duration}`,
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
@@ -88,10 +84,10 @@ export const messagesAPI = {
     onProgress?: (progress: number) => void
   ) {
     const formData = new FormData();
-    formData.append("file", videoBlob, "videonote.webm");
+    formData.append("file", videoBlob, "video_note.webm");
 
     return apiClient.post<MessageRead>(
-      `/chats/${chatId}/messages/video_note?duration=${duration}`,
+      `/messages/${chatId}/video_note?duration=${duration}`,
       formData,
       {
         headers: { "Content-Type": "multipart/form-data" },
@@ -122,26 +118,22 @@ export const messagesAPI = {
     if (width) formData.append("client_width", width.toString());
     if (height) formData.append("client_height", height.toString());
 
-    return apiClient.post<MessageRead>(
-      `/chats/${chatId}/messages/media`,
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total && onProgress) {
-            const percent = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            onProgress(percent);
-          }
-        },
-        timeout: 0,
-      }
-    );
+    return apiClient.post<MessageRead>(`/messages/${chatId}/media`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total && onProgress) {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          onProgress(percent);
+        }
+      },
+      timeout: 0,
+    });
   },
 
   async search(query: string, limit = 50): Promise<MessageRead[]> {
-    const { data } = await apiClient.get<MessageRead[]>("/search", {
+    const { data } = await apiClient.get<MessageRead[]>("/messages/search", {
       params: { q: query, limit },
     });
     return data;
@@ -153,7 +145,7 @@ export const messagesAPI = {
     limit = 50
   ): Promise<MessageListResponse> {
     const { data } = await apiClient.get<MessageListResponse>(
-      `/chats/${chatId}/messages/around`,
+      `/messages/${chatId}/around`,
       {
         params: { message_id: messageId, limit },
       }
@@ -163,7 +155,7 @@ export const messagesAPI = {
 
   async searchInChat(chatId: number, query: string): Promise<MessageRead[]> {
     const { data } = await apiClient.get<MessageRead[]>(
-      `/chats/${chatId}/messages/search`,
+      `/messages/${chatId}/search`,
       { params: { q: query } }
     );
     return data;

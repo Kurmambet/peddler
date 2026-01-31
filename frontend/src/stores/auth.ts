@@ -1,5 +1,5 @@
 // src/stores/auth.ts
-
+import { compressImage } from "@/utils/compressor";
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { authAPI } from "../api/auth";
@@ -140,8 +140,19 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function uploadAvatar(file: File) {
+    let fileToUpload = file;
+    const isImage = file.type.startsWith("image/");
+    if (isImage) {
+      try {
+        // Сжимаем перед отправкой.
+        // Это может занять 100-300мс, что незаметно для юзера
+        fileToUpload = await compressImage(file);
+      } catch (e) {
+        console.warn("Image compression failed, sending original", e);
+      }
+    }
     try {
-      const updatedUser = await authAPI.uploadAvatar(file);
+      const updatedUser = await authAPI.uploadAvatar(fileToUpload);
 
       // Обновляем стейт сразу, чтобы интерфейс перерисовался
       if (user.value) {

@@ -1,0 +1,119 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: peddler-db-prod
+    restart: always # Важно: всегда перезапускать при падении
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    # Ограничиваем ресурсы БД (опционально, чтобы не съела всё)
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - peddler-prod-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: peddler-redis-prod
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_prod_data:/data
+    networks:
+      - peddler-prod-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: peddler-backend-prod
+    restart: always
+    depends_on:
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+      - backend/.env
+    environment:
+      DB_HOST: db
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      USE_REDIS_PUBSUB: "true"
+      DEBUG: "false" # Обязательно выключаем дебаг
+      # Настройки Gunicorn через ENV (если используете скрипт запуска)
+      WORKERS: 2 # Для слабого VPS: 2 воркера оптимально
+    volumes:
+      - ./uploads:/app/uploads # Только загрузки, код внутри образа
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    # Команда запуска с Gunicorn
+    command: >
+      sh -c "alembic upgrade head && 
+             gunicorn app.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 120 --keep-alive 5"
+    networks:
+      - peddler-prod-network
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: peddler-celery-worker-prod
+    restart: always
+    depends_on:
+      redis:
+        condition: service_started
+    env_file:
+      - .env
+      - backend/.env
+    environment:
+      DEBUG: "false"
+      # Важно для ffmpeg, чтобы не набрать в память 4 видео сразу и не упасть с OOM (Out Of Memory).
+      CELERYD_PREFETCH_MULTIPLIER: 1 # Заставляет воркер брать по одной задаче за раз.
+    volumes:
+      - ./uploads:/app/uploads
+    # autoscale: от 1 до 4 процессов в зависимости от нагрузки
+    # --without-gossip --without-mingle: Отключаем служебные протоколы общения воркеров.
+    # Экономит память и CPU, если всего один worker-контейнер
+    command: celery -A app.celery_app worker --loglevel=info --autoscale=4,1 --without-gossip --without-mingle
+    networks:
+      - peddler-prod-network
+
+  tusd:
+    image: tusproject/tusd:latest
+    container_name: peddler-tusd
+    restart: unless-stopped
+    user: "1000:1000" # TODO на vps сойздать папку uploads от имени 1000 пользователя. не от root!!!
+    ports:
+      - "1080:1080" # Порт для Tus протокола
+    volumes:
+      # Важно: монтируем ту же папку uploads, что и у бэкенда!
+      # tusd будет писать в /srv/tusd-data (внутри контейнера),
+      # а мы пробросим это в ./uploads/tus (на хосте)
+      - ./uploads/tus:/srv/tusd-data
+    command: >
+      -host=0.0.0.0 
+      -port=1080 
+      -upload-dir=/srv/tusd-data 
+      -hooks-http=http://backend:8000/api/v1/internal/tus-hook 
+      -hooks-http-retry=3 
+      -hooks-http-backoff=1s
+      -hooks-enabled-events=post-finish
+    networks:
+      - peddler-dev-network
+    depends_on:
+      - backend # Бэкенд должен быть готов принимать хуки
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+
+networks:
+  peddler-prod-network:
+    driver: bridge
