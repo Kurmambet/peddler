@@ -17,6 +17,8 @@ EXCLUDE_DIRS = {
     "video_notes",
     "voice",
     "files",
+    "media",
+    "tus",
 }
 
 SKIP_CONTENT_DIRS = {
@@ -29,12 +31,14 @@ SKIP_CONTENT_DIRS = {
     "video_notes",
     "voice",
     "files",
+    "media",
+    "tus",
     # "backend",
     # "backend/app/models",
     # "core",
     # "utils",
     # ".venv",
-    "frontend",
+    # "frontend",
     # "api",
     # "stores",
     # "frontend/src/styles",

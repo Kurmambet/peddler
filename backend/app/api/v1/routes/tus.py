@@ -19,10 +19,19 @@ from app.tasks.media_tasks import (
 from app.utils.security import decode_token
 from app.ws.events import MessageCreatedEvent
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(tags=["tus"])
 settings = get_settings()
+
+
+# Вспомогательная функция для безопасного перемещения
+def safe_move(src, dst):
+    # shutil.copyfile копирует ТОЛЬКО данные, без прав доступа (metadata)
+    # это спасает от Permission denied на Windows-mounts
+    shutil.copyfile(src, dst)
+    os.remove(src)
 
 
 @router.post("/internal/tus-hook")
@@ -93,10 +102,10 @@ async def tus_post_finish_hook(
         raise HTTPException(401, "Invalid user token")
 
     source_path = f"uploads/tus/{file_id}"
-    # Tusd создает еще .info файлы, их тоже можно почистить, но пока берем только данные
     if not await aiofiles.os.path.exists(source_path):
         # Возможно tusd добавляет расширение или хэширует папки.
-        # Обычно это просто GUID. Проверим.
+        # Обычно это просто GUID.
+        # Иногда tusd добавляет префиксы или меняет путь, но пока оставим как есть
         raise HTTPException(404, f"File not found at {source_path}")
 
     # Определяем целевую папку и тип
@@ -134,26 +143,35 @@ async def tus_post_finish_hook(
 
     # Чтобы не блокировать event loop на больших файлах, можно вынести в тред
     # Но для MVP можно и синхронно, rename тоже был быстр
-    try:
-        shutil.copy2(source_path, target_path)
-        # Удаляем исходник
-        os.remove(source_path)
+    # try:
+    #     shutil.copy2(source_path, target_path)
+    #     # Удаляем исходник
+    #     os.remove(source_path)
 
-        # Теперь файл наш, chmod должен сработать (но он может быть и не нужен,
-        # так как copy создает файл с дефолтными правами umask, обычно rw-r--r--)
-        os.chmod(target_path, 0o666)
+    #     # Теперь файл наш, chmod должен сработать (но он может быть и не нужен,
+    #     # так как copy создает файл с дефолтными правами umask, обычно rw-r--r--)
+    #     os.chmod(target_path, 0o666)
+    # except Exception as e:
+    #     print(f"Error moving file: {e}")
+    #     # Пытаемся fallback на rename, если copy не сработал (например места нет)
+    #     os.rename(source_path, target_path)
+
+    try:
+        # Запускаем блокирующую операцию в отдельном потоке
+        # await run_in_threadpool(shutil.move, source_path, target_path)
+        await run_in_threadpool(safe_move, source_path, target_path)
+        # await run_in_threadpool(os.chmod, target_path, 0o666)
     except Exception as e:
         print(f"Error moving file: {e}")
-        # Пытаемся fallback на rename, если copy не сработал (например места нет)
-        os.rename(source_path, target_path)
+        raise HTTPException(500, f"File processing failed: {e}")
 
     # Удаляем .info файл от tusd (мусор)
     info_path = f"{source_path}.info"
     if await aiofiles.os.path.exists(info_path):
         try:
             await aiofiles.os.remove(info_path)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"Warning: Failed to delete info file {info_path}: {e}")
 
     # Формируем URL
     if msg_type == MessageType.VOICE:

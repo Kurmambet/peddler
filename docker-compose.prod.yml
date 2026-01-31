@@ -90,6 +90,7 @@ services:
     image: tusproject/tusd:latest
     container_name: peddler-tusd
     restart: unless-stopped
+    user: "1000:1000" # TODO на vps сойздать папку uploads от имени 1000 пользователя. не от root!!!
     ports:
       - "1080:1080" # Порт для Tus протокола
     volumes:

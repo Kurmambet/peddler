@@ -1,4 +1,4 @@
-# Stage 1: Builder - устанавливаем зависимости
+# Stage 1: Builder
 FROM python:3.12-slim AS builder
 RUN rm -rf /var/lib/apt/lists/*
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -6,32 +6,27 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
-# Stage 2: Runtime - финальный образ
+# Stage 2: Runtime
 FROM python:3.12-slim
 LABEL maintainer="p.vis@gmail.com"
 LABEL description="Peddler Backend API"
 
-# ffmpeg только в финальном образе
 RUN apt-get update && \
     apt-get install -y --no-install-recommends curl ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
-# Создаем пользователя без root прав
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
-COPY --chown=appuser:appuser ./app ./app
-COPY --chown=appuser:appuser ./alembic ./alembic
-COPY --chown=appuser:appuser ./alembic.ini ./alembic.ini
+
+COPY ./app ./app
+COPY ./alembic ./alembic
+COPY ./alembic.ini ./alembic.ini
 
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
-USER appuser
-EXPOSE 8000
+# --- остаемся root ---
 
-# Production default command: Gunicorn + Uvicorn
-# workers = (2 * CPU) + 1, но для слабого VPS лучше ограничить жестко (2-4)
+EXPOSE 8000
 CMD ["gunicorn", "app.main:app", "--workers", "2", "--worker-class", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000"]
