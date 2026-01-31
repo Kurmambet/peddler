@@ -75,10 +75,10 @@ SKIP_CONTENT_FILES = {
     # "__init__.py",
     # "rate_limiter.py",
     # "exceptions.py",
-    "useVideoRecorder.ts",
-    "useVoiceRecorder.ts",
-    "useAuth.ts",
-    "player.ts",
+    # "useVideoRecorder.ts",
+    # "useVoiceRecorder.ts",
+    # "useAuth.ts",
+    # "player.ts",
     "tailwind.config.ts",
 }
 
