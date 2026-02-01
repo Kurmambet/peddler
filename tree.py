@@ -19,6 +19,8 @@ EXCLUDE_DIRS = {
     "files",
     "media",
     "tus",
+    # "public",
+    "backend",
 }
 
 SKIP_CONTENT_DIRS = {
@@ -33,7 +35,8 @@ SKIP_CONTENT_DIRS = {
     "files",
     "media",
     "tus",
-    # "backend",
+    "public",
+    "backend",
     # "backend/app/models",
     # "core",
     # "utils",

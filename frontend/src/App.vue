@@ -1,12 +1,17 @@
 <!-- src/App.vue -->
 <template>
+  <div v-if="!isOnline" class="bg-red-500 text-white p-2 text-center text-sm">
+    No internet connection. Reconnecting...
+  </div>
   <router-view />
 </template>
 
 <script setup lang="ts">
+import { useOnline } from "@vueuse/core";
 import { onMounted } from "vue";
 import { useGlobalStatus } from "./composables/useGlobalStatus";
 import { useAuthStore } from "./stores/auth";
+const isOnline = useOnline();
 
 const authStore = useAuthStore();
 
