@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512"><svg xmlns="http://www.w3.org/2000/svg" version="1.1" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512"><svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect width="512" height="512" rx="120" fill="rgb(31, 33, 33)"></rect>
+    
+    <g stroke="rgb(50, 184, 198)" stroke-width="50" stroke-linecap="round">
+        <line x1="140" y1="300" x2="300" y2="140"></line>
+        <line x1="212" y1="372" x2="372" y2="212"></line>
+    </g>
+    
+    <circle cx="256" cy="256" r="35" fill="rgb(50, 184, 198)"></circle>
+</svg></svg><style>@media (prefers-color-scheme: light) { :root { filter: none; } }
+@media (prefers-color-scheme: dark) { :root { filter: none; } }
+</style></svg>
