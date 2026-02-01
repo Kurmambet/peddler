@@ -517,12 +517,13 @@ export const useMessagesStore = defineStore("messages", () => {
       }
 
       console.log("Starting Tus upload with metadata:", cleanMetadata);
-
+      const TUS_ENDPOINT =
+        import.meta.env.VITE_TUS_URL || "http://192.168.1.101:1080/files/";
       // Создаем экземпляр загрузки
       const upload = new tus.Upload(file, {
         // В проде это будет /files/ через Nginx, или полный URL
         // tusd слушает 1080, если нет прокси - то http://localhost:1080/files/
-        endpoint: "http://localhost:1080/files/", // Локально
+        endpoint: TUS_ENDPOINT, // Локально
         retryDelays: [0, 1000, 3000, 5000],
         metadata: cleanMetadata,
         onError: (error) => {
