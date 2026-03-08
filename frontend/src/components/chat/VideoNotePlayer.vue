@@ -95,11 +95,13 @@ const isMuted = ref(true);
 const isInViewport = ref(false);
 const progress = ref(0);
 
+const BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:8000";
+
 const fullUrl = computed(() => {
   if (!props.url) return "";
   if (props.url.startsWith("http") || props.url.startsWith("blob:"))
     return props.url;
-  return `http://localhost:8000${
+  return `${BASE_URL}${
     props.url.startsWith("/") ? props.url : `/${props.url}`
   }`;
 });
