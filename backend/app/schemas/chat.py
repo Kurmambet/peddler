@@ -1,20 +1,10 @@
 # app/schemas/chat.py
 from datetime import datetime
-from enum import Enum as PyEnum
 from typing import Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
-
-class ChatType(str, PyEnum):
-    DIRECT = "direct"
-    GROUP = "group"
-
-
-class ChatParticipantRole(str, PyEnum):
-    MEMBER = "member"
-    ADMIN = "admin"
-    OWNER = "owner"
+from app.models.chat import ChatParticipantRole
 
 
 class ChatCounters(BaseModel):
@@ -58,7 +48,7 @@ class DirectChatRead(BaseModel):
 class GroupChatRead(BaseModel):
     id: int
     type: Literal["group"]
-    title: str
+    title: Optional[str] = None
     created_by_id: int
     created_at: datetime
     participant_count: Optional[int] = 0
@@ -82,7 +72,7 @@ class GroupChatCreate(BaseModel):
     type: Literal["group"] = "group"
     participant_usernames: List[str] = Field(
         ...,
-        min_items=1,  # Минимум 1 участник (помимо создателя)
+        min_length=1,  # Минимум 1 участник (помимо создателя)
         description="Usernames of participants to add (creator is added automatically)",
     )
 
@@ -92,7 +82,7 @@ class AddParticipantsRequest(BaseModel):
     """Запрос на добавление участников в группу"""
 
     usernames: List[str] = Field(
-        ..., min_items=1, max_items=50, description="Usernames of users to add to the group"
+        ..., min_length=1, max_length=50, description="Usernames of users to add to the group"
     )
 
 
@@ -100,7 +90,7 @@ class AddParticipantsResponse(BaseModel):
     """Ответ на добавление участников в группу"""
 
     added_count: int = Field(..., ge=1)
-    added_users: List[str] = Field(..., min_items=1)
+    added_users: List[str] = Field(..., min_length=1)
 
 
 class RemoveParticipantResponse(BaseModel):
@@ -136,13 +126,14 @@ class GroupChatDetailRead(BaseModel):
 
     id: int
     type: Literal["group"]
-    title: str
+    title: Optional[str] = None
     description: Optional[str] = None
     created_by_id: int
     created_at: datetime
 
     participants: List[Dict[str, Any]]  # [{user_id, username, role, is_online}]
-    my_role: ChatParticipantRole
+    # my_role: ChatParticipantRole
+    my_role: Optional[ChatParticipantRole] = None
     participant_count: int
 
     class Config:

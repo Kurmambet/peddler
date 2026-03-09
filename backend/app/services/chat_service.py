@@ -1,6 +1,6 @@
 # app/services/chat_service.py
 import logging
-from typing import Dict, List
+from typing import List
 
 from app.models.chat import Chat, ChatParticipantRole, ChatType
 from app.models.user import User
@@ -9,6 +9,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.chat import (
     AddParticipantsResponse,
     ChangeRoleResponse,
+    ChatCounters,
     ChatRead,
     DirectChatRead,
     GroupChatCreate,
@@ -165,7 +166,7 @@ class ChatService:
         for user in all_participants:
             await pubsub_manager.publish_to_user(user.id, event.model_dump_json())
 
-        return new_chat
+        return chat_read
 
     async def get_user_chats(
         self, user_id: int, limit: int = 50, offset: int = 0
@@ -443,6 +444,9 @@ class ChatService:
         requester = await self.user_repo.get_user_by_id(requester_id)
         target_user = await self.user_repo.get_user_by_id(target_user_id)
 
+        if (not target_user) or (not requester):
+            raise HTTPException(status_code=404, detail="User not found")
+
         # 6. Broadcast событие
         event = RoleChangedEvent(
             chat_id=chat_id,
@@ -456,7 +460,10 @@ class ChatService:
         await pubsub_manager.publish_to_chat(chat_id, event.model_dump_json())
 
         return ChangeRoleResponse(
-            user_id=target_user_id, username=target_user.username, new_role=new_role.value
+            user_id=target_user_id,
+            username=target_user.username,
+            # new_role=new_role.value
+            new_role=ChatParticipantRole(new_role.value),
         )
 
     async def update_group(
@@ -647,7 +654,7 @@ class ChatService:
 
         await self.db.commit()
 
-    async def get_chat_counters(self, user_id: int) -> List[Dict]:
+    async def get_chat_counters(self, user_id: int) -> List[ChatCounters]:
         # Получаем все ID чатов пользователя (можно оптимизировать репозиторий, чтобы тянул только ID)
         chats = await self.repo.get_user_chats(user_id, limit=1000)
         chat_ids = [c.id for c in chats]
@@ -658,5 +665,10 @@ class ChatService:
         unread_map = await self.repo.get_unread_counts_batch(chat_ids, user_id)
 
         return [
-            {"chat_id": chat_id, "unread_count": count} for chat_id, count in unread_map.items()
+            ChatCounters(chat_id=chat_id, unread_count=count)
+            for chat_id, count in unread_map.items()
         ]
+
+        # return [
+        #     {"chat_id": chat_id, "unread_count": count} for chat_id, count in unread_map.items()
+        # ]

@@ -2,7 +2,6 @@
 from typing import List
 
 from app.api.dependencies import get_chat_service, get_current_user
-from app.models.chat import Chat
 from app.models.user import User
 from app.schemas.chat import (
     AddParticipantsRequest,
@@ -43,7 +42,7 @@ async def create_group_chat(
     request: GroupChatCreate,
     current_user: User = Depends(get_current_user),
     service: ChatService = Depends(get_chat_service),
-) -> Chat:
+) -> GroupChatRead:
     """Создаёт новый групповой чат"""
     return await service.create_group_chat(current_user, request)
 

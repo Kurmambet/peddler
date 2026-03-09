@@ -20,7 +20,7 @@ class MessageService:
         self.repo = MessageRepository(db)
         self.db = db
 
-    async def send_message(self, chat_id: int, msg_in: MessageCreate, user_id: int) -> MessageRead:
+    async def send_message(self, chat_id: int, msg_in: MessageCreate, user_id: int) -> Message:
         """
         Отправить сообщение в чат.
         """
@@ -139,7 +139,9 @@ class MessageService:
     async def search_messages(self, user_id: int, query: str, limit: int, offset: int):
         return await self.repo.search_messages(user_id, query, limit, offset)
 
-    async def get_messages_around(self, chat_id, message_id, limit, current_user_id) -> MessageRead:
+    async def get_messages_around(
+        self, chat_id, message_id, limit, current_user_id
+    ) -> MessageListResponse:
         await self.repo.verify_chat_access(chat_id, current_user_id)
 
         messages = await self.repo.get_messages_around(chat_id, message_id, limit)

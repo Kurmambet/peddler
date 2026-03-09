@@ -1,11 +1,16 @@
 # app/models/message.py
 from enum import Enum as PyEnum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import BigInteger, Boolean, Enum, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.models.chat import Chat
+    from app.models.user import User
 
 
 class MessageType(str, PyEnum):
