@@ -249,3 +249,22 @@ export interface MessageListResponse {
   offset: number;
   has_more: boolean;
 }
+
+// ============================================================
+// INVITE
+// ============================================================
+export interface InviteTokenResponse {
+  invite_token: string;
+  full_url: string;
+}
+
+export interface GroupPreviewRead {
+  id: number;
+  type: "group";
+  title?: string;
+  description?: string;
+  participants?: ChatParticipant[];
+  participant_count: number;
+  invite_token: string;
+  full_url: string;
+}

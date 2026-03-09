@@ -27,6 +27,10 @@ class Chat(BaseModel):
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
 
+    invite_token: Mapped[String] = mapped_column(
+        String(255), nullable=True, unique=True, index=True
+    )
+
     type: Mapped[ChatType] = mapped_column(
         Enum(ChatType, name="chat_type_enum"),
         nullable=False,

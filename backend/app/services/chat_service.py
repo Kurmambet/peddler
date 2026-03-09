@@ -1,5 +1,6 @@
 # app/services/chat_service.py
 import logging
+import uuid
 from typing import List
 
 from app.models.chat import Chat, ChatParticipantRole, ChatType
@@ -15,6 +16,7 @@ from app.schemas.chat import (
     GroupChatCreate,
     GroupChatDetailRead,
     GroupChatRead,
+    GroupPreviewRead,
     LeaveGroupResponse,
     RemoveParticipantResponse,
     TransferOwnershipResponse,
@@ -672,3 +674,71 @@ class ChatService:
         # return [
         #     {"chat_id": chat_id, "unread_count": count} for chat_id, count in unread_map.items()
         # ]
+
+    async def generate_invite_token(self, chat_id: int, requester_id: int) -> str:
+        requester_role = await self.repo.get_participant_role(chat_id, requester_id)
+        if requester_role not in [ChatParticipantRole.ADMIN, ChatParticipantRole.OWNER]:
+            raise HTTPException(
+                status_code=403, detail="Only admins and owners can generate invite token"
+            )
+
+        new_token = uuid.uuid4().hex
+        await self.repo.update_invite_token(chat_id, new_token)
+        return new_token
+
+    async def revoke_invite_token(self, chat_id: int, requester_id: int) -> None:
+        requester_role = await self.repo.get_participant_role(chat_id, requester_id)
+        if requester_role not in [ChatParticipantRole.ADMIN, ChatParticipantRole.OWNER]:
+            raise HTTPException(
+                status_code=403, detail="Only admins and owners can revoke invite token"
+            )
+
+        await self.repo.update_invite_token(chat_id, None)
+
+    async def get_preview_by_invite(self, token: str) -> GroupPreviewRead:
+        chat = await self.repo.get_chat_by_invite_token(token)
+        if not chat or chat.type != ChatType.GROUP:
+            raise HTTPException(status_code=404, detail="Invalid or expired invite link")
+
+        participant_count = await self.repo.get_participant_count(chat.id)
+        return GroupPreviewRead(
+            id=chat.id,
+            type="group",
+            title=chat.title,
+            description=chat.description,
+            participants=[],  # Можно загружать первые 5 аватарок, если нужно
+            participant_count=participant_count,
+            invite_token=token,
+        )
+
+    async def join_by_invite(self, token: str, user_id: int) -> GroupChatRead:
+        chat = await self.repo.get_chat_by_invite_token(token)
+        if not chat or chat.type != ChatType.GROUP:
+            raise HTTPException(status_code=404, detail="Invalid or expired invite link")
+
+        is_participant = await self.repo.is_chat_participant(chat.id, user_id)
+        if not is_participant:
+            await self.repo.add_participant(chat.id, user_id, ChatParticipantRole.MEMBER)
+            await self.db.commit()
+
+            # Рассылка события о новом участнике
+            user = await self.user_repo.get_user_by_id(user_id)
+            event = UserJoinedEvent(
+                chat_id=chat.id,
+                user_id=user.id,
+                username=user.username,
+                added_by_id=user.id,
+                added_by_username=user.username,
+            )
+            await pubsub_manager.publish_to_chat(chat.id, event.model_dump_json())
+
+        participant_count = await self.repo.get_participant_count(chat.id)
+        return GroupChatRead(
+            id=chat.id,
+            type="group",
+            title=chat.title,
+            created_by_id=chat.created_by_id,
+            created_at=chat.created_at,
+            participant_count=participant_count,
+            unread_count=0,
+        )

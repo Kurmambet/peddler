@@ -135,9 +135,26 @@ class GroupChatDetailRead(BaseModel):
     # my_role: ChatParticipantRole
     my_role: Optional[ChatParticipantRole] = None
     participant_count: int
+    invite_token: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class InviteTokenResponse(BaseModel):
+    invite_token: str
+    full_url: str
+
+
+class GroupPreviewRead(BaseModel):
+    id: int
+    type: Literal["group"]
+    title: Optional[str] = None
+    description: Optional[str] = None
+    participants: List[Dict[str, Any]]
+    participant_count: int
+    invite_token: Optional[str] = None
+    full_url: str
 
 
 class LeaveGroupResponse(BaseModel):

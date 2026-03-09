@@ -9,6 +9,8 @@ import type {
   DirectChatRead,
   GroupChatDetailRead,
   GroupChatRead,
+  GroupPreviewRead,
+  InviteTokenResponse,
   LeaveGroupResponse,
   RemoveParticipantResponse,
   TransferOwnershipResponse,
@@ -186,6 +188,28 @@ export const chatsAPI = {
    */
   async deleteChat(chatId: number) {
     const { data } = await apiClient.delete(`/chats/${chatId}`);
+    return data;
+  },
+
+  async generateInviteToken(chatId: number): Promise<InviteTokenResponse> {
+    const { data } = await apiClient.post<InviteTokenResponse>(
+      `/chats/${chatId}/invite-token`
+    );
+    return data;
+  },
+  async revokeInviteToken(chatId: number): Promise<void> {
+    await apiClient.delete(`/chats/${chatId}/invite-token`);
+  },
+  async getInvitePreview(token: string): Promise<GroupPreviewRead> {
+    const { data } = await apiClient.get<GroupPreviewRead>(
+      `/chats/invite/${token}`
+    );
+    return data;
+  },
+  async joinByInvite(token: string): Promise<GroupChatRead> {
+    const { data } = await apiClient.post<GroupChatRead>(
+      `/chats/invite/${token}/join`
+    );
     return data;
   },
 };

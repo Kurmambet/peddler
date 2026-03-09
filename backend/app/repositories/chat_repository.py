@@ -1,6 +1,6 @@
 # app/repositories/chat_repository.py
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Sequence
 
 from app.models.chat import Chat, ChatParticipant, ChatParticipantRole, ChatType
 from app.models.message import Message
@@ -69,7 +69,9 @@ class ChatRepository:
         self.db.add(participant)
         return participant
 
-    async def get_user_chats(self, user_id: int, limit: int = 50, offset: int = 0) -> List[Chat]:
+    async def get_user_chats(
+        self, user_id: int, limit: int = 50, offset: int = 0
+    ) -> Sequence[Chat]:
         """Получить список чатов пользователя"""
         stmt = (
             select(Chat)
@@ -177,7 +179,12 @@ class ChatRepository:
         )
         result = await self.db.execute(stmt)
         # Возвращает словарь {chat_id: count}
-        return dict(result.all())
+        # return dict(result.all())
+        rows = result.all()
+        return {int(row[0]): int(row[1]) for row in rows}  # явный словарный comprehension с кастом
+
+        # from typing import cast, Dict  - можно было и так
+        # return cast(Dict[int, int], dict(result.all()))
 
     async def delete_chat(self, chat_id: int):
         # Удаляем чат (CASCADE должно удалить участников и сообщения)
@@ -238,3 +245,12 @@ class ChatRepository:
 
         logger.info(f"[get_unread_counts_batch] Final unread_map: {unread_map}")
         return unread_map
+
+    async def get_chat_by_invite_token(self, token: str) -> Optional[Chat]:
+        result = await self.db.execute(select(Chat).where(Chat.invite_token == token))
+        return result.scalar_one_or_none()
+
+    async def update_invite_token(self, chat_id: int, token: Optional[str]) -> None:
+        stmt = update(Chat).where(Chat.id == chat_id).values(invite_token=token)
+        await self.db.execute(stmt)
+        await self.db.commit()

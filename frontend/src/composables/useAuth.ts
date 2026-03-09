@@ -16,7 +16,7 @@ export function useAuth() {
     isSubmitting.value = true;
     try {
       await authStore.login(username, password);
-      await router.push("/");
+      await router.push("/"); // $route.query.redirect
     } catch (err: any) {
       throw err;
     } finally {

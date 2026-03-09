@@ -37,6 +37,13 @@ export const authAPI = {
     return data;
   },
 
+  async getUserByUsername(username: string): Promise<OtherUserProfile> {
+    const { data } = await apiClient.get<OtherUserProfile>(
+      `/users/by-username/${username}`
+    );
+    return data;
+  },
+
   async getUserProfile(userId: number): Promise<OtherUserProfile> {
     const { data } = await apiClient.get(`/users/${userId}`);
     return data;
