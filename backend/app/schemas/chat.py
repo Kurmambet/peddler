@@ -143,7 +143,6 @@ class GroupChatDetailRead(BaseModel):
 
 class InviteTokenResponse(BaseModel):
     invite_token: str
-    full_url: str
 
 
 class GroupPreviewRead(BaseModel):
@@ -154,7 +153,6 @@ class GroupPreviewRead(BaseModel):
     participants: List[Dict[str, Any]]
     participant_count: int
     invite_token: Optional[str] = None
-    full_url: str
 
 
 class LeaveGroupResponse(BaseModel):

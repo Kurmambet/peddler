@@ -255,7 +255,6 @@ export interface MessageListResponse {
 // ============================================================
 export interface InviteTokenResponse {
   invite_token: string;
-  full_url: string;
 }
 
 export interface GroupPreviewRead {
@@ -266,5 +265,4 @@ export interface GroupPreviewRead {
   participants?: ChatParticipant[];
   participant_count: number;
   invite_token: string;
-  full_url: string;
 }

@@ -188,7 +188,7 @@ async def generate_invite_token(
     service: ChatService = Depends(get_chat_service),
 ):
     token = await service.generate_invite_token(chat_id, current_user.id)
-    return InviteTokenResponse(invite_token=token, full_url=f"/join/{token}")
+    return InviteTokenResponse(invite_token=token)
 
 
 @router.delete("/{chat_id}/invite-token", status_code=status.HTTP_204_NO_CONTENT)
