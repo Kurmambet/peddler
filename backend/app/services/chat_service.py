@@ -709,6 +709,7 @@ class ChatService:
             participants=[],  # Можно загружать первые 5 аватарок, если нужно
             participant_count=participant_count,
             invite_token=token,
+            full_url=f"join/{chat.invite_token}",
         )
 
     async def join_by_invite(self, token: str, user_id: int) -> GroupChatRead:

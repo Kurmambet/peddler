@@ -1,8 +1,6 @@
 <!-- frontend/src/components/chat/JoinGroupView.vue -->
 <template>
-  <div
-    class="min-h-screen bg-app-bg-secondary flex items-center justify-center p-4"
-  >
+  <div class="min-h-screen bg-app-surface flex items-center justify-center p-4">
     <div
       class="bg-app-bg p-8 rounded-2xl shadow-sm max-w-sm w-full text-center relative border border-app-border"
     >
@@ -51,7 +49,7 @@
 
         <div
           v-if="group.description"
-          class="mb-6 p-3 bg-app-bg-secondary rounded-lg text-left text-sm text-app-text"
+          class="mb-6 p-3 bg-app-surface rounded-lg text-left text-sm text-app-text"
         >
           {{ group.description }}
         </div>

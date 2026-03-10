@@ -1,8 +1,6 @@
 <!-- frontend/src/components/user/DirectProfileView.vue -->
 <template>
-  <div
-    class="min-h-screen bg-app-bg-secondary flex items-center justify-center p-4"
-  >
+  <div class="min-h-screen bg-app-surface flex items-center justify-center p-4">
     <div
       class="bg-app-bg p-8 rounded-2xl shadow-sm max-w-sm w-full text-center relative border border-app-border"
     >
@@ -42,10 +40,7 @@
         </div>
 
         <!-- Bio -->
-        <div
-          v-if="user.bio"
-          class="mb-6 p-3 bg-app-bg-secondary rounded-lg text-left"
-        >
+        <div v-if="user.bio" class="mb-6 p-3 bg-app-bg rounded-lg text-left">
           <p class="text-sm text-app-text">{{ user.bio }}</p>
         </div>
 
