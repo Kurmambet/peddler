@@ -1,12 +1,21 @@
 # app/schemas/user.py
+import re
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class UserBase(BaseModel):
     username: str = Field(..., min_length=3, max_length=50)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        # Разрешаем только латинские буквы, цифры, точку, дефис и подчеркивание
+        if not re.match(r"^[a-zA-Z0-9_.-]+$", v):
+            raise ValueError("Username can only contain letters, numbers, _, ., and -")
+        return v
 
 
 class UserCreate(UserBase):
