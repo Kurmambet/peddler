@@ -131,6 +131,7 @@ export interface GroupChatDetailRead {
   participants: ChatParticipant[];
   my_role: ChatParticipantRole | string;
   participant_count: number;
+  invite_token: string | null;
 }
 
 export interface GroupChatCreate {

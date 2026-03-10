@@ -307,6 +307,7 @@ class ChatService:
             participants=participants_data,
             my_role=my_role,
             participant_count=len(participants_data),
+            invite_token=chat.invite_token,
         )
 
     async def add_participants(

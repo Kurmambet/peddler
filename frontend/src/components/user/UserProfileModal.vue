@@ -1,7 +1,9 @@
-<!-- frontend\src\components\user\UserProfileModal.vue -->
+<!-- frontend/src/components/user/UserProfileModal.vue -->
 <template>
   <Modal :model-value="true" @close="$emit('close')">
-    <div class="p-6 max-w-sm w-full mx-auto text-center relative">
+    <div
+      class="p-6 max-w-sm w-full mx-auto text-center relative max-h-[90vh] overflow-y-auto custom-scrollbar"
+    >
       <!-- Loading -->
       <div v-if="isLoading" class="py-10">
         <div
@@ -42,6 +44,34 @@
           <p class="text-sm text-app-text">{{ user.bio }}</p>
         </div>
 
+        <!-- QR Code Section -->
+        <div
+          class="mb-6 p-4 border border-app-border rounded-lg bg-app-bg-secondary"
+        >
+          <h3 class="text-sm font-semibold text-app-text mb-3">
+            Share Profile
+          </h3>
+          <div
+            class="justify-center mb-3 bg-white p-2 rounded-lg inline-block mx-auto"
+          >
+            <qrcode-vue :value="profileUrl" :size="150" level="H" />
+          </div>
+          <div class="flex items-center gap-2 mt-2">
+            <input
+              readonly
+              :value="profileUrl"
+              class="flex-1 bg-app-bg border border-app-border rounded px-2 py-1 text-xs text-app-text outline-none"
+            />
+            <Button
+              variant="secondary"
+              size="sm"
+              @click="copyToClipboard(profileUrl)"
+            >
+              Copy
+            </Button>
+          </div>
+        </div>
+
         <!-- Actions -->
         <div class="grid gap-3">
           <Button variant="primary" @click="handleSendMessage" full-width>
@@ -77,14 +107,15 @@
 </template>
 
 <script setup lang="ts">
-import { authAPI } from "@/api/auth"; // или usersAPI, если вынес
+import { authAPI } from "@/api/auth";
 import Avatar from "@/components/ui/Avatar.vue";
 import Button from "@/components/ui/Button.vue";
 import Modal from "@/components/ui/Modal.vue";
 import { useChatsStore } from "@/stores/chats";
 import type { OtherUserProfile } from "@/types/api";
 import { formatDistanceToNow } from "date-fns";
-import { onMounted, ref } from "vue";
+import QrcodeVue from "qrcode.vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 const props = defineProps<{ userId: number }>();
@@ -96,6 +127,20 @@ const chatsStore = useChatsStore();
 const user = ref<OtherUserProfile | null>(null);
 const isLoading = ref(true);
 const error = ref("");
+
+const profileUrl = computed(() => {
+  if (!user.value) return "";
+  return `${window.location.origin}/u/${user.value.username}`;
+});
+
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    // alert("Link copied to clipboard!");
+  } catch (err) {
+    console.error("Failed to copy", err);
+  }
+};
 
 onMounted(async () => {
   try {
@@ -117,9 +162,7 @@ const getLastSeenText = (date: string | null) => {
 
 const handleSendMessage = async () => {
   if (!user.value) return;
-
   try {
-    // Используем существующий метод создания direct чата
     const chat = await chatsStore.createDirectChat(user.value.username);
     router.push(`/chat/${chat.id}`);
     emit("close");

@@ -136,6 +136,33 @@
                 </div>
               </div>
 
+              <!-- Share Profile Section -->
+              <div
+                class="mt-6 p-4 border border-app-border rounded-lg bg-app-bg-secondary flex flex-col items-center"
+              >
+                <h4
+                  class="text-sm font-medium text-app-text mb-3 w-full text-left"
+                >
+                  Share My Profile
+                </h4>
+                <div class="bg-white p-2 rounded-lg mb-3">
+                  <qrcode-vue :value="myProfileUrl" :size="120" level="H" />
+                </div>
+                <div class="flex items-center gap-2 w-full">
+                  <input
+                    readonly
+                    :value="myProfileUrl"
+                    class="flex-1 bg-app-bg border border-app-border rounded px-2 py-1 text-xs text-app-text outline-none"
+                  />
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    @click="copyToClipboard(myProfileUrl)"
+                    >Copy</Button
+                  >
+                </div>
+              </div>
+
               <!-- Actions -->
               <div class="flex justify-end pt-4 border-t border-app-border">
                 <Button
@@ -220,6 +247,7 @@ import Input from "@/components/ui/Input.vue";
 import Modal from "@/components/ui/Modal.vue";
 import { useAuthStore } from "@/stores/auth";
 import type { CurrentUser } from "@/types/api";
+import QrcodeVue from "qrcode.vue";
 import { computed, onMounted, ref } from "vue";
 
 const authStore = useAuthStore();
@@ -246,6 +274,19 @@ const form = ref({
   display_name: "",
   bio: "",
 });
+
+const myProfileUrl = computed(() => {
+  return `${window.location.origin}/u/${form.value.username}`;
+});
+
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    // alert("Copied!");
+  } catch (err) {
+    console.error("Failed to copy", err);
+  }
+};
 
 // Initialize form
 onMounted(async () => {
