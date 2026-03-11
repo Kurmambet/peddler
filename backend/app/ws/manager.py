@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Set
 
-from fastapi import WebSocket
+from fastapi import WebSocket, status
 from sqlalchemy import update
 
 from app.models.user import User
@@ -223,3 +223,19 @@ class ConnectionManager:
         else:
             logger.info(f"[Manager] User {user_id} still has {device_count} device(s) online")
             return False
+
+    async def close_chat_connections(self, chat_id: int):
+        """Принудительно закрывает все вебсокеты заданного чата на текущем воркере."""
+        async with self._lock:
+            if chat_id in self.active_connections:
+                # Копируем сет, чтобы избежать RuntimeError при изменении размера во время итерации
+                connections = list(self.active_connections[chat_id])
+                for websocket in connections:
+                    try:
+                        await websocket.close(
+                            code=status.WS_1000_NORMAL_CLOSURE, reason="Chat deleted"
+                        )
+                    except Exception as e:
+                        logger.debug(f"Failed to close websocket for deleted chat {chat_id}: {e}")
+                # При закрытии сокета роутер (router.py) поймает WebSocketDisconnect
+                # и сам вызовет manager.disconnect() для очистки структур.

@@ -1,5 +1,7 @@
 # app/services/chat_service.py
 import logging
+import os
+import shutil
 import uuid
 from typing import List
 
@@ -24,6 +26,7 @@ from app.schemas.chat import (
 )
 from app.ws import pubsub_manager
 from app.ws.events import (
+    ChatDeletedEvent,
     GroupUpdatedEvent,
     NewChatEvent,
     RoleChangedEvent,
@@ -31,9 +34,26 @@ from app.ws.events import (
     UserLeftEvent,
 )
 from fastapi import HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+
+def delete_chat_files_sync(chat_id: int):
+    """Синхронно удаляет директории с файлами чата."""
+    base_dirs = [
+        f"uploads/voice/{chat_id}",
+        f"uploads/video_notes/{chat_id}",
+        f"uploads/files/{chat_id}",
+        f"uploads/media/{chat_id}",
+    ]
+    for directory in base_dirs:
+        if os.path.exists(directory):
+            try:
+                shutil.rmtree(directory)
+            except Exception as e:
+                logger.error(f"Failed to remove directory {directory}: {e}")
 
 
 class ChatService:
@@ -618,34 +638,18 @@ class ChatService:
         )
 
     async def delete_chat(self, chat_id: int, user_id: int):
-        """
-        Удалить чат.
-        Для Direct: удаляет чат полностью.
-        Для Group: удаляет только если ты Owner (полное удаление).
-        """
         chat = await self.repo.get_chat_by_id(chat_id)
         if not chat:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
 
         # Проверяем права
         if chat.type == ChatType.DIRECT:
-            # Проверяем, что пользователь участник
             is_participant = await self.repo.is_chat_participant(chat_id, user_id)
             if not is_participant:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN, detail="Not a participant"
                 )
-
-            # В Direct удаляем чат полностью
-            await self.repo.delete_chat(chat_id)
-
         elif chat.type == ChatType.GROUP:
-            # Сначала отправляем событие ВСЕМ участникам, что группа удалена
-            # Но так как мы сейчас удалим чат, participants могут удалиться каскадно
-            # Лучше сначала получить список участников, потом удалить
-            # await pubsub_manager.publish_to_chat(chat_id, GroupDeletedEvent(...))
-
-            # Только Owner может удалить группу
             role = await self.repo.get_participant_role(chat_id, user_id)
             if role != ChatParticipantRole.OWNER:
                 raise HTTPException(
@@ -653,9 +657,18 @@ class ChatService:
                     detail="Only owner can delete the group. Use /leave to exit.",
                 )
 
-            await self.repo.delete_chat(chat_id)
+        # 1. Отправляем событие ВСЕМ участникам и воркерам, что чат удален.
+        # Метод listen_to_redis перехватит его, отключит клиентов и вычистит ws-память.
+        event = ChatDeletedEvent(chat_id=chat_id)
+        await pubsub_manager.publish_to_chat(chat_id, event.model_dump_json())
 
+        # 2. Удаляем чат из БД (каскадно удалятся участники и сообщения)
+        await self.repo.delete_chat(chat_id)
         await self.db.commit()
+
+        # 3. Безопасно удаляем файлы и директории с диска (выполняем в фоновом потоке,
+        # чтобы не блокировать event loop долгими I/O операциями)
+        await run_in_threadpool(delete_chat_files_sync, chat_id)
 
     async def get_chat_counters(self, user_id: int) -> List[ChatCounters]:
         # Получаем все ID чатов пользователя (можно оптимизировать репозиторий, чтобы тянул только ID)

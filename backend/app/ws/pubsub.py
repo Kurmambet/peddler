@@ -1,5 +1,6 @@
 # app/ws/pubsub.py
 import asyncio
+import json
 import logging
 from typing import Optional
 
@@ -187,6 +188,14 @@ class RedisPubSubManager:
                     try:
                         chat_id = int(channel.split(":")[1])
                         await self.connection_manager.broadcast_to_chat(chat_id, data)
+
+                        try:
+                            parsed_data = json.loads(data)
+                            if parsed_data.get("type") == "chat_deleted":
+                                await self.connection_manager.close_chat_connections(chat_id)
+                                await self.unsubscribe_from_chat(chat_id)
+                        except json.JSONDecodeError:
+                            pass
                     except (IndexError, ValueError):
                         logger.error(f"Invalid chat channel format: {channel}")
 
