@@ -49,7 +49,7 @@
         <p class="text-center text-sm text-app-text-secondary">
           No account?
           <router-link
-            to="/register"
+            :to="{ path: '/register', query: $route.query }"
             class="text-app-primary hover:text-app-primary-hover"
           >
             Register

@@ -63,7 +63,7 @@
               class="flex-1 bg-app-bg border border-app-border rounded px-2 py-1 text-xs text-app-text outline-none"
             />
             <Button
-              variant="secondary"
+              variant="primary"
               size="sm"
               @click="copyToClipboard(profileUrl)"
             >
