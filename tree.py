@@ -18,13 +18,12 @@ EXCLUDE_DIRS = {
     "files",
     "media",
     "tus",
-    # "public",
-    # "backend",
+    "public",
+    "backend",
     "node_modules",
     "tests",
     "dist",
     "dev-dist",
-    "public",
 }
 
 SKIP_CONTENT_DIRS = {
@@ -54,7 +53,7 @@ SKIP_CONTENT_DIRS = {
     "frontend/src/components/auth",
     "frontend/src/components/settings",
     "frontend/src/components/ui",
-    # "frontend/src/components/user",
+    "frontend/src/components/user",
 }
 
 SKIP_CONTENT_FILES = {
@@ -80,7 +79,7 @@ SKIP_CONTENT_FILES = {
     "generate_secret.py",
     # "pyproject.toml",
     "__init__.py",
-    "rate_limiter.py",
+    # "rate_limiter.py",
     "exceptions.py",
     "useVideoRecorder.ts",
     "useVoiceRecorder.ts",
