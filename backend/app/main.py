@@ -1,5 +1,6 @@
 # backend/app/main.py
 
+import asyncio
 import mimetypes
 import os
 from contextlib import asynccontextmanager
@@ -52,29 +53,36 @@ if not os.path.exists(MEDIA_DIR):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # startup
+    # STARTUP
     await init_db()
     if settings.USE_REDIS_PUBSUB:
         await pubsub_manager.connect()
     yield
 
-    # Уведомляем всех клиентов о shutdown
-
+    # SHUTDOWN
     shutdown_event = ErrorEvent(
         code="SERVER_SHUTDOWN", message="Server is shutting down, please reconnect"
     )
 
-    for chat_id, connections in list(manager.active_connections.items()):
-        for ws in list(connections):
+    # ВАЖНО: Для потокобезопасности копируем ключи и значения из manager
+    chats_to_close = list(manager.active_connections.items())
+
+    for chat_id, connections in chats_to_close:
+        # Копируем множество (set) коннектов
+        conns_list = list(connections)
+        for ws in conns_list:
             try:
                 await ws.send_text(shutdown_event.model_dump_json())
                 await ws.close(code=1001, reason="Server shutdown")
-            except:
-                pass
+            except Exception:
+                pass  # Игнорируем ошибки, если сокет уже закрыт
 
-    # shutdown
+    # Даем немного времени на закрытие сокетов
+    await asyncio.sleep(0.5)
+
     if settings.USE_REDIS_PUBSUB:
         await pubsub_manager.disconnect()
+
     await close_db()
 
 
