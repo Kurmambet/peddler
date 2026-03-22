@@ -1,0 +1,21 @@
+# frontend/Dockerfile.prod
+# Stage 1: Сборка фронтенда
+FROM node:20-alpine AS builder
+WORKDIR /app
+
+COPY frontend/package*.json ./
+RUN npm ci
+
+COPY frontend/ .
+# При сборке подтягиваем переменные из .env
+RUN npm run build
+
+# Stage 2: Nginx сервер
+FROM nginx:alpine
+LABEL maintainer="p.vis@gmail.com"
+
+RUN rm -rf /usr/share/nginx/html/*
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+EXPOSE 80 443
+CMD ["nginx", "-g", "daemon off;"]

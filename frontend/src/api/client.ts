@@ -25,6 +25,8 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem("access_token");
       window.location.href = "/login";
+    } else if (error.response.status === 429) {
+      alert("You are sending requests too fast. Please wait a moment.");
     }
     return Promise.reject(error);
   }

@@ -1,6 +1,9 @@
 # app/services/chat_service.py
 import logging
-from typing import Dict, List
+import os
+import shutil
+import uuid
+from typing import List
 
 from app.models.chat import Chat, ChatParticipantRole, ChatType
 from app.models.user import User
@@ -9,11 +12,13 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.chat import (
     AddParticipantsResponse,
     ChangeRoleResponse,
+    ChatCounters,
     ChatRead,
     DirectChatRead,
     GroupChatCreate,
     GroupChatDetailRead,
     GroupChatRead,
+    GroupPreviewRead,
     LeaveGroupResponse,
     RemoveParticipantResponse,
     TransferOwnershipResponse,
@@ -21,6 +26,7 @@ from app.schemas.chat import (
 )
 from app.ws import pubsub_manager
 from app.ws.events import (
+    ChatDeletedEvent,
     GroupUpdatedEvent,
     NewChatEvent,
     RoleChangedEvent,
@@ -28,9 +34,26 @@ from app.ws.events import (
     UserLeftEvent,
 )
 from fastapi import HTTPException, status
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+
+def delete_chat_files_sync(chat_id: int):
+    """Синхронно удаляет директории с файлами чата."""
+    base_dirs = [
+        f"uploads/voice/{chat_id}",
+        f"uploads/video_notes/{chat_id}",
+        f"uploads/files/{chat_id}",
+        f"uploads/media/{chat_id}",
+    ]
+    for directory in base_dirs:
+        if os.path.exists(directory):
+            try:
+                shutil.rmtree(directory)
+            except Exception as e:
+                logger.error(f"Failed to remove directory {directory}: {e}")
 
 
 class ChatService:
@@ -165,7 +188,7 @@ class ChatService:
         for user in all_participants:
             await pubsub_manager.publish_to_user(user.id, event.model_dump_json())
 
-        return new_chat
+        return chat_read
 
     async def get_user_chats(
         self, user_id: int, limit: int = 50, offset: int = 0
@@ -304,6 +327,7 @@ class ChatService:
             participants=participants_data,
             my_role=my_role,
             participant_count=len(participants_data),
+            invite_token=chat.invite_token,
         )
 
     async def add_participants(
@@ -443,6 +467,9 @@ class ChatService:
         requester = await self.user_repo.get_user_by_id(requester_id)
         target_user = await self.user_repo.get_user_by_id(target_user_id)
 
+        if (not target_user) or (not requester):
+            raise HTTPException(status_code=404, detail="User not found")
+
         # 6. Broadcast событие
         event = RoleChangedEvent(
             chat_id=chat_id,
@@ -456,7 +483,10 @@ class ChatService:
         await pubsub_manager.publish_to_chat(chat_id, event.model_dump_json())
 
         return ChangeRoleResponse(
-            user_id=target_user_id, username=target_user.username, new_role=new_role.value
+            user_id=target_user_id,
+            username=target_user.username,
+            # new_role=new_role.value
+            new_role=ChatParticipantRole(new_role.value),
         )
 
     async def update_group(
@@ -608,34 +638,18 @@ class ChatService:
         )
 
     async def delete_chat(self, chat_id: int, user_id: int):
-        """
-        Удалить чат.
-        Для Direct: удаляет чат полностью.
-        Для Group: удаляет только если ты Owner (полное удаление).
-        """
         chat = await self.repo.get_chat_by_id(chat_id)
         if not chat:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
 
         # Проверяем права
         if chat.type == ChatType.DIRECT:
-            # Проверяем, что пользователь участник
             is_participant = await self.repo.is_chat_participant(chat_id, user_id)
             if not is_participant:
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN, detail="Not a participant"
                 )
-
-            # В Direct удаляем чат полностью
-            await self.repo.delete_chat(chat_id)
-
         elif chat.type == ChatType.GROUP:
-            # Сначала отправляем событие ВСЕМ участникам, что группа удалена
-            # Но так как мы сейчас удалим чат, participants могут удалиться каскадно
-            # Лучше сначала получить список участников, потом удалить
-            # await pubsub_manager.publish_to_chat(chat_id, GroupDeletedEvent(...))
-
-            # Только Owner может удалить группу
             role = await self.repo.get_participant_role(chat_id, user_id)
             if role != ChatParticipantRole.OWNER:
                 raise HTTPException(
@@ -643,11 +657,20 @@ class ChatService:
                     detail="Only owner can delete the group. Use /leave to exit.",
                 )
 
-            await self.repo.delete_chat(chat_id)
+        # 1. Отправляем событие ВСЕМ участникам и воркерам, что чат удален.
+        # Метод listen_to_redis перехватит его, отключит клиентов и вычистит ws-память.
+        event = ChatDeletedEvent(chat_id=chat_id)
+        await pubsub_manager.publish_to_chat(chat_id, event.model_dump_json())
 
+        # 2. Удаляем чат из БД (каскадно удалятся участники и сообщения)
+        await self.repo.delete_chat(chat_id)
         await self.db.commit()
 
-    async def get_chat_counters(self, user_id: int) -> List[Dict]:
+        # 3. Безопасно удаляем файлы и директории с диска (выполняем в фоновом потоке,
+        # чтобы не блокировать event loop долгими I/O операциями)
+        await run_in_threadpool(delete_chat_files_sync, chat_id)
+
+    async def get_chat_counters(self, user_id: int) -> List[ChatCounters]:
         # Получаем все ID чатов пользователя (можно оптимизировать репозиторий, чтобы тянул только ID)
         chats = await self.repo.get_user_chats(user_id, limit=1000)
         chat_ids = [c.id for c in chats]
@@ -658,5 +681,78 @@ class ChatService:
         unread_map = await self.repo.get_unread_counts_batch(chat_ids, user_id)
 
         return [
-            {"chat_id": chat_id, "unread_count": count} for chat_id, count in unread_map.items()
+            ChatCounters(chat_id=chat_id, unread_count=count)
+            for chat_id, count in unread_map.items()
         ]
+
+        # return [
+        #     {"chat_id": chat_id, "unread_count": count} for chat_id, count in unread_map.items()
+        # ]
+
+    async def generate_invite_token(self, chat_id: int, requester_id: int) -> str:
+        requester_role = await self.repo.get_participant_role(chat_id, requester_id)
+        if requester_role not in [ChatParticipantRole.ADMIN, ChatParticipantRole.OWNER]:
+            raise HTTPException(
+                status_code=403, detail="Only admins and owners can generate invite token"
+            )
+
+        new_token = uuid.uuid4().hex
+        await self.repo.update_invite_token(chat_id, new_token)
+        return new_token
+
+    async def revoke_invite_token(self, chat_id: int, requester_id: int) -> None:
+        requester_role = await self.repo.get_participant_role(chat_id, requester_id)
+        if requester_role not in [ChatParticipantRole.ADMIN, ChatParticipantRole.OWNER]:
+            raise HTTPException(
+                status_code=403, detail="Only admins and owners can revoke invite token"
+            )
+
+        await self.repo.update_invite_token(chat_id, None)
+
+    async def get_preview_by_invite(self, token: str) -> GroupPreviewRead:
+        chat = await self.repo.get_chat_by_invite_token(token)
+        if not chat or chat.type != ChatType.GROUP:
+            raise HTTPException(status_code=404, detail="Invalid or expired invite link")
+
+        participant_count = await self.repo.get_participant_count(chat.id)
+        return GroupPreviewRead(
+            id=chat.id,
+            type="group",
+            title=chat.title,
+            description=chat.description,
+            participants=[],  # Можно загружать первые 5 аватарок, если нужно
+            participant_count=participant_count,
+            invite_token=token,
+        )
+
+    async def join_by_invite(self, token: str, user_id: int) -> GroupChatRead:
+        chat = await self.repo.get_chat_by_invite_token(token)
+        if not chat or chat.type != ChatType.GROUP:
+            raise HTTPException(status_code=404, detail="Invalid or expired invite link")
+
+        is_participant = await self.repo.is_chat_participant(chat.id, user_id)
+        if not is_participant:
+            await self.repo.add_participant(chat.id, user_id, ChatParticipantRole.MEMBER)
+            await self.db.commit()
+
+            # Рассылка события о новом участнике
+            user = await self.user_repo.get_user_by_id(user_id)
+            event = UserJoinedEvent(
+                chat_id=chat.id,
+                user_id=user.id,
+                username=user.username,
+                added_by_id=user.id,
+                added_by_username=user.username,
+            )
+            await pubsub_manager.publish_to_chat(chat.id, event.model_dump_json())
+
+        participant_count = await self.repo.get_participant_count(chat.id)
+        return GroupChatRead(
+            id=chat.id,
+            type="group",
+            title=chat.title,
+            created_by_id=chat.created_by_id,
+            created_at=chat.created_at,
+            participant_count=participant_count,
+            unread_count=0,
+        )

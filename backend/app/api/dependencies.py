@@ -5,12 +5,28 @@ from app.services.chat_service import ChatService
 from app.services.message_service import MessageService
 from app.services.user_service import UserService
 from app.utils.security import get_user_id_from_token
-from fastapi import Depends, HTTPException, status
+from app.ws.rate_limiter import RateLimiter
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+
+# Экземпляр лимитера для REST API (например, 20 запросов в 1 секунду)
+rest_rate_limiter = RateLimiter(max_requests=5, window_seconds=1)
+
+
+async def check_rate_limit(request: Request):
+    """Dependency для ограничения количества запросов по IP"""
+    # Получаем IP клиента с учетом того, что мы за Nginx
+    forwarded = request.headers.get("X-Forwarded-For")
+    client_ip = forwarded.split(",")[0] if forwarded else request.client.host
+    if not await rest_rate_limiter.is_allowed(f"rest:{client_ip}"):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests. Please try again later.",
+        )
 
 
 async def get_current_user(

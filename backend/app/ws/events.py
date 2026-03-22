@@ -34,6 +34,7 @@ class EventType(str, Enum):
     GROUP_UPDATED = "group_updated"
     ROLE_CHANGED = "role_changed"
     NEW_CHAT = "new_chat"
+    CHAT_DELETED = "chat_deleted"
 
 
 class WSEvent(BaseModel):
@@ -241,3 +242,8 @@ class NewChatEvent(WSEvent):
     chat: Dict[
         str, Any
     ]  # Здесь будет сериализованный объект чата (DirectChatRead или GroupChatRead)
+
+
+class ChatDeletedEvent(WSEvent):
+    type: EventType = EventType.CHAT_DELETED
+    chat_id: int

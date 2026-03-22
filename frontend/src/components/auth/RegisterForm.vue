@@ -53,7 +53,7 @@
         <p class="text-center text-sm text-app-text-secondary">
           Have an account?
           <router-link
-            to="/login"
+            :to="{ path: '/login', query: $route.query }"
             class="text-app-primary hover:text-app-primary-hover"
           >
             Sign in

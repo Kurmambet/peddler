@@ -1,13 +1,17 @@
 # app/models/user.py
 
 from datetime import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import Boolean, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from app.models.chat import Chat, ChatParticipant
+    from app.models.message import Message
 
 
 class User(BaseModel):

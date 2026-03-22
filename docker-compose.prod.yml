@@ -1,8 +1,9 @@
+# docker-compose.prod.yml
 services:
   db:
     image: postgres:16-alpine
     container_name: peddler-db-prod
-    restart: always # Важно: всегда перезапускать при падении
+    restart: always
     env_file:
       - .env
     environment:
@@ -11,7 +12,6 @@ services:
       POSTGRES_DB: ${DB_NAME}
     volumes:
       - postgres_prod_data:/var/lib/postgresql/data
-    # Ограничиваем ресурсы БД (опционально, чтобы не съела всё)
     deploy:
       resources:
         limits:
@@ -32,71 +32,55 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     container_name: peddler-backend-prod
     restart: always
     depends_on:
-      db:
-        condition: service_started
-      redis:
-        condition: service_started
+      - db
+      - redis
     env_file:
       - .env
-      - backend/.env
     environment:
       DB_HOST: db
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       USE_REDIS_PUBSUB: "true"
-      DEBUG: "false" # Обязательно выключаем дебаг
-      # Настройки Gunicorn через ENV (если используете скрипт запуска)
-      WORKERS: 2 # Для слабого VPS: 2 воркера оптимально
+      DEBUG: "false"
+      ALLOWED_ORIGINS: "https://${DOMAIN},http://${DOMAIN}"
     volumes:
-      - ./uploads:/app/uploads # Только загрузки, код внутри образа
-    ports:
-      - "${BACKEND_PORT:-8000}:8000"
-    # Команда запуска с Gunicorn
-    command: >
-      sh -c "alembic upgrade head && 
-             gunicorn app.main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000 --timeout 120 --keep-alive 5"
+      - ./uploads:/app/uploads
     networks:
       - peddler-prod-network
 
   celery-worker:
     build:
       context: ./backend
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.prod
     container_name: peddler-celery-worker-prod
     restart: always
     depends_on:
-      redis:
-        condition: service_started
+      - redis
+      - db
     env_file:
       - .env
-      - backend/.env
     environment:
       DEBUG: "false"
-      # Важно для ffmpeg, чтобы не набрать в память 4 видео сразу и не упасть с OOM (Out Of Memory).
-      CELERYD_PREFETCH_MULTIPLIER: 1 # Заставляет воркер брать по одной задаче за раз.
+      CELERYD_PREFETCH_MULTIPLIER: 1
     volumes:
       - ./uploads:/app/uploads
-    # autoscale: от 1 до 4 процессов в зависимости от нагрузки
-    # --without-gossip --without-mingle: Отключаем служебные протоколы общения воркеров.
-    # Экономит память и CPU, если всего один worker-контейнер
-    command: celery -A app.celery_app worker --loglevel=info --autoscale=4,1 --without-gossip --without-mingle
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2 --without-gossip --without-mingle
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
     networks:
       - peddler-prod-network
 
   tusd:
     image: tusproject/tusd:latest
     container_name: peddler-tusd
-    restart: unless-stopped
-    user: "1000:1000" # TODO на vps сойздать папку uploads от имени 1000 пользователя. не от root!!!
-    ports:
-      - "1080:1080" # Порт для Tus протокола
+    restart: always
+    user: "1000:1000"
     volumes:
-      # Важно: монтируем ту же папку uploads, что и у бэкенда!
-      # tusd будет писать в /srv/tusd-data (внутри контейнера),
-      # а мы пробросим это в ./uploads/tus (на хосте)
       - ./uploads/tus:/srv/tusd-data
     command: >
       -host=0.0.0.0 
@@ -106,10 +90,32 @@ services:
       -hooks-http-retry=3 
       -hooks-http-backoff=1s
       -hooks-enabled-events=post-finish
+      -behind-proxy
     networks:
-      - peddler-dev-network
+      - peddler-prod-network
     depends_on:
-      - backend # Бэкенд должен быть готов принимать хуки
+      - backend
+
+  nginx:
+    build:
+      context: ./
+      dockerfile: frontend/Dockerfile.prod
+    container_name: peddler-nginx-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./uploads:/usr/share/nginx/html/static:ro
+      # Пробрасываем сертификаты с хоста (Read-Only)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+      - tusd
+    networks:
+      - peddler-prod-network
+
 volumes:
   postgres_prod_data:
   redis_prod_data:

@@ -1,6 +1,6 @@
 # app/models/chat.py
 from enum import Enum as PyEnum
-from typing import List
+from typing import TYPE_CHECKING, List
 
 from sqlalchemy import Enum, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -9,6 +9,11 @@ from app.models.base import BaseModel
 
 # from app.models.user import User
 # from app.models.message import Message
+
+# Этот блок "видит" только Pylance, при запуске приложения он игнорируется
+if TYPE_CHECKING:
+    from app.models.message import Message
+    from app.models.user import User
 
 
 class ChatType(str, PyEnum):
@@ -21,6 +26,10 @@ class Chat(BaseModel):
 
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+
+    invite_token: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, unique=True, index=True
+    )
 
     type: Mapped[ChatType] = mapped_column(
         Enum(ChatType, name="chat_type_enum"),

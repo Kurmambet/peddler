@@ -2,7 +2,7 @@
 
 import os
 import uuid
-from typing import List
+from typing import List, Sequence
 
 import aiofiles
 import aiofiles.os
@@ -30,7 +30,7 @@ async def search_users(
     limit: int = Query(10, ge=1, le=50),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-) -> List[User]:
+) -> Sequence[User]:
     """
     Поиск пользователей по username.
     Возвращает только активных пользователей (is_active=True).
@@ -124,3 +124,16 @@ async def upload_avatar(
     process_avatar_task.delay(file_path)
 
     return current_user
+
+
+@router.get("/by-username/{username}", response_model=OtherUserProfile)
+async def get_user_by_exact_username(
+    username: str,
+    current_user: User = Depends(get_current_user),
+    service: UserService = Depends(get_user_service),  # или db: AsyncSession
+):
+    # можно дернуть репозиторий напрямую
+    user = await service.repo.get_user_by_username(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return await service.get_other_user_profile(current_user.id, user.id)

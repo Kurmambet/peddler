@@ -5,7 +5,7 @@ import uuid
 from typing import List, Optional
 
 import aiofiles
-from app.api.dependencies import get_current_user, get_message_service
+from app.api.dependencies import check_rate_limit, get_current_user, get_message_service
 from app.models.message import MessageType
 from app.models.user import User
 from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
@@ -89,7 +89,12 @@ async def search_messages_endpoint(
     return message_reads
 
 
-@router.post("/{chat_id}", response_model=MessageRead, status_code=201)
+@router.post(
+    "/{chat_id}",
+    response_model=MessageRead,
+    status_code=201,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def send_message(
     chat_id: int,
     msg_in: MessageCreate,
@@ -187,9 +192,9 @@ async def get_chat_messages(
     return MessageListResponse(
         messages=message_reads,
         has_more=has_more,
-        offset=0,  # Deprecated, можно слать 0
-        limit=limit,
-        total=0,
+        # offset=0,  # Deprecated, можно слать 0
+        # limit=limit,
+        # total=0,
     )
 
 
@@ -222,7 +227,10 @@ async def upload_voice_message(
         raise HTTPException(400, f"File too large (max {MAX_VOICE_SIZE // 1024 // 1024}MB)")
 
     # Сохранение файла
-    file_extension = file.filename.split(".")[-1] if "." in file.filename else "webm"
+    filename = file.filename or ""
+    file_extension = filename.split(".")[-1] if "." in filename else "webm"
+    # file_extension = file.filename.split(".")[-1] if "." in file.filename else "webm"
+
     new_filename = f"{uuid.uuid4()}.{file_extension}"
     chat_dir = f"{VOICE_DIR}/{chat_id}"
     os.makedirs(chat_dir, exist_ok=True)
@@ -343,7 +351,8 @@ async def upload_file_message(
 
     # 2. Подготовка путей
     # Используем UUID для имени файла на диске, чтобы избежать коллизий
-    file_extension = file.filename.split(".")[-1] if "." in file.filename else "bin"
+    filename = file.filename or ""
+    file_extension = filename.split(".")[-1] if "." in filename else "bin"
     new_filename = f"{uuid.uuid4()}.{file_extension}"
     chat_dir = f"{FILES_DIR}/{chat_id}"
     os.makedirs(chat_dir, exist_ok=True)
@@ -452,7 +461,8 @@ async def upload_media_message(
         raise HTTPException(400, "File must be image or video")
 
     # 1. Сохраняем оригинал
-    file_ext = file.filename.split(".")[-1] if "." in file.filename else "bin"
+    filename = file.filename or ""
+    file_ext = filename.split(".")[-1] if "." in filename else "bin"
     if is_video and file_ext == "bin":
         file_ext = "mp4"  # fallback
     if is_image and file_ext == "bin":

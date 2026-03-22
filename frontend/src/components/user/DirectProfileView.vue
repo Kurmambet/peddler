@@ -1,8 +1,8 @@
-<!-- frontend/src/components/user/UserProfileModal.vue -->
+<!-- frontend/src/components/user/DirectProfileView.vue -->
 <template>
-  <Modal :model-value="true" @close="$emit('close')">
+  <div class="min-h-screen bg-app-surface flex items-center justify-center p-4">
     <div
-      class="p-6 max-w-sm w-full mx-auto text-center relative max-h-[90vh] overflow-y-auto custom-scrollbar"
+      class="bg-app-bg p-8 rounded-2xl shadow-sm max-w-sm w-full text-center relative border border-app-border"
     >
       <!-- Loading -->
       <div v-if="isLoading" class="py-10">
@@ -18,7 +18,7 @@
             :username="user.username"
             :src="user.avatar_url"
             size="xl"
-            class="w-24 h-24 text-2xl"
+            class="w-24 h-24 text-3xl shadow-sm"
           />
         </div>
 
@@ -44,39 +44,38 @@
           <p class="text-sm text-app-text">{{ user.bio }}</p>
         </div>
 
-        <!-- QR Code Section -->
-        <div
-          class="mb-6 p-4 border border-app-border rounded-lg bg-app-bg-secondary"
-        >
-          <h3 class="text-sm font-semibold text-app-text mb-3">
-            Share Profile
-          </h3>
-          <div
-            class="justify-center mb-3 bg-white p-2 rounded-lg inline-block mx-auto"
-          >
-            <qrcode-vue :value="profileUrl" :size="150" level="H" />
-          </div>
-          <div class="flex items-center gap-2 mt-2">
-            <input
-              readonly
-              :value="profileUrl"
-              class="flex-1 bg-app-bg border border-app-border rounded px-2 py-1 text-xs text-app-text outline-none"
-            />
-            <Button
-              variant="primary"
-              size="sm"
-              @click="copyToClipboard(profileUrl)"
-            >
-              Copy
-            </Button>
-          </div>
-        </div>
-
         <!-- Actions -->
         <div class="grid gap-3">
-          <Button variant="primary" @click="handleSendMessage" full-width>
+          <Button
+            variant="primary"
+            @click="handleSendMessage"
+            full-width
+            :disabled="isJoining"
+          >
             <span class="flex items-center justify-center gap-2">
               <svg
+                v-if="isJoining"
+                class="animate-spin h-5 w-5 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                ></circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                ></path>
+              </svg>
+              <svg
+                v-else
                 class="w-5 h-5"
                 fill="none"
                 stroke="currentColor"
@@ -89,65 +88,58 @@
                   d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
                 />
               </svg>
-              Send Message
+              {{ isJoining ? "Opening chat..." : "Send Message" }}
             </span>
           </Button>
 
-          <!-- Block (позже) -->
-          <!-- <Button variant="secondary" class="text-app-error border-app-error/30 hover:bg-app-error/10">Block User</Button> -->
+          <Button variant="secondary" @click="router.push('/')" full-width>
+            Back to Chats
+          </Button>
         </div>
       </template>
 
       <!-- Error -->
-      <div v-else-if="error" class="py-6 text-app-error">
-        {{ error }}
+      <div v-else-if="error" class="py-6 text-center">
+        <p class="text-app-error mb-4">{{ error }}</p>
+        <Button variant="primary" @click="router.push('/')">Go Home</Button>
       </div>
     </div>
-  </Modal>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { authAPI } from "@/api/auth";
 import Avatar from "@/components/ui/Avatar.vue";
 import Button from "@/components/ui/Button.vue";
-import Modal from "@/components/ui/Modal.vue";
 import { useChatsStore } from "@/stores/chats";
 import type { OtherUserProfile } from "@/types/api";
 import { formatDistanceToNow } from "date-fns";
-import QrcodeVue from "qrcode.vue";
-import { computed, onMounted, ref } from "vue";
-import { useRouter } from "vue-router";
+import { onMounted, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
-const props = defineProps<{ userId: number }>();
-const emit = defineEmits(["close"]);
-
+const route = useRoute();
 const router = useRouter();
 const chatsStore = useChatsStore();
 
 const user = ref<OtherUserProfile | null>(null);
 const isLoading = ref(true);
+const isJoining = ref(false);
 const error = ref("");
 
-const profileUrl = computed(() => {
-  if (!user.value) return "";
-  return `${window.location.origin}/u/${user.value.username}`;
-});
-
-const copyToClipboard = async (text: string) => {
-  try {
-    await navigator.clipboard.writeText(text);
-    // alert("Link copied to clipboard!");
-  } catch (err) {
-    console.error("Failed to copy", err);
-  }
-};
-
 onMounted(async () => {
+  const username = route.params.username as string;
+  if (!username) {
+    error.value = "Invalid username link";
+    isLoading.value = false;
+    return;
+  }
+
   try {
-    user.value = await authAPI.getUserProfile(props.userId);
+    // Вызываем новый метод для поиска по username
+    user.value = await authAPI.getUserByUsername(username);
   } catch (e: any) {
     console.error("Failed to load profile", e);
-    error.value = "Failed to load user profile";
+    error.value = "User not found or unavailable";
   } finally {
     isLoading.value = false;
   }
@@ -162,12 +154,15 @@ const getLastSeenText = (date: string | null) => {
 
 const handleSendMessage = async () => {
   if (!user.value) return;
+  isJoining.value = true;
   try {
     const chat = await chatsStore.createDirectChat(user.value.username);
     router.push(`/chat/${chat.id}`);
-    emit("close");
   } catch (e) {
     console.error("Failed to start chat", e);
+    error.value = "Could not create chat";
+  } finally {
+    isJoining.value = false;
   }
 };
 </script>

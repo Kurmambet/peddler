@@ -30,6 +30,7 @@ taskkill /PID 8200 /F
 alembic revision --autogenerate -m "Initial migration"
 alembic revision --autogenerate -m "add_full_text_search"
 alembic revision --autogenerate -m "add media fields2"
+alembic revision --autogenerate -m "add invite_token"
 
     with op.get_context().autocommit_block():
         op.execute("ALTER TYPE messagetype ADD VALUE 'IMAGE'")

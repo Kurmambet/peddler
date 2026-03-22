@@ -118,11 +118,13 @@ const hoverProgress = ref<number | null>(null);
 
 let wavUrl: string | null = null;
 
+const BASE_URL = import.meta.env.VITE_BASE_URL || "http://localhost:8000";
+
 const fullUrl = computed(() => {
   if (props.url.startsWith("http") || props.url.startsWith("blob:"))
     return props.url;
-  return `http://localhost:8000${
-    props.url.startsWith("/") ? props.url : `/${props.url}`
+  return `${BASE_URL}${
+    props.url.startsWith("/") ? props.url : "/" + props.url
   }`;
 });
 

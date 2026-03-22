@@ -1,12 +1,22 @@
 // src/composables/useAuth.ts
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 
 export function useAuth() {
   const authStore = useAuthStore();
   const router = useRouter();
+  const route = useRoute();
   const isSubmitting = ref(false);
+
+  const getRedirectPath = (): string => {
+    const redirect = route.query.redirect as string;
+    // Защита от Open Redirect: убеждаемся, что путь локальный (начинается с '/' и не является '//')
+    if (redirect && redirect.startsWith("/") && !redirect.startsWith("//")) {
+      return redirect;
+    }
+    return "/";
+  };
 
   const handleLogin = async (username: string, password: string) => {
     if (!username || !password) {
@@ -16,7 +26,8 @@ export function useAuth() {
     isSubmitting.value = true;
     try {
       await authStore.login(username, password);
-      await router.push("/");
+      // Используем безопасный путь
+      await router.push(getRedirectPath());
     } catch (err: any) {
       throw err;
     } finally {
@@ -36,7 +47,8 @@ export function useAuth() {
     isSubmitting.value = true;
     try {
       await authStore.register(username, password);
-      await router.push("/");
+      // Используем безопасный путь и для регистрации
+      await router.push(getRedirectPath());
     } catch (err: any) {
       throw err;
     } finally {

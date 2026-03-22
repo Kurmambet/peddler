@@ -2,7 +2,6 @@
 from typing import List
 
 from app.api.dependencies import get_chat_service, get_current_user
-from app.models.chat import Chat
 from app.models.user import User
 from app.schemas.chat import (
     AddParticipantsRequest,
@@ -16,6 +15,8 @@ from app.schemas.chat import (
     GroupChatCreate,
     GroupChatDetailRead,
     GroupChatRead,
+    GroupPreviewRead,
+    InviteTokenResponse,
     LeaveGroupResponse,
     RemoveParticipantResponse,
     TransferOwnershipRequest,
@@ -43,7 +44,7 @@ async def create_group_chat(
     request: GroupChatCreate,
     current_user: User = Depends(get_current_user),
     service: ChatService = Depends(get_chat_service),
-) -> Chat:
+) -> GroupChatRead:
     """Создаёт новый групповой чат"""
     return await service.create_group_chat(current_user, request)
 
@@ -178,3 +179,36 @@ async def leave_group(
     Если вы OWNER и остались другие участники, сначала передайте права.
     """
     return await service.leave_group(chat_id, current_user.id)
+
+
+@router.post("/{chat_id}/invite-token", response_model=InviteTokenResponse)
+async def generate_invite_token(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+):
+    token = await service.generate_invite_token(chat_id, current_user.id)
+    return InviteTokenResponse(invite_token=token)
+
+
+@router.delete("/{chat_id}/invite-token", status_code=status.HTTP_204_NO_CONTENT)
+async def revoke_invite_token(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+):
+    await service.revoke_invite_token(chat_id, current_user.id)
+
+
+@router.get("/invite/{token}", response_model=GroupPreviewRead)
+async def get_invite_preview(token: str, service: ChatService = Depends(get_chat_service)):
+    return await service.get_preview_by_invite(token)
+
+
+@router.post("/invite/{token}/join", response_model=GroupChatRead)
+async def join_chat_by_invite(
+    token: str,
+    current_user: User = Depends(get_current_user),
+    service: ChatService = Depends(get_chat_service),
+):
+    return await service.join_by_invite(token, current_user.id)

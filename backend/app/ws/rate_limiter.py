@@ -1,27 +1,36 @@
-# app/ws/rate_limiter.py
-from collections import defaultdict
-from datetime import datetime, timedelta
+import time
+
+from app.ws.globals import pubsub_manager
 
 
 class RateLimiter:
-    """Простой in-memory rate limiter."""
+    """Rate limiter на базе Redis (Sliding Window Log)."""
 
     def __init__(self, max_requests: int = 10, window_seconds: int = 1):
         self.max_requests = max_requests
-        self.window = timedelta(seconds=window_seconds)
-        self.requests = defaultdict(list)
+        self.window_seconds = window_seconds
 
-    async def is_allowed(self, user_id: int) -> bool:
-        now = datetime.utcnow()
-        cutoff = now - self.window
+    async def is_allowed(self, identifier: str) -> bool:
+        """
+        Проверяет, разрешен ли запрос.
+        """
 
-        # Удаляем старые запросы
-        self.requests[user_id] = [
-            req_time for req_time in self.requests[user_id] if req_time > cutoff
-        ]
+        # Если Redis еще не подключен (например, тесты или сбой), пропускаем запрос
+        if not pubsub_manager.redis:
+            return True
 
-        if len(self.requests[user_id]) >= self.max_requests:
-            return False
+        key = f"rate_limit:{identifier}"
+        now = time.time()
+        window_start = now - self.window_seconds
 
-        self.requests[user_id].append(now)
-        return True
+        # Используем pipeline через уже существующий клиент Redis
+        async with pubsub_manager.redis.pipeline(transaction=True) as pipe:
+            pipe.zremrangebyscore(key, 0, window_start)
+            pipe.zadd(key, {str(now): now})
+            pipe.zcard(key)
+            pipe.expire(key, self.window_seconds + 1)
+
+            results = await pipe.execute()
+
+        request_count = results[2]
+        return request_count <= self.max_requests

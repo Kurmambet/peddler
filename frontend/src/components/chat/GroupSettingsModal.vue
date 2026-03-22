@@ -54,6 +54,60 @@
         <template v-else>
           <!-- Tab: INFO -->
           <div v-if="activeTab === 'info'" class="space-y-6">
+            <!-- Invite Link Section (Only for Admins/Owners) -->
+            <div
+              class="p-4 border border-app-border rounded-lg bg-app-bg-secondary"
+            >
+              <div
+                v-if="canEdit"
+                class="flex justify-between items-center mb-3"
+              >
+                <h3 class="text-sm font-semibold text-app-text">Invite Link</h3>
+                <Button
+                  v-if="inviteToken"
+                  variant="secondary"
+                  size="sm"
+                  @click="generateNewInviteLink"
+                  :disabled="isGeneratingLink"
+                >
+                  {{ isGeneratingLink ? "Generating..." : "Regenerate Link" }}
+                </Button>
+              </div>
+
+              <div v-if="inviteToken" class="flex flex-col items-center">
+                <div class="bg-white p-2 rounded-lg mb-3">
+                  <qrcode-vue :value="groupInviteUrl" :size="150" level="H" />
+                </div>
+                <div class="flex items-center gap-2 w-full">
+                  <input
+                    readonly
+                    :value="groupInviteUrl"
+                    class="flex-1 bg-app-bg border border-app-border rounded px-3 py-2 text-sm text-app-text outline-none"
+                  />
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    @click="copyToClipboard(groupInviteUrl)"
+                  >
+                    Copy
+                  </Button>
+                </div>
+              </div>
+
+              <div v-else class="text-center py-4">
+                <p class="text-sm text-app-text-secondary mb-3">
+                  No invite link generated yet.
+                </p>
+                <Button
+                  variant="primary"
+                  @click="generateNewInviteLink"
+                  :disabled="isGeneratingLink"
+                >
+                  {{ isGeneratingLink ? "Generating..." : "Generate Link" }}
+                </Button>
+              </div>
+            </div>
+
             <Input
               v-model="form.title"
               label="Group Name"
@@ -152,6 +206,7 @@
 </template>
 
 <script setup lang="ts">
+import { chatsAPI } from "@/api/chats";
 import Button from "@/components/ui/Button.vue";
 import Input from "@/components/ui/Input.vue";
 import Modal from "@/components/ui/Modal.vue";
@@ -159,6 +214,7 @@ import UserProfileModal from "@/components/user/UserProfileModal.vue";
 import router from "@/router";
 import { useAuthStore } from "@/stores/auth";
 import { useChatsStore } from "@/stores/chats";
+import QrcodeVue from "qrcode.vue";
 import { computed, onMounted, ref } from "vue";
 import AddParticipantsModal from "./AddParticipantsModal.vue";
 import GroupMembersList from "./GroupMembersList.vue";
@@ -209,6 +265,40 @@ const isChanged = computed(() => {
   );
 });
 
+const inviteToken = ref<string | null>(null);
+const isGeneratingLink = ref(false);
+
+const groupInviteUrl = computed(() => {
+  if (!inviteToken.value) return "";
+  return `${window.location.origin}/join/${inviteToken.value}`;
+});
+
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text);
+    // alert("Link copied to clipboard!");
+  } catch (err) {
+    console.error("Failed to copy", err);
+  }
+};
+
+const generateNewInviteLink = async () => {
+  isGeneratingLink.value = true;
+  try {
+    const response = await chatsAPI.generateInviteToken(props.chatId);
+    inviteToken.value = response.invite_token;
+    // Обновляем токен в сторе, чтобы при закрытии/открытии он сохранился
+    if (chatsStore.currentGroupDetails) {
+      chatsStore.currentGroupDetails.invite_token = response.invite_token;
+    }
+  } catch (error) {
+    console.error("Failed to generate link", error);
+    alert("Failed to generate invite link");
+  } finally {
+    isGeneratingLink.value = false;
+  }
+};
+
 const loadData = async () => {
   isLoading.value = true;
   try {
@@ -216,9 +306,11 @@ const loadData = async () => {
     const details = chatsStore.currentGroupDetails;
     if (details) {
       form.value = {
-        title: details.title,
+        title: details.title || "",
         description: details.description || "",
       };
+      // Устанавливаем токен из полученных данных группы
+      inviteToken.value = details.invite_token || null;
     }
   } catch (e) {
     console.error("Failed to load group details", e);

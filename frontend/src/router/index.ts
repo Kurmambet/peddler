@@ -28,6 +28,18 @@ const routes = [
     component: () => import("@/components/chat/CreateDirectChat.vue"),
     meta: { requiresAuth: true },
   },
+  {
+    path: "/join/:token",
+    name: "JoinGroup",
+    component: () => import("../components/chat/JoinGroupView.vue"),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/u/:username",
+    name: "DirectProfile",
+    component: () => import("../components/user/DirectProfileView.vue"),
+    meta: { requiresAuth: true },
+  },
 ];
 
 const router = createRouter({
@@ -54,14 +66,16 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-    return "/login";
+    return { path: "/login", query: { redirect: to.fullPath } };
   }
+
   if (
     authStore.isAuthenticated &&
     (to.path === "/login" || to.path === "/register")
   ) {
-    return "/";
+    // Если юзер вошел, отправляем его по intent-ссылке или на главную
+    const redirectPath = to.query.redirect as string;
+    return redirectPath || "/";
   }
 });
-
 export default router;

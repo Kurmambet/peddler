@@ -116,7 +116,11 @@ function createChatInstance() {
       });
 
       ws.value.onMessage("error", (event: any) => {
-        console.error("[useChat] ❌ WebSocket error event:", event);
+        if (event.code === "RATE_LIMIT_EXCEEDED") {
+          alert(event.message || "Sending messages too fast");
+        } else {
+          console.error("[useChat] WebSocket error event:", event);
+        }
       });
 
       // ws.value.onMessage("connected", (event: any) => {

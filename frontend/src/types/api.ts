@@ -131,6 +131,7 @@ export interface GroupChatDetailRead {
   participants: ChatParticipant[];
   my_role: ChatParticipantRole | string;
   participant_count: number;
+  invite_token: string | null;
 }
 
 export interface GroupChatCreate {
@@ -248,4 +249,21 @@ export interface MessageListResponse {
   limit: number;
   offset: number;
   has_more: boolean;
+}
+
+// ============================================================
+// INVITE
+// ============================================================
+export interface InviteTokenResponse {
+  invite_token: string;
+}
+
+export interface GroupPreviewRead {
+  id: number;
+  type: "group";
+  title?: string;
+  description?: string;
+  participants?: ChatParticipant[];
+  participant_count: number;
+  invite_token: string;
 }

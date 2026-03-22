@@ -16,7 +16,7 @@ router = APIRouter(tags=["auth"])
 async def register_user(
     user_in: UserCreate,
     db: AsyncSession = Depends(get_db),
-) -> UserRead:
+) -> UserRead:  # Оставляем строгий тип
     # Проверить, что username свободен
     result = await db.execute(select(User).where(User.username == user_in.username))
     existing_user = result.scalars().first()
@@ -31,11 +31,12 @@ async def register_user(
         username=user_in.username,
         hashed_password=hash_password(user_in.password),
     )
-    db.add(db_user)  # помечаем объект на вставку
-    await db.commit()  # отправляем INSERT в БД, фиксируем транзакцию
-    await db.refresh(db_user)  # заново читает объект из БД и обновляет его поля
+    db.add(db_user)
+    await db.commit()
+    await db.refresh(db_user)
 
-    return db_user  # Pydantic сам превратит в UserRead через from_attributes
+    # Явно конвертируем SQLAlchemy объект в Pydantic модель
+    return UserRead.model_validate(db_user)
 
 
 # oauth2_scheme
@@ -74,35 +75,3 @@ async def debug_token(token: str):
 @router.get("/me", response_model=UserRead)
 async def read_me(current_user: User = Depends(get_current_user)):
     return current_user
-
-
-# @router.get("/users/search", response_model=List[UserRead])
-# async def search_users(
-#     q: str = Query(..., min_length=1, max_length=50, description="Search query"),
-#     limit: int = Query(10, ge=1, le=50),
-#     current_user: User = Depends(get_current_user),
-#     db: AsyncSession = Depends(get_db),
-# ) -> List[User]:
-#     """
-#     Поиск пользователей по username.
-#     Возвращает только активных пользователей (is_active=True).
-#     Не возвращает текущего пользователя.
-#     """
-#     # Поиск по LIKE (регистронезависимый)
-#     stmt = (
-#         select(User)
-#         .where(
-#             and_(
-#                 or_(User.username.ilike(f"%{q}%"), User.display_name.ilike(f"%{q}%")),
-#                 User.is_active,
-#                 User.id != current_user.id,
-#             )
-#         )
-#         .limit(limit)
-#         .order_by(User.username)
-#     )
-
-#     result = await db.execute(stmt)
-#     users = result.scalars().all()
-
-#     return users
