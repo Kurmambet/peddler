@@ -14,7 +14,7 @@ class RateLimiter:
         """
         Проверяет, разрешен ли запрос.
         """
-        print("rest_rate_limiter.is_allowed(frest:client_ip) вызван. identifier:", identifier)
+
         # Если Redis еще не подключен (например, тесты или сбой), пропускаем запрос
         if not pubsub_manager.redis:
             return True
@@ -33,12 +33,4 @@ class RateLimiter:
             results = await pipe.execute()
 
         request_count = results[2]
-        print(
-            "request_count:",
-            request_count,
-            "self.max_requests",
-            self.max_requests,
-            "is_allowed:",
-            request_count <= self.max_requests,
-        )
         return request_count <= self.max_requests

@@ -72,7 +72,7 @@ async def tus_post_finish_hook(
         except ValueError:
             raise HTTPException(400, "Invalid chat_id")
 
-    print(f"DEBUG: file_id={file_id}, chat_id={chat_id}, token_len={len(token) if token else 0}")
+    # print(f"DEBUG: file_id={file_id}, chat_id={chat_id}, token_len={len(token) if token else 0}")
 
     if not file_id or not chat_id or not token:
         # Если чего-то нет, 400 вернет ошибку, но теперь мы увидим в логах почему
@@ -97,8 +97,8 @@ async def tus_post_finish_hook(
         user_id = int(payload.get("sub"))
         user_repo = UserRepository(db)
         user = await user_repo.get_user_by_id(user_id)
-    except Exception as e:
-        print(f"Auth error in hook: {e}")
+    except Exception:
+        # print(f"Auth error in hook: {e}")
         raise HTTPException(401, "Invalid user token")
 
     source_path = f"uploads/tus/{file_id}"
@@ -162,7 +162,7 @@ async def tus_post_finish_hook(
         await run_in_threadpool(safe_move, source_path, target_path)
         # await run_in_threadpool(os.chmod, target_path, 0o666)
     except Exception as e:
-        print(f"Error moving file: {e}")
+        # print(f"Error moving file: {e}")
         raise HTTPException(500, f"File processing failed: {e}")
 
     # Удаляем .info файл от tusd (мусор)

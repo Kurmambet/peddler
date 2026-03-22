@@ -22,7 +22,6 @@ async def check_rate_limit(request: Request):
     # Получаем IP клиента с учетом того, что мы за Nginx
     forwarded = request.headers.get("X-Forwarded-For")
     client_ip = forwarded.split(",")[0] if forwarded else request.client.host
-    print("check_rate_limit вызван")
     if not await rest_rate_limiter.is_allowed(f"rest:{client_ip}"):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

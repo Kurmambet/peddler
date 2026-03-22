@@ -106,9 +106,9 @@ def get_settings() -> Settings:
     return Settings()
 
 
-if __name__ == "__main__":
-    settings = get_settings()
-    print("ENV_FILE:", ENV_FILE)
-    print("DATABASE_URL:", settings.DATABASE_URL)
-    print("ALLOWED_ORIGINS:", settings.ALLOWED_ORIGINS)
-    print("Type:", type(settings.ALLOWED_ORIGINS))
+# if __name__ == "__main__":
+#     settings = get_settings()
+#     print("ENV_FILE:", ENV_FILE)
+#     print("DATABASE_URL:", settings.DATABASE_URL)
+#     print("ALLOWED_ORIGINS:", settings.ALLOWED_ORIGINS)
+#     print("Type:", type(settings.ALLOWED_ORIGINS))

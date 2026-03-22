@@ -87,7 +87,6 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: int):
             # --- RATE LIMIT ---
             # Для WS мы ограничиваем по user_id, чтобы один пользователь не спамил
             is_allowed = await rate_limiter.is_allowed(f"ws_user:{user.id}")
-            print(f"ws_user:{user.id}", "is_allowed:", is_allowed)
             if not is_allowed:
                 error_event = ErrorEvent(
                     code="RATE_LIMIT_EXCEEDED", message="You are sending messages too fast"
