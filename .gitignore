@@ -85,6 +85,22 @@ celerybeat-schedule-wal
 
 
 .no
-
-
-
+.ruff_cache
+notes.md
+notes.py
+project_structure.md
+uploads/
+avatars/
+voice/
+uploads/voice/
+uploads/video_notes/
+video_notes/
+uploads/files/
+files/
+/1/
+*.webm
+plan.md
+plan_tusd.md
+build_cap.md
+android/
+fordep.md

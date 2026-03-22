@@ -1,0 +1,63 @@
+docker-compose -f docker-compose.dev.yml up -d
+docker-compose -f docker-compose.dev.yml up --build -d
+docker-compose -f docker-compose.dev.yml down
+
+# 1. Подключись к контейнеру PostgreSQL
+docker exec -it peddler-db-dev psql -U peddler -d peddler
+
+# 2. Посмотри таблицы
+\dt
+
+# 3. Посмотри пользователей
+SELECT id, username FROM users;
+SELECT * FROM users;
+
+# 4. Посмотри чаты
+SELECT * FROM chats;
+
+# 5. Посмотри сообщения
+SELECT * FROM messages;
+
+# 6. Посмотри участников чатов
+SELECT * FROM chat_participants;
+
+# 7. Выйти
+\q
+
+
+# Подключиться к Redis
+docker exec -it peddler-redis-dev redis-cli -a psw123
+
+# Проверить подключение
+127.0.0.1:6379> PING
+PONG
+
+# Мониторинг событий в реальном времени
+127.0.0.1:6379> MONITOR
+OK
+# Теперь отправьте сообщение через UI и смотрите логи
+
+# Подписаться на канал чата (в отдельном терминале)
+127.0.0.1:6379> SUBSCRIBE "chat:1:events"
+Reading messages... (press Ctrl-C to quit)
+# Отправьте сообщение - увидите JSON event
+
+
+
+# Если Redis порт открыт (6379:6379), можешь подключиться с хоста:
+docker exec peddler-redis-dev redis-cli -a psw123 ping
+# Должно быть: PONG
+
+# Или:
+docker exec peddler-redis-dev redis-cli -a psw123 INFO server
+
+
+рименение миграция в docker:
+# 1. Зайди в контейнер backend
+docker exec -it peddler-backend-dev sh
+
+# 2. Внутри контейнера примени миграции
+alembic upgrade head
+
+# 3. Выйди
+exit

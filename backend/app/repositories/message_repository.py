@@ -1,0 +1,283 @@
+# app/repositories/message_repository.py
+from typing import List, Optional
+
+from app.core.exceptions import ChatAccessDenied
+from app.models.chat import Chat, ChatParticipant
+from app.models.message import Message, MessageType
+from sqlalchemy import and_, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+
+
+class MessageRepository:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def verify_chat_access(self, chat_id: int, user_id: int) -> Chat:
+        """Проверить, что пользователь является участником чата. RAISE если нет доступа."""
+        result = await self.db.execute(
+            select(Chat)
+            .join(ChatParticipant)
+            .where(
+                and_(
+                    Chat.id == chat_id,
+                    ChatParticipant.user_id == user_id,
+                )
+            )
+        )
+        chat = result.scalar_one_or_none()
+        if not chat:
+            raise ChatAccessDenied()
+        # if not chat:
+        #     raise ValueError("User is not a participant of this chat")
+        return chat
+
+    async def create_message(
+        self,
+        chat_id: int,
+        sender_id: int,
+        content: str,
+        message_type: MessageType = MessageType.TEXT,
+        file_url: Optional[str] = None,
+        file_size: Optional[int] = None,
+        duration: Optional[int] = None,
+        filename: Optional[str] = None,
+        mimetype: Optional[str] = None,
+        preview_url: Optional[str] = None,
+        media_width: Optional[int] = None,
+        media_height: Optional[int] = None,
+    ) -> Message:
+        message = Message(
+            chat_id=chat_id,
+            sender_id=sender_id,
+            content=content,
+            message_type=message_type,
+            file_url=file_url,
+            file_size=file_size,
+            duration=duration,
+            filename=filename,
+            mimetype=mimetype,
+            preview_url=preview_url,
+            media_width=media_width,
+            media_height=media_height,
+        )
+        self.db.add(message)
+        await self.db.flush()
+        return message
+
+    async def get_chat_messages(
+        self,
+        chat_id: int,
+        limit: int = 50,
+        before_id: Optional[int] = None,  # ID < before_id (СТАРЕЕ)
+        after_id: Optional[int] = None,  # ID > after_id (НОВЕЕ)
+    ) -> List[Message]:
+        # Базовый запрос
+        stmt = (
+            select(Message)
+            .options(selectinload(Message.sender))
+            .where(
+                Message.chat_id == chat_id,
+                Message.is_deleted.is_(False),
+            )
+        )
+
+        # 1. Скролл вверх (в прошлое) ИЛИ первая загрузка
+        if before_id:
+            stmt = stmt.where(Message.id < before_id).order_by(Message.id.desc())
+
+        # 2. Скролл вниз (в будущее)
+        elif after_id:
+            stmt = stmt.where(Message.id > after_id).order_by(Message.id.asc())
+
+        # 3. Дефолт (самые новые, если нет курсоров)
+        else:
+            stmt = stmt.order_by(Message.id.desc())
+
+        # Лимит (+1 чтобы проверить has_more)
+        stmt = stmt.limit(limit + 1)
+
+        result = await self.db.execute(stmt)
+        messages = list(result.scalars().all())
+
+        # Если был запрос "after_id" (в будущее), мы получили их ASC (101, 102...).
+        # Но фронтенд ждет сортировку всегда от старых к новым (или наоборот, как договорились).
+        # Обычно API возвращает список отсортированный по времени.
+        # В вашем текущем коде вы возвращаете DESC (новые первые) для первой страницы,
+        # и фронт их переворачивает (или нет).
+
+        # Давайте договоримся: Репозиторий возвращает как есть,
+        # но для консистентности "after_id" (ASC) лучше не трогать,
+        # а "before_id" (DESC) - это естественный порядок "от конца".
+
+        return messages
+
+    async def get_message_by_id(
+        self, chat_id: int, message_id: int, user_id: int
+    ) -> Optional[Message]:
+        """Получить сообщение с проверкой доступа"""
+        result = await self.db.execute(
+            select(Message).where(
+                and_(
+                    Message.id == message_id,
+                    Message.chat_id == chat_id,
+                    Message.sender_id != user_id,  # Только чужие сообщения
+                )
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def mark_messages_read_until(
+        self, chat_id: int, user_id: int, last_message_id: int
+    ) -> int:
+        """
+        Помечает прочитанными все сообщения в чате до last_message_id включительно,
+        которые еще не прочитаны и не отправлены самим пользователем (если is_read храним на сообщении).
+
+        Возвращает количество обновленных сообщений.
+        """
+        # Важно: если is_read хранится в таблице Message, это работает только для 1-on-1 чатов или
+        # если мы считаем сообщение прочитанным, когда его увидел ХОТЯ БЫ ОДИН (плохая практика для групп).
+        #
+        # ПРАВИЛЬНЫЙ ПОДХОД ДЛЯ ГРУПП (на будущее):
+        # Обновлять last_read_message_id в таблице ChatParticipant.
+        #
+        # ТЕКУЩИЙ ПОДХОД (совместимый с твоей схемой, где is_read в Message):
+        # Работает корректно для Direct Chat. Для групп будет помечаться "прочитано",
+        # когда первый человек прочитает.
+
+        stmt = (
+            update(Message)
+            .where(
+                and_(
+                    Message.chat_id == chat_id,
+                    Message.id <= last_message_id,
+                    Message.is_read == False,
+                    Message.sender_id
+                    != user_id,  # Не помечаем свои сообщения (хотя они и так read=True обычно)
+                )
+            )
+            .values(is_read=True)
+        )
+
+        result = await self.db.execute(stmt)
+        await self.db.commit()
+        return result.rowcount
+
+    async def search_messages(
+        self, user_id: int, query_str: str, limit: int = 20, offset: int = 0
+    ) -> list[Message]:
+        """
+        Поиск сообщений во всех чатах, где состоит пользователь.
+        Использует websearch_to_tsquery для обработки запроса.
+        """
+
+        # 1. Формируем tsquery для двух языков
+        # websearch_to_tsquery — безопасная функция, она сама выкинет спецсимволы,
+        # обработает кавычки и т.д.
+        # Мы ищем: (query в русском) ИЛИ (query в английском)
+        search_query = func.websearch_to_tsquery("russian", query_str).op("||")(
+            func.websearch_to_tsquery("english", query_str)
+        )
+        # оператор | для tsquery означает OR.
+
+        stmt = (
+            select(Message)
+            # !!! 1. Подгружаем связанные сущности (Eager Loading) !!!
+            .options(
+                selectinload(Message.sender),  # Чтобы получить username, display_name
+                selectinload(Message.chat),  # Чтобы получить title
+            )
+            # .join(Message.chat) - этот join уже не обязателен для выборки данных,
+            # но может быть нужен для фильтрации, если бы фильтровали по свойствам чата.
+            # В данном случае join с ChatParticipant достаточен для безопасности.
+            .join(ChatParticipant, Message.chat_id == ChatParticipant.chat_id)
+            .where(
+                ChatParticipant.user_id == user_id,
+                Message.is_deleted.is_(False),
+                Message.search_vector.op("@@")(search_query),
+            )
+            .order_by(
+                func.ts_rank(Message.search_vector, search_query).desc(), Message.created_at.desc()
+            )
+            .limit(limit)
+            .offset(offset)
+        )
+
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+
+    async def get_messages_around(
+        self, chat_id: int, message_id: int, limit: int = 50
+    ) -> list[Message]:
+        """
+        Возвращает сообщения вокруг указанного ID.
+        Примерно limit/2 до и limit/2 после.
+        """
+        half_limit = limit // 2
+
+        # 1. Сообщения "старее или само сообщение" (включая self)
+        stmt_older = (
+            select(Message)
+            .options(selectinload(Message.sender))
+            .where(
+                Message.chat_id == chat_id,
+                Message.id <= message_id,
+                Message.is_deleted.is_(False),
+            )
+            .order_by(Message.id.desc())
+            .limit(half_limit + 1)  # +1 на всякий случай для центровки
+        )
+
+        # 2. Сообщения "новее"
+        stmt_newer = (
+            select(Message)
+            .options(selectinload(Message.sender))
+            .where(
+                Message.chat_id == chat_id, Message.id > message_id, Message.is_deleted.is_(False)
+            )
+            .order_by(Message.id.asc())
+            .limit(half_limit)
+        )
+
+        # Выполняем
+        res_older = await self.db.execute(stmt_older)
+        res_newer = await self.db.execute(stmt_newer)
+
+        older_msgs = res_older.scalars().all()  # [target, target-1, target-2...]
+        newer_msgs = res_newer.scalars().all()  # [target+1, target+2...]
+
+        # Объединяем и сортируем правильно (от старых к новым)
+        # older_msgs нужно перевернуть, т.к. они были DESC
+        all_messages = sorted(list(older_msgs) + list(newer_msgs), key=lambda x: x.id)
+
+        return all_messages
+
+    async def search_chat_messages(
+        self, chat_id: int, query_str: str, limit: int = 1000
+    ) -> List[Message]:
+        """
+        Поиск внутри конкретного чата.
+        Возвращаем список сообщений, отсортированных по дате (старые -> новые),
+        чтобы фронтенд мог удобно навигироваться.
+        """
+        # Формируем поисковый запрос (так же, как в глобальном поиске)
+        search_query = func.websearch_to_tsquery("russian", query_str).op("||")(
+            func.websearch_to_tsquery("english", query_str)
+        )
+
+        stmt = (
+            select(Message)
+            # Нам нужны только ID и created_at для навигации, но для простоты
+            # вернем объекты (можно оптимизировать через load_only, если сообщений тысячи)
+            .where(
+                Message.chat_id == chat_id,
+                Message.is_deleted.is_(False),
+                Message.search_vector.op("@@")(search_query),
+            )
+            .order_by(Message.created_at.asc())  # Важно: хронологический порядок
+            .limit(limit)
+        )
+
+        result = await self.db.execute(stmt)
+        return result.scalars().all()

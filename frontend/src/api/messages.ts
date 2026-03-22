@@ -1,0 +1,163 @@
+// src/api/messages.ts
+import type { MessageListResponse, MessageRead } from "../types/api";
+import { apiClient } from "./client";
+
+export const messagesAPI = {
+  list: (
+    chatId: number,
+    limit: number = 50,
+    cursor?: { before_id?: number; after_id?: number }
+  ) =>
+    apiClient.get<MessageListResponse>(`/messages/${chatId}`, {
+      params: {
+        limit,
+        before_id: cursor?.before_id,
+        after_id: cursor?.after_id,
+      },
+    }),
+
+  send: (chatId: number, content: string) =>
+    apiClient.post<MessageRead>(`/messages/${chatId}`, {
+      chat_id: chatId,
+      content,
+    }),
+
+  sendFile(
+    chatId: number,
+    file: File,
+    caption?: string,
+    onProgress?: (progress: number) => void
+  ) {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (caption) {
+      formData.append("content", caption);
+    }
+    return apiClient.post<MessageRead>(`/messages/${chatId}/file`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      // Axios progress event
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total && onProgress) {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          onProgress(percent);
+        }
+      },
+      timeout: 0, // Бесконечный таймаут для больших файлов
+    });
+  },
+
+  sendVoice(
+    chatId: number,
+    audioBlob: Blob,
+    duration: number,
+    onProgress?: (progress: number) => void
+  ) {
+    const formData = new FormData();
+    formData.append("file", audioBlob, "voice.webm");
+
+    return apiClient.post<MessageRead>(
+      `/messages/${chatId}/voice?duration=${duration}`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total && onProgress) {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(percent);
+          }
+        },
+        timeout: 0,
+      }
+    );
+  },
+
+  sendVideoNote(
+    chatId: number,
+    videoBlob: Blob,
+    duration: number,
+    onProgress?: (progress: number) => void
+  ) {
+    const formData = new FormData();
+    formData.append("file", videoBlob, "video_note.webm");
+
+    return apiClient.post<MessageRead>(
+      `/messages/${chatId}/video_note?duration=${duration}`,
+      formData,
+      {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total && onProgress) {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(percent);
+          }
+        },
+        timeout: 0,
+      }
+    );
+  },
+
+  sendMedia(
+    chatId: number,
+    file: File,
+    caption?: string,
+    width?: number,
+    height?: number,
+    onProgress?: (progress: number) => void
+  ) {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (caption) formData.append("caption", caption);
+    if (width) formData.append("client_width", width.toString());
+    if (height) formData.append("client_height", height.toString());
+
+    return apiClient.post<MessageRead>(`/messages/${chatId}/media`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total && onProgress) {
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total
+          );
+          onProgress(percent);
+        }
+      },
+      timeout: 0,
+    });
+  },
+
+  async search(query: string, limit = 50): Promise<MessageRead[]> {
+    const { data } = await apiClient.get<MessageRead[]>("/messages/search", {
+      params: { q: query, limit },
+    });
+    return data;
+  },
+
+  async listAround(
+    chatId: number,
+    messageId: number,
+    limit = 50
+  ): Promise<MessageListResponse> {
+    const { data } = await apiClient.get<MessageListResponse>(
+      `/messages/${chatId}/around`,
+      {
+        params: { message_id: messageId, limit },
+      }
+    );
+    return data;
+  },
+
+  async searchInChat(chatId: number, query: string): Promise<MessageRead[]> {
+    const { data } = await apiClient.get<MessageRead[]>(
+      `/messages/${chatId}/search`,
+      { params: { q: query } }
+    );
+    return data;
+  },
+};

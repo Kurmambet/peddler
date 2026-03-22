@@ -1,0 +1,125 @@
+# docker-compose.prod.yml
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: peddler-db-prod
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - peddler-prod-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: peddler-redis-prod
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_prod_data:/data
+    networks:
+      - peddler-prod-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: peddler-backend-prod
+    restart: always
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env
+    environment:
+      DB_HOST: db
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      USE_REDIS_PUBSUB: "true"
+      DEBUG: "false"
+      ALLOWED_ORIGINS: "https://${DOMAIN},http://${DOMAIN}"
+    volumes:
+      - ./uploads:/app/uploads
+    networks:
+      - peddler-prod-network
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: peddler-celery-worker-prod
+    restart: always
+    depends_on:
+      - redis
+      - db
+    env_file:
+      - .env
+    environment:
+      DEBUG: "false"
+      CELERYD_PREFETCH_MULTIPLIER: 1
+    volumes:
+      - ./uploads:/app/uploads
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2 --without-gossip --without-mingle
+    deploy:
+      resources:
+        limits:
+          memory: 1.5G
+    networks:
+      - peddler-prod-network
+
+  tusd:
+    image: tusproject/tusd:latest
+    container_name: peddler-tusd
+    restart: always
+    user: "1000:1000"
+    volumes:
+      - ./uploads/tus:/srv/tusd-data
+    command: >
+      -host=0.0.0.0 
+      -port=1080 
+      -upload-dir=/srv/tusd-data 
+      -hooks-http=http://backend:8000/api/v1/internal/tus-hook 
+      -hooks-http-retry=3 
+      -hooks-http-backoff=1s
+      -hooks-enabled-events=post-finish
+      -behind-proxy
+    networks:
+      - peddler-prod-network
+    depends_on:
+      - backend
+
+  nginx:
+    build:
+      context: ./
+      dockerfile: frontend/Dockerfile.prod
+    container_name: peddler-nginx-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./uploads:/usr/share/nginx/html/static:ro
+      # Пробрасываем сертификаты с хоста (Read-Only)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - backend
+      - tusd
+    networks:
+      - peddler-prod-network
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+
+networks:
+  peddler-prod-network:
+    driver: bridge
