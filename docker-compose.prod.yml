@@ -108,6 +108,8 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./uploads:/usr/share/nginx/html/static:ro
+      # Пробрасываем сертификаты с хоста (Read-Only)
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       - backend
       - tusd

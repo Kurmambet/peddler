@@ -5,7 +5,7 @@ import uuid
 from typing import List, Optional
 
 import aiofiles
-from app.api.dependencies import get_current_user, get_message_service
+from app.api.dependencies import check_rate_limit, get_current_user, get_message_service
 from app.models.message import MessageType
 from app.models.user import User
 from app.schemas.message import MessageCreate, MessageListResponse, MessageRead
@@ -89,7 +89,12 @@ async def search_messages_endpoint(
     return message_reads
 
 
-@router.post("/{chat_id}", response_model=MessageRead, status_code=201)
+@router.post(
+    "/{chat_id}",
+    response_model=MessageRead,
+    status_code=201,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def send_message(
     chat_id: int,
     msg_in: MessageCreate,

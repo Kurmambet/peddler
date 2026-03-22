@@ -84,6 +84,18 @@ async def websocket_endpoint(websocket: WebSocket, chat_id: int):
             # Ждем сообщение от клиента (блокирующий вызов)
             raw_data = await websocket.receive_text()
 
+            # --- RATE LIMIT ---
+            # Для WS мы ограничиваем по user_id, чтобы один пользователь не спамил
+            is_allowed = await rate_limiter.is_allowed(f"ws_user:{user.id}")
+            print(f"ws_user:{user.id}", "is_allowed:", is_allowed)
+            if not is_allowed:
+                error_event = ErrorEvent(
+                    code="RATE_LIMIT_EXCEEDED", message="You are sending messages too fast"
+                )
+                await manager.send_personal_message(error_event.model_dump_json(), websocket)
+                continue  # Пропускаем обработку этого сообщения
+            # --------------------
+
             # Обрабатываем событие, создавая НОВУЮ сессию для каждой операции
             async with AsyncSessionLocal() as db:
                 await handle_client_event(

@@ -7,10 +7,10 @@ import requests
 # КОНФИГУРАЦИЯ
 # ==========================================
 BASE_URL = "http://localhost:8000/api/v1"
-CHAT_ID = 1  # ID чата, куда будем спамить
-USER_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwiaWF0IjoxNzY5NjA0Mjc0LCJleHAiOjE3NzAyMDkwNzR9.XbABOG6yuN8DzPP51AcG0_JjuskdmESCOD7mu2ucLUI"  # без 'Bearer '
+CHAT_ID = 7  # ID чата, куда будем спамить
+USER_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyIiwiaWF0IjoxNzc0MTY1MzUzLCJleHAiOjE3NzQ3NzAxNTN9.VnSdJ3vNHKa4v8TFz4_vbKz1LHTFSqiKXHDJ2ZJWWjk"  # без 'Bearer '
 MESSAGE_COUNT = 2000  # Сколько сообщений создать
-DELAY = 0.01  # Задержка (сек). 0.01 = ~100 req/sec
+DELAY = 0.001  # Задержка (сек). 0.01 = ~100 req/sec
 
 # Словарь для генерации "осмысленного" бреда
 WORDS = [
