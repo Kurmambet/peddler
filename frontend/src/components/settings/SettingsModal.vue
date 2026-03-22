@@ -222,6 +222,25 @@
                   >Change</Button
                 >
               </div>
+              <!-- PWA Install (Добавляем сюда) -->
+              <div
+                v-if="canInstall"
+                class="p-4 border border-app-border rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6"
+              >
+                <div>
+                  <h4 class="font-medium text-app-text">Install App</h4>
+                  <p class="text-sm text-app-text-secondary mt-1">
+                    Install Peddler on your device for a better experience
+                  </p>
+                </div>
+                <Button
+                  variant="primary"
+                  @click="installPwa"
+                  class="w-full md:w-auto"
+                >
+                  Install
+                </Button>
+              </div>
             </div>
 
             <!-- Tab: Appearance -->
@@ -245,10 +264,12 @@ import Avatar from "@/components/ui/Avatar.vue";
 import Button from "@/components/ui/Button.vue";
 import Input from "@/components/ui/Input.vue";
 import Modal from "@/components/ui/Modal.vue";
+import { usePwaInstall } from "@/composables/usePwaInstall";
 import { useAuthStore } from "@/stores/auth";
 import type { CurrentUser } from "@/types/api";
 import QrcodeVue from "qrcode.vue";
 import { computed, onMounted, ref } from "vue";
+const { canInstall, installPwa } = usePwaInstall();
 
 const authStore = useAuthStore();
 

@@ -10,14 +10,17 @@
 import { useOnline } from "@vueuse/core";
 import { onMounted } from "vue";
 import { useGlobalStatus } from "./composables/useGlobalStatus";
+import { usePwaInstall } from "./composables/usePwaInstall";
 import { useAuthStore } from "./stores/auth";
-const isOnline = useOnline();
 
+const isOnline = useOnline();
 const authStore = useAuthStore();
+const { initPwaListener } = usePwaInstall();
 
 useGlobalStatus();
 
 onMounted(async () => {
+  initPwaListener();
   if (authStore.token) {
     console.log("[App] Restoring session...");
     try {
