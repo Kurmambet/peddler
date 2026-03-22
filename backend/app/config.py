@@ -7,8 +7,7 @@ from typing import Any, List
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Абсолютный путь до backend/.env
-BASE_DIR = Path(__file__).resolve().parent.parent  # backend/
+BASE_DIR = Path(__file__).resolve().parent.parent
 ENV_FILE = BASE_DIR / ".env"
 
 
@@ -20,23 +19,20 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # ========== APP ==========
     APP_NAME: str = "Peddler"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 
-    # ========== SERVER ==========
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    # ========== DATABASE ==========
-
+    # DATABASE - убрал дефолтные пароли. Если их не будет в .env, приложение упадет при старте (это безопасно)
     DB_HOST: str = "localhost"
     DB_PORT: str = "5432"
     DB_USER: str = "peddler"
-    DB_PASS: str = "password"
+    DB_PASS: str
     DB_NAME: str = "peddler"
-    DB_ECHO: bool = False  # Логировать SQL queries
+    DB_ECHO: bool = False
 
     @property
     def DATABASE_URL(self) -> str:
@@ -45,16 +41,10 @@ class Settings(BaseSettings):
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
-    # ========== JWT ==========
-    SECRET_KEY: str = "secret"  # Должна быть ОЧЕНЬ длинная в продакшене
+    # JWT - обязательно должен быть передан
+    SECRET_KEY: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
-
-    # ========== SECURITY ==========
-    # ALLOWED_ORIGINS: List[str] = [
-    #     "http://localhost:3000",
-    #     "https://yourdomain.com",
-    # ]
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
 
     ALLOWED_ORIGINS: Any = "http://localhost:3000"
     CORS_CREDENTIALS: bool = True
@@ -62,53 +52,32 @@ class Settings(BaseSettings):
     @field_validator("ALLOWED_ORIGINS", mode="before")
     @classmethod
     def parse_origins(cls, v: Any) -> List[str]:
-        """Парсит ALLOWED_ORIGINS из любого формата."""
-        # Уже список
         if isinstance(v, list):
             return v
-
-        # Строка
         if isinstance(v, str):
             v = v.strip()
-
-            # Пустая строка
             if not v:
                 return ["http://localhost:3000"]
-
-            # JSON формат
             if v.startswith("["):
                 try:
                     return json.loads(v)
                 except Exception:
                     pass
-
-            # CSV формат (через запятую)
             return [origin.strip() for origin in v.split(",") if origin.strip()]
-
-        # Fallback
         return ["http://localhost:3000"]
 
-    # ========== REDIS ==========
+    # REDIS
     REDIS_URL: str = "redis://localhost:6379"
     USE_REDIS_PUBSUB: bool = True
 
     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/2"
     CELERY_TASK_TRACK_STARTED: bool = True
-    CELERY_TASK_TIME_LIMIT: int = 300  # 5 минут
+    CELERY_TASK_TIME_LIMIT: int = 300
 
-    # ========== LOGGING ==========
     LOG_LEVEL: str = "INFO"
 
 
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings()
-
-
-# if __name__ == "__main__":
-#     settings = get_settings()
-#     print("ENV_FILE:", ENV_FILE)
-#     print("DATABASE_URL:", settings.DATABASE_URL)
-#     print("ALLOWED_ORIGINS:", settings.ALLOWED_ORIGINS)
-#     print("Type:", type(settings.ALLOWED_ORIGINS))
+    return Settings()  # type: ignore
