@@ -360,7 +360,7 @@
                     :class="{
                       'justify-end': isOwn(msg),
                       // Если это кружочек, приподнимаем время чуть выше или делаем его белым (опционально)
-                      'text-white drop-shadow-md':
+                      'text-app-text drop-shadow-md':
                         msg.message_type === 'video_note',
                     }"
                   >

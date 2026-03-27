@@ -2,7 +2,7 @@
 <template>
   <div
     ref="containerRef"
-    class="relative w-48 h-48 sm:w-60 sm:h-60 rounded-full overflow-hidden shadow-2xl bg-black group cursor-pointer transform-gpu"
+    class="relative w-48 h-48 sm:w-60 sm:h-60 rounded-full overflow-hidden bg-black group cursor-pointer transform-gpu"
     @click="toggleSound"
   >
     <video
