@@ -209,7 +209,11 @@ async def get_messages_around(
     return await service.get_messages_around(chat_id, message_id, limit, current_user.id)
 
 
-@router.post("/{chat_id}/voice", response_model=MessageRead)
+@router.post(
+    "/{chat_id}/voice",
+    response_model=MessageRead,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def upload_voice_message(
     chat_id: int,
     file: UploadFile = File(...),
@@ -279,7 +283,11 @@ async def upload_voice_message(
     return message
 
 
-@router.post("/{chat_id}/video_note", response_model=MessageRead)
+@router.post(
+    "/{chat_id}/video_note",
+    response_model=MessageRead,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def upload_video_note(
     chat_id: int,
     file: UploadFile = File(...),
@@ -338,7 +346,11 @@ async def upload_video_note(
     return message  # Возвращаем ответ отправителю (у него optimistic UI, он сообщение уже видит)
 
 
-@router.post("/{chat_id}/file", response_model=MessageRead)
+@router.post(
+    "/{chat_id}/file",
+    response_model=MessageRead,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def upload_file_message(
     chat_id: int,
     file: UploadFile = File(...),
@@ -435,7 +447,11 @@ async def search_messages_in_chat(
     ]
 
 
-@router.post("/{chat_id}/media", response_model=MessageRead)
+@router.post(
+    "/{chat_id}/media",
+    response_model=MessageRead,
+    dependencies=[Depends(check_rate_limit)],
+)
 async def upload_media_message(
     chat_id: int,
     file: UploadFile = File(...),

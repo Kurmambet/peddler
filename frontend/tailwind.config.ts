@@ -22,8 +22,6 @@ const config: Config = {
         "app-border": "rgb(var(--color-border) / <alpha-value>)",
         "app-border-strong": "rgb(var(--color-border-strong) / <alpha-value>)",
         "app-border-subtle": "rgb(var(--color-border-subtle) / <alpha-value>)",
-
-        /* ─── Основные цвета (Primary) ─── */
         "app-primary": "rgb(var(--color-primary) / <alpha-value>)",
         "app-primary-hover": "rgb(var(--color-primary-hover) / <alpha-value>)",
         "app-primary-active":
@@ -98,17 +96,17 @@ const config: Config = {
           "monospace",
         ],
       },
-
-      /* РАЗМЕРЫ ШРИФТОВ */
+      /* ТЕПЕРЬ РАЗМЕРЫ ШРИФТОВ БЕРУТСЯ ИЗ ПЕРЕМЕННЫХ CSS */
       fontSize: {
-        xs: ["0.75rem", { lineHeight: "1rem" }],
-        sm: ["0.875rem", { lineHeight: "1.25rem" }],
-        base: ["1rem", { lineHeight: "1.5rem" }],
-        lg: ["1.125rem", { lineHeight: "1.75rem" }],
-        xl: ["1.25rem", { lineHeight: "1.75rem" }],
-        "2xl": ["1.5rem", { lineHeight: "2rem" }],
-        "3xl": ["1.875rem", { lineHeight: "2.25rem" }],
-        "4xl": ["2.25rem", { lineHeight: "2.5rem" }],
+        xs: ["var(--font-size-xs)", { lineHeight: "1.25" }],
+        sm: ["var(--font-size-sm)", { lineHeight: "1.25" }],
+        base: ["var(--font-size-base)", { lineHeight: "1.5" }],
+        md: ["var(--font-size-md)", { lineHeight: "1.5" }],
+        lg: ["var(--font-size-lg)", { lineHeight: "1.5" }],
+        xl: ["var(--font-size-xl)", { lineHeight: "1.5" }],
+        "2xl": ["var(--font-size-2xl)", { lineHeight: "1.25" }],
+        "3xl": ["var(--font-size-3xl)", { lineHeight: "1.25" }],
+        "4xl": ["var(--font-size-4xl)", { lineHeight: "1.1" }],
       },
 
       /* ЭКРАНЫ (Breakpoints) */
@@ -222,68 +220,20 @@ const config: Config = {
         tooltip: "1070",
         notification: "1080",
       },
-
-      /* ВЫСОТА И ШИРИНА */
-      width: {
-        "screen-safe": "min(100vw, 100dvw)",
-      },
-
+      width: { "screen-safe": "min(100vw, 100dvw)" },
       height: {
         sidebar: "calc(100vh - 64px)",
         "screen-safe": "min(100vh, 100dvh)",
       },
-
-      /* МАКСИМАЛЬНАЯ ШИРИНА */
-      maxWidth: {
-        container: "1200px",
-        "chat-message": "85%",
-      },
-
-      /* OPACITY */
-      opacity: {
-        0: "0",
-        5: "0.05",
-        10: "0.1",
-        20: "0.2",
-        30: "0.3",
-        40: "0.4",
-        50: "0.5",
-        60: "0.6",
-        70: "0.7",
-        80: "0.8",
-        90: "0.9",
-        100: "1",
-      },
-
-      /* RING (Focus rings) */
+      maxWidth: { container: "1200px", "chat-message": "85%" },
       ringColor: {
         DEFAULT: "rgb(var(--color-primary))",
         "app-focus": "rgb(var(--color-focus-ring))",
       },
-
-      ringWidth: {
-        DEFAULT: "2px",
-        0: "0px",
-        1: "1px",
-        2: "2px",
-        4: "4px",
-      },
     },
   },
-
   plugins: [],
-
   darkMode: ["class", '[data-theme="dark"]'],
-
-  corePlugins: {
-    preflight: true,
-  },
-
-  important: false,
-
-  future: {
-    respectDefaultRingColorOpacity: true,
-  },
 };
 
 export default config;
