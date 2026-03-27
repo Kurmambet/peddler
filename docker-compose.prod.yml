@@ -45,10 +45,12 @@ services:
     container_name: peddler-backend-prod
     restart: always
     depends_on:
-      - fix-permissions:
-          condition: service_completed_successfully
-      - db
-      - redis
+      fix-permissions:
+        condition: service_completed_successfully
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
     env_file:
       - .env
     environment:
@@ -69,10 +71,12 @@ services:
     container_name: peddler-celery-worker-prod
     restart: always
     depends_on:
-      - fix-permissions:
+      fix-permissions:
         condition: service_completed_successfully
-      - redis
-      - db
+      redis:
+        condition: service_started
+      db:
+        condition: service_started
     env_file:
       - .env
     environment:
