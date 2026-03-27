@@ -1,183 +1,99 @@
 /* ============================================================================
    src/styles/variables.css
-   
-   CSS Custom Properties для темизации приложения.
-   ТОЛЬКО ПЕРЕМЕННЫЕ - без классов .hidden, .flex и т.д.
    ============================================================================ */
 
-/* ============================================================================
-   СВЕТЛЫЙ РЕЖИМ (Light Mode) — по умолчанию
-   ============================================================================ */
+/* СВЕТЛЫЙ РЕЖИМ (Solarized Light) */
+:root,
+[data-theme="light"] {
+  --color-bg: 253 246 227;
+  --color-surface: 238 232 213;
+  --color-card: 255 255 255;
 
-:root {
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Цвета фона */
-  /* ─────────────────────────────────────────────────────────────────────── */
+  --color-text: 101 123 131;
+  --color-text-secondary: 147 161 161;
+  --color-text-inverse: 253 246 227;
 
-  --color-bg: 252 252 249;
-  --color-surface: 255 255 253;
-  --color-card: 255 255 253;
+  --color-border: 147 161 161;
+  --color-border-strong: 101 123 131;
+  --color-border-subtle: 238 232 213;
 
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Цвета текста */
-  /* ─────────────────────────────────────────────────────────────────────── */
+  --color-primary: 42 161 152;
+  --color-primary-hover: 38 139 210;
+  --color-primary-active: 7 54 66;
+  --color-primary-subtle: 147 161 161;
 
-  --color-text: 19 52 59;
-  --color-text-secondary: 98 108 113;
-  --color-text-inverse: 252 252 249;
+  --color-success: 133 153 0;
+  --color-success-hover: 115 133 0;
+  --color-success-subtle: 133 153 0;
 
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Границы и разделители */
-  /* ─────────────────────────────────────────────────────────────────────── */
+  --color-error: 220 50 47;
+  --color-error-hover: 203 75 22;
+  --color-error-subtle: 220 50 47;
 
-  --color-border: 94 82 64;
-  --color-border-strong: 94 82 64;
-  --color-border-subtle: 94 82 64;
+  --color-warning: 181 137 0;
+  --color-warning-hover: 161 122 0;
+  --color-warning-subtle: 181 137 0;
 
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Основные цвета (Primary/Brand) */
-  /* ─────────────────────────────────────────────────────────────────────── */
+  --color-info: 38 139 210;
+  --color-info-hover: 42 161 152;
+  --color-info-subtle: 38 139 210;
 
-  --color-primary: 33 128 141;
-  --color-primary-hover: 29 116 128;
-  --color-primary-active: 26 104 115;
-  --color-primary-subtle: 33 128 141;
+  --color-message-incoming: 238 232 213;
+  --color-message-outgoing: 42 161 152;
+  --color-message-text-incoming: 101 123 131;
+  --color-message-text-outgoing: 253 246 227;
+  --color-typing: 147 161 161;
 
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Статусные цвета */
-  /* ─────────────────────────────────────────────────────────────────────── */
+  --color-focus-ring: 42 161 152;
+  --color-disabled: 238 232 213;
+  --color-disabled-text: 147 161 161;
 
-  --color-success: 33 128 141;
-  --color-success-hover: 29 116 128;
-  --color-success-subtle: 33 128 141;
+  /* Аватары */
+  --color-avatar-1: 38 139 210;
+  --color-avatar-2: 42 161 152;
+  --color-avatar-3: 133 153 0;
+  --color-avatar-4: 181 137 0;
+  --color-avatar-5: 203 75 22;
+  --color-avatar-6: 220 50 47;
 
-  --color-error: 192 21 47;
-  --color-error-hover: 192 21 47;
-  --color-error-subtle: 192 21 47;
-
-  --color-warning: 168 75 47;
-  --color-warning-hover: 168 75 47;
-  --color-warning-subtle: 168 75 47;
-
-  --color-info: 98 108 113;
-  --color-info-hover: 98 108 113;
-  --color-info-subtle: 98 108 113;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Специальные цвета для чата */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  --color-message-incoming: 94 82 64;
-  --color-message-outgoing: 33 128 141;
-  --color-message-text-incoming: 19 52 59;
-  --color-message-text-outgoing: 252 252 249;
-  --color-typing: 94 82 64;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Интерактивные элементы */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  --color-focus-ring: 33 128 141;
-  --color-disabled: 94 82 64;
-  --color-disabled-text: 98 108 113;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Аватары (цвета для инициалов) */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  --color-avatar-1: 33 128 141;
-  --color-avatar-2: 45 166 178;
-  --color-avatar-3: 50 184 198;
-  --color-avatar-4: 29 116 128;
-  --color-avatar-5: 168 75 47;
-  --color-avatar-6: 192 21 47;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* SPACING (Стандартные отступы) */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  --spacing-xs: 0.25rem; /* 4px */
-  --spacing-sm: 0.5rem; /* 8px */
-  --spacing-md: 1rem; /* 16px */
-  --spacing-lg: 1.5rem; /* 24px */
-  --spacing-xl: 2rem; /* 32px */
-  --spacing-2xl: 3rem; /* 48px */
-  --spacing-3xl: 4rem; /* 64px */
-
+  /* ОТСТУПЫ */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+  --spacing-2xl: 3rem;
+  --spacing-3xl: 4rem;
   --gutter-mobile: 1rem;
   --gutter-desktop: 1.5rem;
 
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* ТИПОГРАФИЯ (Font Sizes) */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  --font-size-xs: 0.6875rem; /* 11px */
-  --font-size-sm: 0.75rem; /* 12px */
-  --font-size-base: 0.875rem; /* 14px */
-  --font-size-md: 0.875rem; /* 14px */
-  --font-size-lg: 1rem; /* 16px */
-  --font-size-xl: 1.125rem; /* 18px */
-  --font-size-2xl: 1.25rem; /* 20px */
-  --font-size-3xl: 1.5rem; /* 24px */
-  --font-size-4xl: 1.875rem; /* 30px */
-
-  --line-height-tight: 1.2;
-  --line-height-normal: 1.5;
-  --line-height-relaxed: 1.75;
-
-  --font-weight-normal: 400;
-  --font-weight-medium: 500;
-  --font-weight-semibold: 550;
-  --font-weight-bold: 600;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* Z-INDEX (Слои) */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
-  --z-hide: -1;
-  --z-auto: 0;
-  --z-base: 1;
-  --z-elevated: 10;
-  --z-sticky: 20;
-  --z-fixed: 30;
-  --z-dropdown: 1000;
-  --z-modal-backdrop: 1040;
-  --z-modal: 1050;
-  --z-popover: 1060;
-  --z-tooltip: 1070;
-  --z-notification: 1080;
-  --z-debugger: 9999;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* BORDER RADIUS */
-  /* ─────────────────────────────────────────────────────────────────────── */
+  /* ТИПОГРАФИЯ */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-md: 1.125rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 1.875rem;
+  --font-size-3xl: 2.25rem;
+  --font-size-4xl: 3rem;
 
   --radius-none: 0;
-  --radius-sm: 0.375rem; /* 6px */
-  --radius-base: 0.5rem; /* 8px */
-  --radius-md: 0.75rem; /* 12px */
-  --radius-lg: 1rem; /* 16px */
-  --radius-xl: 1.5rem; /* 24px */
+  --radius-sm: 0.375rem;
+  --radius-base: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
   --radius-full: 9999px;
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* TRANSITIONS & ANIMATIONS */
-  /* ─────────────────────────────────────────────────────────────────────── */
 
   --duration-fast: 150ms;
   --duration-normal: 250ms;
   --duration-slow: 300ms;
   --duration-slower: 500ms;
-
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
-
-  /* ─────────────────────────────────────────────────────────────────────── */
-  /* SHADOWS (Тени для глубины) */
-  /* ─────────────────────────────────────────────────────────────────────── */
-
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.02);
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.04),
@@ -190,10 +106,7 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.03);
 }
 
-/* ============================================================================
-   ТЁМНЫЙ РЕЖИМ (Dark Mode) — через prefers-color-scheme
-   ============================================================================ */
-
+/* ТЁМНЫЙ РЕЖИМ (Возвращен ваш исходный вариант) */
 @media (prefers-color-scheme: dark) {
   :root {
     --color-bg: 31 33 33;
@@ -234,10 +147,6 @@
   }
 }
 
-/* ============================================================================
-   РУЧНОЕ ПЕРЕКЛЮЧЕНИЕ ТЕМЫ (для кнопки "Light/Dark")
-   ============================================================================ */
-
 [data-theme="dark"] {
   --color-bg: 31 33 33;
   --color-surface: 38 40 40;
@@ -276,67 +185,24 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.15);
 }
 
-[data-theme="light"] {
-  --color-bg: 252 252 249;
-  --color-surface: 255 255 253;
-  --color-card: 255 255 253;
-  --color-text: 19 52 59;
-  --color-text-secondary: 98 108 113;
-  --color-text-inverse: 252 252 249;
-  --color-border: 94 82 64;
-  --color-border-strong: 94 82 64;
-  --color-border-subtle: 94 82 64;
-  --color-primary: 33 128 141;
-  --color-primary-hover: 29 116 128;
-  --color-primary-active: 26 104 115;
-  --color-primary-subtle: 33 128 141;
-  --color-success: 33 128 141;
-  --color-success-hover: 29 116 128;
-  --color-success-subtle: 33 128 141;
-  --color-error: 192 21 47;
-  --color-error-hover: 192 21 47;
-  --color-error-subtle: 192 21 47;
-  --color-warning: 168 75 47;
-  --color-warning-hover: 168 75 47;
-  --color-warning-subtle: 168 75 47;
-  --color-info: 98 108 113;
-  --color-info-hover: 98 108 113;
-  --color-info-subtle: 98 108 113;
-  --color-message-incoming: 94 82 64;
-  --color-message-outgoing: 33 128 141;
-  --color-message-text-incoming: 19 52 59;
-  --color-message-text-outgoing: 252 252 249;
-  --color-typing: 94 82 64;
-  --color-focus-ring: 33 128 141;
-  --color-disabled: 94 82 64;
-  --color-disabled-text: 98 108 113;
-  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.03);
-}
-
 /* ============================================================================
-   MOBILE RESPONSIVE (480px and below)
+   MOBILE RESPONSIVE (480px and below) - ОСТАВЛЯЕМ УЛУЧШЕННЫЕ РАЗМЕРЫ
    ============================================================================ */
 
 @media (max-width: 480px) {
   :root {
-    --font-size-xs: 0.625rem; /* 10px */
-    --font-size-sm: 0.6875rem; /* 11px */
-    --font-size-base: 0.8125rem; /* 13px */
-    --font-size-md: 0.8125rem; /* 13px */
-    --font-size-lg: 0.9375rem; /* 15px */
-    --font-size-xl: 1.0625rem; /* 17px */
-    --font-size-2xl: 1.1875rem; /* 19px */
-    --font-size-3xl: 1.375rem; /* 22px */
-    --font-size-4xl: 1.625rem; /* 26px */
+    /* Оставляем базовый шрифт комфортным для мобильных устройств (не менее 16px) */
+    --font-size-xs: 0.8125rem; /* 13px */
+    --font-size-sm: 0.9375rem; /* 15px */
+    --font-size-base: 1rem; /* 16px - комфортно для чтения */
+    --font-size-md: 1.125rem; /* 18px */
+    --font-size-lg: 1.25rem; /* 20px */
 
-    --spacing-md: 0.75rem; /* 12px */
-    --spacing-lg: 1rem; /* 16px */
-    --spacing-xl: 1.5rem; /* 24px */
-    --spacing-2xl: 2rem; /* 32px */
-    --spacing-3xl: 3rem; /* 48px */
-
-    --gutter-mobile: 0.75rem;
+    /* Сохраняем увеличенные отступы (Touch Targets), чтобы по кнопкам было легче попадать */
+    --spacing-md: 1rem; /* 16px */
+    --spacing-lg: 1.5rem;
+    --spacing-xl: 2rem;
+    --gutter-mobile: 1rem;
   }
 }
 

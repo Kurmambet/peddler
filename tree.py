@@ -19,7 +19,7 @@ EXCLUDE_DIRS = {
     "media",
     "tus",
     "public",
-    "backend",
+    # "backend",
     "node_modules",
     "tests",
     "dist",
