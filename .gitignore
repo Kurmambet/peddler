@@ -89,18 +89,16 @@ celerybeat-schedule-wal
 notes.md
 notes.py
 project_structure.md
-uploads/
-avatars/
-voice/
-uploads/voice/
-uploads/video_notes/
-video_notes/
-uploads/files/
-files/
-/1/
 *.webm
 plan.md
 plan_tusd.md
 build_cap.md
 android/
 fordep.md
+
+# Игнорируем всё содержимое внутри всех подпапок uploads/
+uploads/**/*
+# Но не игнорируем сами папки (Git должен в них зайти)
+!uploads/**/
+# И не игнорируем файлы .gitkeep, чтобы Git мог зафиксировать эти папки
+!uploads/**/.gitkeep

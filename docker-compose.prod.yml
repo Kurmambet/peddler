@@ -29,6 +29,15 @@ services:
     networks:
       - peddler-prod-network
 
+  # временный контейнер для выдачи прав
+  fix-permissions:
+    image: alpine:latest
+    user: root
+    volumes:
+      - ./uploads:/app/uploads
+    # Он просто меняет владельца папки на 1000:1000 (appuser) и выключается
+    command: sh -c "chown -R 1000:1000 /app/uploads && chmod -R 775 /app/uploads"
+
   backend:
     build:
       context: ./backend
@@ -36,6 +45,8 @@ services:
     container_name: peddler-backend-prod
     restart: always
     depends_on:
+      - fix-permissions:
+          condition: service_completed_successfully
       - db
       - redis
     env_file:
@@ -58,6 +69,8 @@ services:
     container_name: peddler-celery-worker-prod
     restart: always
     depends_on:
+      - fix-permissions:
+        condition: service_completed_successfully
       - redis
       - db
     env_file:
