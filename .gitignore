@@ -102,3 +102,11 @@ uploads/**/*
 !uploads/**/
 # И не игнорируем файлы .gitkeep, чтобы Git мог зафиксировать эти папки
 !uploads/**/.gitkeep
+
+
+
+# Matrix Synapse — generated secrets
+matrix/synapse/homeserver.yaml
+matrix/synapse/*.signing.key
+matrix/synapse/*.log.config
+matrix/synapse/*.log

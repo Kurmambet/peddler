@@ -130,6 +130,32 @@ services:
     depends_on:
       - backend
       - tusd
+      - synapse
+      - element-web
+    networks:
+      - peddler-prod-network
+
+  synapse:
+    image: matrixdotorg/synapse:latest
+    container_name: synapse
+    restart: always
+    volumes:
+      - ./matrix/synapse:/data
+    depends_on:
+      - db
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    networks:
+      - peddler-prod-network
+
+  element-web:
+    image: vectorim/element-web:latest
+    container_name: element-web
+    restart: always
+    volumes:
+      - ./matrix/element/config.json:/app/config.json:ro
     networks:
       - peddler-prod-network
 
