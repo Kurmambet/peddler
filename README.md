@@ -7,51 +7,28 @@
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?logo=redis)](https://redis.io)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-&gt; Full-stack messenger platform with real-time messaging, voice/video notes, group chats with RBAC, and optimistic UI. Built as a monolith with clean architecture, preparing for mobile transition via CapacitorJS.
+> Full-stack платформа-мессенджер с обменом сообщениями в реальном времени, голосовыми/видео заметками, групповыми чатами с RBAC и оптимистичным UI. Построена как монолит с чистой архитектурой, готовится к переходу на мобильные платформы через CapacitorJS.
 
 ---
 
-## ✨ Current Features
+## ✨ Текущие возможности
 
-- ⚡ **Real-time WebSocket Communication** — Custom WS manager with Redis Pub/Sub backend for horizontal scaling
-- 🎙️ **Voice Messages** — WebM/Opus recording with waveform visualization (canvas-based player)
-- 🎥 **Video Notes** — Circular video messages (Telegram-style) with FFmpeg processing
-- 📎 **Resumable File Uploads** — TUS protocol for reliable large file transfers (pausable, resumable)
-- 🏗️ **Clean Architecture** — Repository Pattern, Service Layer, Dependency Injection
-- 👥 **Group Management** — Role-based access control (Owner/Admin/Member), transfer ownership, participant management
-- 🔍 **Full-Text Search** — PostgreSQL `tsvector` with Russian/English websearch support
-- 🔄 **Optimistic UI** — Instant message rendering with sync indicators, offline-first approach in stores
-- 🧮 **Unread Counters** — Aggregation via SQLAlchemy with real-time sync via WebSocket
-- 🖼️ **Media Pipeline** — Celery + FFmpeg for video transcoding, Pillow for image thumbnails
-
----
-
-## 🏗️ Architecture Overview
-
-### High-Level Design
-
-> Full-stack messenger platform with real-time messaging, voice/video notes, group chats with RBAC, and optimistic UI. Built as a monolith with clean architecture, preparing for mobile transition via CapacitorJS.
+- **Общение по WebSocket в реальном времени** — собственный WS-менеджер с бэкендом Redis Pub/Sub для горизонтального масштабирования
+- **Голосовые сообщения** — запись в WebM/Opus с визуализацией waveform (плеер на canvas)
+- **Видео-заметки** — круглые видеосообщения (в стиле Telegram) с обработкой через FFmpeg
+- **Возобновляемая загрузка файлов** — протокол TUS для надёжной передачи больших файлов (с паузой и возобновлением)
+- **Чистая архитектура** — Repository Pattern, слой сервисов (Service Layer), Dependency Injection
+- **Управление группами** — ролевой доступ (Owner/Admin/Member), передача владения, управление участниками
+- **Полнотекстовый поиск** — PostgreSQL `tsvector` с поддержкой websearch на русском/английском
+- **Оптимистичный UI** — мгновенный рендеринг сообщений с индикаторами синхронизации, offline-first подход в сторах
+- **Счётчики непрочитанных** — агрегация через SQLAlchemy с синхронизацией в реальном времени по WebSocket
+- **Медиапайплайн** — Celery + FFmpeg для транскодирования видео, Pillow для миниатюр изображений
 
 ---
 
-## ✨ Current Features
+## 🏗️ Обзор архитектуры
 
-- ⚡ **Real-time WebSocket Communication** — Custom WS manager with Redis Pub/Sub backend for horizontal scaling
-- 🎙️ **Voice Messages** — WebM/Opus recording with waveform visualization (canvas-based player)
-- 🎥 **Video Notes** — Circular video messages (Telegram-style) with FFmpeg processing
-- 📎 **Resumable File Uploads** — TUS protocol for reliable large file transfers (pausable, resumable)
-- 🏗️ **Clean Architecture** — Repository Pattern, Service Layer, Dependency Injection
-- 👥 **Group Management** — Role-based access control (Owner/Admin/Member), transfer ownership, participant management
-- 🔍 **Full-Text Search** — PostgreSQL `tsvector` with Russian/English websearch support
-- 🔄 **Optimistic UI** — Instant message rendering with sync indicators, offline-first approach in stores
-- 🧮 **Unread Counters** — Aggregation via SQLAlchemy with real-time sync via WebSocket
-- 🖼️ **Media Pipeline** — Celery + FFmpeg for video transcoding, Pillow for image thumbnails
-
----
-
-## 🏗️ Architecture Overview
-
-### High-Level Design
+### Общая схема
 
 ```
 ┌─────────────┐      ┌──────────────┐      ┌─────────────┐
@@ -72,10 +49,9 @@
                               └──────────────────────────────┘
 ```
 
-### Backend Architecture (Clean Architecture)
+### Архитектура бэкенда (Clean Architecture)
 
 ```
-
 backend/app/
 ├── api/v1/routes/ # FastAPI routers (auth, chats, messages, tus hooks)
 ├── repositories/ # Repository Pattern (ChatRepository, MessageRepository, UserRepository)
@@ -85,21 +61,19 @@ backend/app/
 ├── ws/ # WebSocket layer (manager, auth, events, rate_limiter, pubsub)
 ├── tasks/ # Celery tasks (avatar processing, video transcoding, pubsub)
 └── core/ # Exceptions, security (bcrypt, JWT), config
-
 ```
 
-**Key Architectural Decisions:**
+**Ключевые архитектурные решения:**
 
-- **Repository Pattern**: Complete abstraction over PostgreSQL with async SQLAlchemy 2.0
-- **TUS Protocol**: Standalone `tusd` container handles uploads → hooks notify backend → Celery processes files
-- **Redis Pub/Sub**: Enables horizontal scaling of WebSocket connections across multiple backend instances
-- **Optimistic Concurrency**: Versioning on critical updates (group management)
-- **Full-Text Search**: PostgreSQL GIN indexes on `search_vector` column (Russian + English)
+- **Repository Pattern**: полная абстракция над PostgreSQL с асинхронным SQLAlchemy 2.0
+- **Протокол TUS**: отдельный контейнер `tusd` обрабатывает загрузки → хуки уведомляют бэкенд → Celery обрабатывает файлы
+- **Redis Pub/Sub**: позволяет горизонтально масштабировать WebSocket-соединения между несколькими инстансами бэкенда
+- **Оптимистичная конкурентность**: версионирование критичных обновлений (управление группами)
+- **Полнотекстовый поиск**: GIN-индексы PostgreSQL на колонке `search_vector` (русский + английский)
 
-### Frontend Architecture
+### Архитектура фронтенда
 
 ```
-
 frontend/src/
 ├── components/ # Vue 3 SFCs (Composition API)
 │ ├── chat/ # ChatPage, MessageList, MessageInput, GroupSettings
@@ -108,48 +82,47 @@ frontend/src/
 ├── composables/ # useChat, useVoiceRecorder, useVideoRecorder, useTyping
 ├── ws/ # WebSocket client with auto-reconnect
 └── api/ # Axios instances with interceptors
-
 ```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Быстрый старт
 
-### Prerequisites
+### Требования
 
-- Docker 24+ & Docker Compose v2
+- Docker 24+ и Docker Compose v2
 - Git
 
-### Development Mode
+### Режим разработки
 
 ```bash
 git clone https://github.com/Kurmambet/peddler.git
 cd peddler
 git checkout dev
 
-# Environment setup
+# Настройка окружения
 cp .env.example .env
 cp backend/.env.example backend/.env
-# Edit .env files (set SECRET_KEY, DB passwords)
+# Отредактируйте .env файлы (задайте SECRET_KEY, пароли БД)
 
-# Start infrastructure
+# Запуск инфраструктуры
 docker-compose -f docker-compose.dev.yml up --build
 
-# Run migrations (new terminal)
+# Применение миграций (в новом терминале)
 docker exec -it peddler-backend-dev alembic upgrade head
 ```
 
-**Services:**
-| Service | URL | Description |
+**Сервисы:**
+| Сервис | URL | Описание |
 |---------|-----|-------------|
-| Frontend | http://localhost:5173 | Vite HMR dev server |
+| Frontend | http://localhost:5173 | Vite HMR dev-сервер |
 | API Docs | http://localhost:8000/docs | Swagger UI (OpenAPI 3.0) |
-| Backend | http://localhost:8000 | FastAPI app |
-| TUS | http://localhost:1080 | Resumable upload server |
-| PostgreSQL | localhost:5432 | Main database |
-| Redis | localhost:6379 | Cache + Pub/Sub |
+| Backend | http://localhost:8000 | FastAPI-приложение |
+| TUS | http://localhost:1080 | Сервер возобновляемой загрузки |
+| PostgreSQL | localhost:5432 | Основная база данных |
+| Redis | localhost:6379 | Кэш + Pub/Sub |
 
-### Production Build
+### Продакшен-сборка
 
 ```bash
 docker-compose -f docker-compose.prod.yml up -d --build
@@ -157,28 +130,28 @@ docker-compose -f docker-compose.prod.yml up -d --build
 
 ---
 
-## 📤 File Upload Architecture (TUS + Celery)
+## 📤 Архитектура загрузки файлов (TUS + Celery)
 
-1. **Client** (tus-js-client) initiates upload → `POST :1080/files/`
-2. **TUSD** stores chunks in `./uploads/tus/`
-3. **Hook** (`post-finish`) → Backend receives metadata via `/api/v1/internal/tus-hook`
-4. **Backend** validates, moves file to `./uploads/{voice,media,files}/`, creates DB record
-5. **Celery Tasks**:
-   - `process_image_and_publish_task`: Generates thumbnails, updates dimensions
-   - `process_video_and_publish_task`: FFmpeg transcoding to H.264/AAC
-   - `process_video_note_and_publish_task`: Fixes WebM container duration
-6. **WebSocket**: Publishes `message_created` event to chat participants
+1. **Клиент** (tus-js-client) инициирует загрузку → `POST :1080/files/`
+2. **TUSD** сохраняет чанки в `./uploads/tus/`
+3. **Хук** (`post-finish`) → бэкенд получает метаданные через `/api/v1/internal/tus-hook`
+4. **Бэкенд** валидирует, перемещает файл в `./uploads/{voice,media,files}/`, создаёт запись в БД
+5. **Задачи Celery**:
+   - `process_image_and_publish_task`: генерирует миниатюры, обновляет размеры
+   - `process_video_and_publish_task`: транскодирование FFmpeg в H.264/AAC
+   - `process_video_note_and_publish_task`: исправляет длительность контейнера WebM
+6. **WebSocket**: публикует событие `message_created` участникам чата
 
 ---
 
-## 🔌 WebSocket Protocol
+## 🔌 WebSocket-протокол
 
-### Endpoints
+### Эндпоинты
 
-- `/api/v1/ws/chats/{chat_id}` — Chat-specific events (messages, typing)
-- `/api/v1/ws/status` — Global user status (online/offline), presence tracking
+- `/api/v1/ws/chats/{chat_id}` — события конкретного чата (сообщения, набор текста)
+- `/api/v1/ws/status` — глобальный статус пользователя (online/offline), отслеживание присутствия
 
-### Event Schema (JSON)
+### Схема событий (JSON)
 
 ```json
 // Client -> Server
@@ -203,79 +176,79 @@ docker-compose -f docker-compose.prod.yml up -d --build
 
 ---
 
-## 🛣️ Roadmap
+## 🛣️ Дорожная карта
 
-### Phase 1: Core Stabilization ✅
+### Этап 1: Стабилизация ядра ✅
 
-- [x] Repository Pattern & Clean Architecture
-- [x] RBAC for groups (Owner/Admin/Member)
-- [x] TUS resumable uploads
-- [x] PostgreSQL Full-Text Search (Russian/English)
-- [x] FFmpeg media pipeline (Celery)
-- [x] Optimistic UI with pending states
-- [x] Docker Production setup
+- [x] Repository Pattern и чистая архитектура
+- [x] RBAC для групп (Owner/Admin/Member)
+- [x] Возобновляемые загрузки TUS
+- [x] Полнотекстовый поиск PostgreSQL (русский/английский)
+- [x] Медиапайплайн FFmpeg (Celery)
+- [x] Оптимистичный UI с состояниями ожидания
+- [x] Продакшен-настройка Docker
 
-### Phase 2: Mobile Integration (CapacitorJS)
+### Этап 2: Мобильная интеграция (CapacitorJS)
 
-> Priority before WebRTC because calls require native plugins.
+> Приоритет выше WebRTC, потому что звонкам нужны нативные плагины.
 
 11. **Capacitor Core**
-    - [ ] Android Studio / Xcode project generation
+    - [ ] Генерация проекта Android Studio / Xcode
     - [ ] Deep Links (`peddler://chat/123`)
-    - [ ] **Push Notifications (FCM)** — WebSocket dies in background after 30-60s
-      - Firebase Admin SDK integration
-      - `user_id -> [device_tokens]` mapping
-      - Silent Push (data refresh) vs Alert Push
-    - [ ] **SQLite Local Storage** (`capacitor-community/sqlite`)
-      - Offline-first message history
-      - Sync mechanism with backend
+    - [ ] **Push-уведомления (FCM)** — WebSocket отключается в фоне через 30-60 секунд
+      - Интеграция Firebase Admin SDK
+      - Сопоставление `user_id -> [device_tokens]`
+      - Silent Push (обновление данных) vs Alert Push
+    - [ ] **Локальное хранилище SQLite** (`capacitor-community/sqlite`)
+      - Офлайн-история сообщений
+      - Механизм синхронизации с бэкендом
 
-### Phase 3: WebRTC Calls (Complex)
+### Этап 3: WebRTC-звонки (сложный)
 
-5. **1-on-1 Calls (P2P)**
+5. **Звонки один-на-один (P2P)**
 
-   - [ ] Coturn (STUN/TURN) in Docker for NAT traversal
-   - [ ] Signaling via existing WebSocket (SDP offer/answer)
-   - [ ] **Native Call UI (CallKeep)** — iOS CallKit + Android ConnectionService
-     - VoIP Push Notifications (required for waking locked device)
+   - [ ] Coturn (STUN/TURN) в Docker для обхода NAT
+   - [ ] Сигнализация через существующий WebSocket (SDP offer/answer)
+   - [ ] **Нативный UI звонков (CallKeep)** — iOS CallKit + Android ConnectionService
+     - VoIP Push-уведомления (нужны для пробуждения заблокированного устройства)
 
-6. **Group Calls (SFU)**
-   - [ ] **LiveKit** integration (Go-based SFU)
-   - Backend generates access tokens, LiveKit handles media routing
-   - Replaces P2P mesh (which fails at 5+ participants: 20 streams per client)
+6. **Групповые звонки (SFU)**
+   - [ ] Интеграция **LiveKit** (SFU на Go)
+   - Бэкенд генерирует токены доступа, LiveKit обрабатывает маршрутизацию медиа
+   - Заменяет P2P-mesh (который не работает при 5+ участниках: 20 потоков на клиента)
 
-### Phase 4: DevOps & Production
+### Этап 4: DevOps и продакшен
 
-7. **Nginx & SSL**
+7. **Nginx и SSL**
 
-   - [ ] Let's Encrypt/certbot automation
-   - [ ] Brotli compression, static caching
-   - [ ] WebSocket proxy timeout tuning
+   - [ ] Автоматизация Let's Encrypt/certbot
+   - [ ] Сжатие Brotli, кэширование статики
+   - [ ] Настройка таймаутов WebSocket-прокси
 
-8. **Monitoring**
+8. **Мониторинг**
 
-   - [ ] Prometheus (metrics: WS connections, Celery queue depth, API latency)
-   - [ ] Grafana dashboards
-   - [ ] NodeExporter for VPS metrics
+   - [ ] Prometheus (метрики: WS-соединения, глубина очереди Celery, задержка API)
+   - [ ] Дашборды Grafana
+   - [ ] NodeExporter для метрик VPS
 
 9. **CI/CD**
    - [ ] GitLab CI → Docker Hub
-   - [ ] ArgoCD (GitOps) or simple `docker-compose pull && up` for VPS
+   - [ ] ArgoCD (GitOps) или простой `docker-compose pull && up` для VPS
 
 ---
 
-## 🛡️ Security Considerations
+## 🛡️ Вопросы безопасности
 
-- **Passwords**: bcrypt with 72-byte truncation safety
-- **JWT**: HS256, 7-day expiration (configurable)
-- **File Uploads**: MIME-type validation via magic bytes in TUS hooks (not just extension)
-- **SQL Injection**: Protected by SQLAlchemy 2.0 Core with parameterized queries
-- **CORS**: Strict origin validation, credentials enabled for WebSocket auth
-- **Rate Limiting**: WebSocket rate limiter (10 req/sec per user)
+- **Пароли**: bcrypt с защитой от усечения 72 байт
+- **JWT**: HS256, срок действия 7 дней (настраивается)
+- **Загрузка файлов**: проверка MIME-типа по magic bytes в хуках TUS (не только по расширению)
+- **SQL-инъекции**: защита через SQLAlchemy 2.0 Core с параметризованными запросами
+- **CORS**: строгая проверка origin, credentials включены для WebSocket-аутентификации
+- **Rate Limiting**: ограничитель частоты запросов по WebSocket (10 запросов/сек на пользователя)
 
 ---
 
-## 🧪 Testing
+## 🧪 Тестирование
 
 ```bash
 # Backend
@@ -290,7 +263,7 @@ npm run lint
 
 ---
 
-## 📂 Project Structure (Key Files)
+## 📂 Структура проекта (ключевые файлы)
 
 ```
 peddler/
@@ -316,27 +289,27 @@ peddler/
 
 ---
 
-## 🤝 Contributing
+## 🤝 Участие в разработке
 
-1. Fork the project
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request targeting `dev` branch
+1. Форкните проект
+2. Создайте feature-ветку (`git checkout -b feature/amazing-feature`)
+3. Закоммитьте изменения (`git commit -m 'Add amazing feature'`)
+4. Запушьте ветку (`git push origin feature/amazing-feature`)
+5. Откройте Pull Request в ветку `dev`
 
-**Code Style:**
+**Стиль кода:**
 
-- Backend: `ruff format && ruff check --fix` (configured in `pyproject.toml`)
-- Frontend: ESLint + Prettier via Vite
-
----
-
-## 📝 License
-
-MIT License — see [LICENSE](LICENSE) file.
+- Backend: `ruff format && ruff check --fix` (настроено в `pyproject.toml`)
+- Frontend: ESLint + Prettier через Vite
 
 ---
 
-**Made with ❤️ by [Kurmambet](https://github.com/Kurmambet)**
+## 📝 Лицензия
 
-_Peddler is not affiliated with Telegram or any other messaging platform. Built for educational purposes and production experimentation._
+MIT License — см. файл [LICENSE](LICENSE).
+
+---
+
+**Сделано с ❤️ — [Kurmambet](https://github.com/Kurmambet)**
+
+_Peddler не аффилирован с Telegram или любой другой платформой обмена сообщениями. Создан в образовательных целях и для экспериментов с продакшен-решениями._
